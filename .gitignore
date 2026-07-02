@@ -6,3 +6,8 @@ __pycache__/
 
 .streamlit/secrets.toml
 
+.labassistant_history/
+# Local development
+.Rhistory
+.codex/
+graphify-out/
