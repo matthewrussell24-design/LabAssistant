@@ -1,0 +1,19 @@
+sample_id,timepoint,injection_number,peak_name,retention_time_min,area,height,width,tailing_factor,known_or_unknown
+Formulation A,T0,1,parent,5.00,1000,420,0.18,1.10,known
+Formulation A,T0,1,known_impurity_A,6.20,40,22,0.14,1.05,known
+Formulation A,T0,1,unknown_1,7.40,0,0,0.12,1.00,unknown
+Formulation A,T0,2,parent,5.01,990,415,0.18,1.11,known
+Formulation A,T0,2,known_impurity_A,6.21,42,23,0.14,1.06,known
+Formulation A,T0,2,unknown_1,7.41,0,0,0.12,1.00,unknown
+Formulation A,T1,1,parent,5.08,880,365,0.20,1.22,known
+Formulation A,T1,1,known_impurity_A,6.24,95,50,0.15,1.12,known
+Formulation A,T1,1,unknown_1,7.48,20,9,0.15,1.08,unknown
+Formulation A,T1,2,parent,5.09,860,358,0.21,1.25,known
+Formulation A,T1,2,known_impurity_A,6.25,100,52,0.15,1.15,known
+Formulation A,T1,2,unknown_1,7.49,22,10,0.15,1.10,unknown
+Formulation A,T2,1,parent,5.32,650,260,0.27,1.95,known
+Formulation A,T2,1,known_impurity_A,6.30,155,80,0.18,1.25,known
+Formulation A,T2,1,unknown_1,7.62,65,30,0.20,1.40,unknown
+Formulation A,T2,2,parent,5.36,520,210,0.30,2.05,known
+Formulation A,T2,2,known_impurity_A,6.34,120,62,0.19,1.30,known
+Formulation A,T2,2,unknown_1,7.68,50,22,0.21,1.45,unknown

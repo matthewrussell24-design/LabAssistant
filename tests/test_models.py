@@ -1,10 +1,14 @@
 from labassistant.models import (
     AngleSummary,
+    ChromatographyMeasurement,
+    ChromatographyPeak,
     DerivedMetrics,
     DistributionData,
+    MassBalanceAssessment,
     Measurement,
     MeasurementFlag,
     MeasurementMetadata,
+    Observation,
     SummaryMetrics,
 )
 
@@ -100,3 +104,38 @@ def test_measurement_merge_carries_and_fills_angle_summaries():
     forward = base.angle_summaries[0]
     assert forward.z_average == 453.0
     assert forward.primary_peak_nm == 420.2
+
+
+def test_chromatography_models_serialize_to_plain_dicts():
+    peak = ChromatographyPeak(
+        peak_id="parent",
+        name="Parent",
+        role="parent",
+        retention_time_min=5.2,
+        area=1200.0,
+    )
+    measurement = ChromatographyMeasurement(
+        sample_name="Stress T1",
+        technique="HPLC",
+        injection_id="inj-1",
+        peaks=[peak],
+        total_area=1400.0,
+        parent_peak_id="parent",
+    )
+    assessment = MassBalanceAssessment(
+        sample_name="Stress T1",
+        parent_change_percent=-12.5,
+        observations=[
+            Observation(
+                label="Parent peak decreased",
+                category="mass_balance",
+                evidence="Parent area changed by -12.5%.",
+            )
+        ],
+        hypotheses=["Degradation into detected impurities"],
+    )
+
+    assert measurement.to_dict()["peaks"][0]["peak_id"] == "parent"
+    payload = assessment.to_dict()
+    assert payload["observations"][0]["label"] == "Parent peak decreased"
+    assert payload["hypotheses"] == ["Degradation into detected impurities"]

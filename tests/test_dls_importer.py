@@ -77,6 +77,22 @@ def test_summary_stats_table_detection_and_excel_date_formatting():
     assert format_measurement_date(45100) == "2023-06-23 00:00:00"
 
 
+def test_replicate_metrics_preserve_summary_row_order():
+    upload = FakeUpload(
+        "summary.csv",
+        """Index,Sample Name,Measurement Date/Time,Scattering Collection (°),Z-Average (nm),PDI
+1,Lot A,2026-07-01 12:00:00,173,100,0.20
+2,Lot A,2026-07-01 12:01:00,173,104,0.21
+3,Lot A,2026-07-01 12:02:00,173,108,0.22
+""",
+    )
+
+    result = parse_dls_upload(upload)
+
+    assert result.replicate_metrics["Z-Average"] == [100.0, 104.0, 108.0]
+    assert result.replicate_metrics["PDI"] == [0.20, 0.21, 0.22]
+
+
 def test_parse_dls_upload_returns_structured_result_from_csv_upload():
     upload = FakeUpload(
         "sample_a.csv",

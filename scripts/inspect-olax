@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: scripts/inspect-olax <file.olax> [more.olax ...]" >&2
+  exit 2
+fi
+
+for path in "$@"; do
+  .venv/bin/python - "$path" <<'PY'
+import sys
+from labassistant.importers.openlab_olax import parser_report
+
+print(parser_report(sys.argv[1]))
+PY
+  if [ "$#" -gt 1 ]; then
+    echo
+  fi
+done

@@ -11,3 +11,4 @@ __pycache__/
 .Rhistory
 .codex/
 graphify-out/
+.labassistant_memory/

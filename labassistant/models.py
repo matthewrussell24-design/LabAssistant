@@ -90,6 +90,195 @@ class MeasurementFlag:
 
 
 @dataclass
+class Observation:
+    """Normalized scientific finding derived from measurements or analysis."""
+
+    label: str
+    category: str
+    evidence: str
+    sample_name: str | None = None
+    severity: str = "info"
+    confidence: str = "medium"
+    source_type: str = "measurement"
+    source_id: str | None = None
+    recommendation: str | None = None
+
+
+@dataclass
+class ChromatographyPeak:
+    """One chromatographic peak after parsing or manual entry."""
+
+    peak_id: str
+    name: str | None = None
+    role: str = "unknown"  # parent, known_impurity, unknown, standard, recovery_control
+    retention_time_min: float | None = None
+    area: float | None = None
+    area_percent: float | None = None
+    height: float | None = None
+    width_seconds: float | None = None
+    tailing_factor: float | None = None
+    resolution: float | None = None
+    signal_to_noise: float | None = None
+    integration_start_min: float | None = None
+    integration_end_min: float | None = None
+    coelution_suspected: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ChromatographyMeasurement:
+    """Raw chromatographic evidence from one analytical run.
+
+    This is a future-facing model only. It does not parse HPLC/SEC files yet;
+    ingestion adapters should populate it once chromatography support is added.
+    """
+
+    sample_name: str
+    technique: str = "HPLC"
+    method_name: str | None = None
+    injection_id: str | None = None
+    timepoint: str | None = None
+    replicate_id: str | None = None
+    source_files: list[str] = field(default_factory=list)
+    peaks: list[ChromatographyPeak] = field(default_factory=list)
+    total_area: float | None = None
+    parent_peak_id: str | None = None
+    recovery_percent: float | None = None
+    replicate_rsd_percent: float | None = None
+    baseline_status: str | None = None
+    integration_method: str | None = None
+    notes: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class MassBalanceAssessment:
+    """Mass-balance interpretation over chromatographic evidence."""
+
+    sample_name: str
+    parent_change_percent: float | None = None
+    parent_area_percent: float | None = None
+    total_area_change_percent: float | None = None
+    known_impurity_change_percent: float | None = None
+    known_impurity_area_percent: float | None = None
+    unknown_area_percent: float | None = None
+    missing_area_change_percent: float | None = None
+    retention_time_shift_min: float | None = None
+    recovery_percent: float | None = None
+    replicate_rsd_percent: float | None = None
+    total_area_conserved: bool | None = None
+    observations: list[Observation] = field(default_factory=list)
+    hypotheses: list[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class Experiment:
+    """Instrument-agnostic container for one analytical experiment.
+
+    An ``Experiment`` is the top-level unit LabAssistant reasons about. It holds
+    whatever raw evidence an importer produced (DLS ``Measurement`` objects, HPLC
+    ``ChromatographyMeasurement`` objects, future SEC/UV/ELISA records) alongside
+    the normalized ``Observation`` stream. The intelligence layer (Investigator,
+    mass-balance reasoning) consumes ``observations`` and never touches raw files,
+    so a new instrument only needs an importer that fills this object.
+
+    ``measurements`` is deliberately untyped (``Any``) so the same container works
+    for every technique. ``instrument`` and ``technique`` describe provenance;
+    ``metadata`` carries importer-specific context (sequence name, operator,
+    archive entry counts, unsupported sections, etc.).
+    """
+
+    experiment_id: str
+    label: str
+    instrument: str | None = None
+    technique: str | None = None
+    source_path: str | None = None
+    created_at: str | None = None
+    measurements: list[Any] = field(default_factory=list)
+    observations: list[Observation] = field(default_factory=list)
+    unsupported_sections: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def add_observation(self, observation: Observation) -> None:
+        self.observations.append(observation)
+
+    def observations_by_category(self) -> dict[str, list[Observation]]:
+        grouped: dict[str, list[Observation]] = {}
+        for observation in self.observations:
+            grouped.setdefault(observation.category, []).append(observation)
+        return grouped
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "experiment_id": self.experiment_id,
+            "label": self.label,
+            "instrument": self.instrument,
+            "technique": self.technique,
+            "source_path": self.source_path,
+            "created_at": self.created_at,
+            "measurements": [
+                measurement.to_dict() if hasattr(measurement, "to_dict") else measurement
+                for measurement in self.measurements
+            ],
+            "observations": [asdict(observation) for observation in self.observations],
+            "unsupported_sections": list(self.unsupported_sections),
+            "metadata": self.metadata,
+        }
+
+
+@dataclass
+class InvestigatorFinding:
+    """One question/answer pair produced by the Scientific Investigator."""
+
+    question: str
+    answer: str
+    details: list[str] = field(default_factory=list)
+
+
+@dataclass
+class InvestigatorReport:
+    """Deterministic reasoning output over an Experiment's Observations.
+
+    The Investigator consumes Observations only. It never reads raw files or
+    Measurements, which keeps the reasoning layer instrument-agnostic: any
+    importer that emits Observations can be interpreted by the same engine.
+    """
+
+    experiment_id: str
+    what_happened: str
+    is_complete: bool
+    is_interpretable: bool
+    completeness_gaps: list[str] = field(default_factory=list)
+    interpretation_blockers: list[str] = field(default_factory=list)
+    confidence_improvers: list[str] = field(default_factory=list)
+    highlights: list[str] = field(default_factory=list)
+    findings: list[InvestigatorFinding] = field(default_factory=list)
+    observation_counts: dict[str, int] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "experiment_id": self.experiment_id,
+            "what_happened": self.what_happened,
+            "is_complete": self.is_complete,
+            "is_interpretable": self.is_interpretable,
+            "completeness_gaps": list(self.completeness_gaps),
+            "interpretation_blockers": list(self.interpretation_blockers),
+            "confidence_improvers": list(self.confidence_improvers),
+            "highlights": list(self.highlights),
+            "findings": [asdict(finding) for finding in self.findings],
+            "observation_counts": dict(self.observation_counts),
+        }
+
+
+@dataclass
 class Measurement:
     metadata: MeasurementMetadata
     summary_metrics: SummaryMetrics = field(default_factory=SummaryMetrics)

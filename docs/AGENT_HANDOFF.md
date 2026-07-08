@@ -5,11 +5,22 @@ next best move changes.
 
 ## Current Objective
 
+LabAssistant's strategic direction has broadened: it is an Experiment
+Intelligence Platform that transforms laboratory data into scientific insight
+across the lifecycle of a scientific experiment, not a DLS analyzer or primarily
+a Zetasizer/DLS dashboard. The current Zetasizer/DLS workflow is the first
+supported use case and must remain stable while the backend moves toward
+experiment-first ingestion, metrics, reasoning, reporting, and memory.
+
+Experiments are first-class objects. Measurements are building blocks. The
+reasoning engine should compare observations across instruments and over time.
+Reports should describe experiments, not datasets.
+
 Phases 3, 4, and 5 all have working implementations validated against the real
-Orchestra exports, and dual-angle protein aggregation detection is now a headline
-scientific feature (see "Dual-Angle Aggregation Detection" below). The roadmap's
-core phases are complete; the next objective is to polish real-file edge cases
-(other software versions, single-angle runs, volume/number distributions).
+Orchestra exports, and dual-angle protein aggregation detection is now the first
+deep instrument-specific scientific interpretation feature. The next objective
+is to preserve that workflow while introducing compatibility-first package
+boundaries for the broader platform architecture.
 
 Recently completed across the phases:
 
@@ -38,15 +49,34 @@ model, `build_metrics_table`, and `build_angle_table`.
 - Imported samples are cached in `st.session_state` by uploaded-file batch
   signature. This prevents Streamlit widget reruns, such as changing the
   reference sample, from dropping back to the import button.
-- `README.md` gives setup instructions and a short project overview.
-- `LabAssistant_Vision_and_Roadmap.md` contains the product vision and phased
-  roadmap.
-- `docs/ARCHITECTURE.md` describes the intended module structure and extraction
-  path.
+- `README.md` frames LabAssistant as a laboratory intelligence platform and
+  summarizes current DLS capabilities.
+- `docs/VISION.md` is the canonical product vision.
+- `docs/ROADMAP.md` is the canonical incremental platform roadmap.
+- `docs/ARCHITECTURE.md` describes the intended instrument-agnostic module
+  boundaries and migration guardrails.
+- `LabAssistant_Vision_and_Roadmap.md` is now a compatibility pointer to the
+  split docs.
 
 ## Next Best Move
 
-Two lanes are currently open:
+The safest next move is a compatibility-first refactor that introduces
+experiment-centered boundaries without breaking the current Zetasizer workflow:
+
+1. Add a first-class `Experiment` model/envelope around the existing
+   `Measurement` list and history record payloads.
+2. Add `labassistant/ingestion/zetasizer.py` as a facade over the existing DLS
+   importer and multi-file import flow.
+3. Add `labassistant/reasoning/experiment_brief.py` as a facade over the current
+   decision brief logic in `interpretation.py`.
+4. Add `labassistant/reasoning/reproducibility.py` for pure percent-RSD/outlier
+   helpers currently living in `trend_analysis.py`, keeping old imports working.
+5. Add `labassistant/particle_size_metrics.py` behind the existing
+   `labassistant/metrics.py` compatibility module; later convert to
+   `metrics/particle_size.py` when callers are ready.
+6. Add compatibility tests proving old and new import paths both work.
+
+After that, two lanes remain open:
 
 ### Phase 3 Lane
 
@@ -341,8 +371,8 @@ AN140527. Do not treat it as a minor metric.
 
 ## Working Rules for Agents
 
-- Read `README.md`, `LabAssistant_Vision_and_Roadmap.md`, this file, and
-  `docs/ARCHITECTURE.md` before making architectural changes.
+- Read `docs/VISION.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, this file,
+  and `README.md` before making architectural changes.
 - Check `git status --short` before editing. Preserve user or previous-agent
   changes.
 - Keep changes scoped to the current milestone.

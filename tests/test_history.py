@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from labassistant.history import (
     compare_experiments,
     compare_to_history,

@@ -1,241 +1,179 @@
 # LabAssistant
 
-LabAssistant is a Streamlit application moving from DLS file viewing toward a
-laboratory intelligence platform. The core product question is:
+LabAssistant is an Experiment Intelligence Platform that transforms laboratory
+data into scientific insight across the lifecycle of a scientific experiment.
 
-> Which sample deserves attention, and why?
+The current working product supports a Zetasizer/DLS workflow, but that workflow
+is the first use case rather than the final product. The long-term platform goal
+is:
 
-The current app focuses on DLS uploads, but the architecture should stay flexible
-enough to support HPLC, UV-Vis, SEC, ELISA, microscopy, report generation, and
-AI summaries over time.
+```text
+Define or upload an experiment -> LabAssistant gathers observations from every
+available measurement, explains what happened, whether the result is
+trustworthy, why it matters, and what to do next.
+```
 
-## Dual-Angle Aggregation Detection (headline feature)
+Every experiment should answer four questions:
+
+1. What happened?
+2. Is it real/trustworthy?
+3. Why does it matter?
+4. What should the scientist do next?
+
+The intelligence layer is the product. Instruments are plugins. Experiments are
+first-class objects. Measurements are building blocks.
+
+## Current Supported Use Case
+
+LabAssistant currently focuses on DLS/Zetasizer uploads from Malvern Orchestra
+exports:
+
+- Upload multiple CSV or Excel files at once.
+- Preview automatically grouped lots before import.
+- Merge summary/statistics exports, intensity size distributions, and
+  correlogram files into one `Measurement` per lot.
+- Calculate LabAssistant-derived scientific metrics.
+- Detect dual-angle aggregation signals.
+- Summarize quality, reproducibility, drift, and historical similarity.
+- Start the dashboard with an Experiment Brief instead of raw charts.
+
+The Zetasizer workflow should remain stable while the backend moves toward
+experiment-first ingestion, metrics, reasoning, memory, and reporting.
+
+## Product Direction
+
+LabAssistant should eventually support multiple analytical techniques:
+
+- DLS / Zetasizer
+- HPLC
+- SEC
+- UV-Vis
+- ELISA
+- DSC
+- Rheology
+- Stability studies
+- Other laboratory instrument outputs
+
+Instrument-specific logic belongs in ingestion/parsing modules. Scientific
+reasoning should be general and reusable across instruments, conditions,
+batches, formulations, and time.
+
+Reports should describe experiments, not datasets. Instrument exports and
+measurements are supporting evidence inside an experiment-level narrative.
+
+The current DLS concepts should evolve into broader platform concepts:
+
+| Current DLS feature | Platform concept |
+| --- | --- |
+| Aggregation detection | Particle quality assessment |
+| Percent RSD | Reproducibility analysis |
+| Drift detection | Trend analysis |
+| Outlier detection | Quality control |
+| Dual-angle comparison | Multi-detector comparison |
+| Decision Brief | Experiment Brief |
+| Zetasizer importer | One supported ingestion adapter |
+
+## Current DLS Capabilities
+
+### Dual-Angle Aggregation Detection
 
 LabAssistant implements Malvern Panalytical's dual-angle protein-aggregation
-method (application notes AN101104 and AN140527). Forward scatter (~12.8°) is far
-more sensitive to a small number of large species than backscatter (~173°), so a
-gap between the two angles is an early aggregation signal:
+method (application notes AN101104 and AN140527). Forward scatter (~12.8 deg) is
+more sensitive to a small number of large species than backscatter (~173 deg), so
+a gap between the two angles can be an early aggregation signal:
 
-> Aggregation Index = Z-average(forward) / Z-average(backscatter) − 1
+```text
+Aggregation Index = Z-average(forward) / Z-average(backscatter) - 1
+```
 
-An index near 0 means the angles agree (no aggregate signature); the reference
-baseline is ~0.05 for a stable sample rising to ~0.1 at the onset of aggregation.
-The feature (`labassistant/aggregation.py`, `assess_dual_angle_aggregation`) uses:
+The index is treated as a screening signal, not proof of aggregation. The
+assessment checks index magnitude, forward/backscatter Z-average separation,
+intensity distribution evidence, correlogram confidence, and replicate
+consistency before recommending review, repeat, or orthogonal confirmation.
 
-- summary data for the per-angle Z-average values that define the index,
-- intensity distribution data to check the forward angle for aggregate peaks or a
-  large-particle tail,
-- correlogram baseline noise to rate measurement confidence.
+### Multi-File Import Workflow
 
-The index is never treated as proof of aggregation. Each measurement gets a
-**corroboration checklist** (`DualAngleAggregation.checks`) across five evidence
-areas — index magnitude, forward vs backscatter Z-average, forward distribution
-evidence (large-particle tail, secondary peak, peak shift), correlogram
-confidence (baseline noise, decay quality), and replicate consistency across the
-two angles — each marked supports / neutral / insufficient. The corroboration
-score and measurement confidence drive an **interpretation category**:
-
-- Low signal (index < 0.05)
-- Watch (0.05–0.10)
-- Elevated (0.10–0.30)
-- Strong signal, corroborated (index ≥ 0.30 with confident, independently
-  supported evidence)
-- Strong signal, repeat recommended (strong index but thin evidence/confidence)
-
-Language stays deliberately non-definitive: "Strong dual-angle aggregation
-signal", "Forward-angle large-species enrichment", "Requires corroboration", and
-"Recommend review / repeat / orthogonal confirmation".
-
-The dashboard shows this prominently at the top: an Aggregation Index card per
-lot with its category and corroboration score, a forward-vs-backscatter
-Z-average comparison, an Aggregation Index chart with the watch/elevated lines, a
-paired intensity distribution overlay by angle, the corroboration checklist with
-supports/neutral/insufficient marks, and the recommendation. Elevated samples are
-flagged for review.
-
-## Current Dashboard
-
-The dashboard is being redesigned around fast scientific decision-making:
-
-- Upload multiple DLS CSV or Excel files at once
-- Preview automatically grouped lots before importing
-- Merge summary/statistics exports, intensity size distributions, and
-  correlogram files into one `Measurement` per lot
-- Start with a decision brief naming the best sample, sample needing attention,
-  flagged count, and next recommended check
-- Read a short analyst-style AI summary instead of long generic explanations
-- Review compact sample summary cards
-- Compare the primary distribution overlay and key Z-average/PDI metrics first
-- Expand secondary diagnostics only when needed, including peak plots,
-  D10-D90 spread, tail index, signal matrix, scattering-angle coverage, small
-  multiples, correlogram signal quality, raw parsed points, metadata, and
-  original text
-
-## Multi-File Import Workflow
-
-The current importer is intentionally modular and lives in:
+The current importer lives in:
 
 - `labassistant/importers/file_classifier.py`
 - `labassistant/importers/lot_grouper.py`
 - `labassistant/importers/measurement_importer.py`
+- `labassistant/importers/dls.py`
 
-Streamlit uses `st.file_uploader(..., accept_multiple_files=True)` rather than
-folder upload. After files are selected, the app shows this preview table before
-importing:
+Streamlit uses multi-file upload. After files are selected, the app previews:
 
 ```text
 Lot | Summary file | Intensity file | Correlogram file | Status
 ```
 
-Supported classifications:
-
-- summary/statistics export
-- size distribution by intensity
-- correlogram
-- unknown
-
-Project-specific lot normalization is important. These all group together:
-
-```text
-446-01, Lot 446-01, Lyo 446-01, Lot 1 -> lot_1 / display "Lot 1"
-446-02, Lot 446-02, Lyo 446-02, Lot 2 -> lot_2 / display "Lot 2"
-446-03, Lot 446-03, Lyo 446-03, Lot 3 -> lot_3 / display "Lot 3"
-```
-
 For each detected lot, `measurement_importer.py` creates one merged
 `Measurement`:
 
-- summary/statistics data supplies Z-average, PDI, count rate, and metadata
-- intensity distribution data supplies graph curves, replicate distributions,
-  peaks, D10/D50/D90, tail area, and distribution width
-- correlogram data supplies replicate correlation pairs and signal/noise quality
+- Summary/statistics data supplies Z-average, PDI, count rate, per-angle
+  summaries, and metadata.
+- Intensity distribution data supplies curves, replicate distributions, peaks,
+  D10/D50/D90, tail area, and distribution width.
+- Correlogram data supplies replicate correlation pairs and signal/noise
+  quality.
 
 Do not generate graph or derived distribution metrics from summary-only data
 when distribution files are available.
 
-## LabAssistant-Derived Metrics
+### LabAssistant-Derived Metrics
 
-Beyond the instrument's own numbers, `labassistant/metrics.py` computes its own
-scientific metrics on the intensity distribution (all pure and unit-documented):
+`labassistant/metrics.py` computes pure scientific metrics from distributions:
 
-- `count_peaks` — number of resolved size modes.
-- `calculate_peak_width` — primary-peak full-width-at-half-maximum, reported as a
-  geometric span ratio (upper/lower diameter) because DLS is log-normal.
-- `calculate_peak_symmetry` — right/left half-width ratio; > 1 means the peak
-  tails toward larger particles (an early aggregation cue).
-- `calculate_log_skewness` — intensity-weighted skewness of log10(diameter);
-  0 is a clean log-normal, positive means a large-particle tail.
-- `assess_aggregation_risk` — Low / Moderate / High from combined evidence (tail
-  index, secondary-peak size, PDI, skew, width).
-- `calculate_quality_score` — 0-100 heuristic screening score for how clean a
-  measurement looks.
+- `count_peaks`
+- `calculate_peak_width`
+- `calculate_peak_symmetry`
+- `calculate_log_skewness`
+- `assess_aggregation_risk`
+- `calculate_quality_score`
 
-`correlogram_noise_score` measures per-replicate baseline scatter (points that
-have decayed below 10% of the intercept), averaged across replicates — a real
-noise signal, not the spread of the whole decay curve.
+`labassistant/trend_analysis.py` holds reusable series analysis for
+reproducibility, drift, change points, and outliers. This module is one of the
+first signs of the future instrument-agnostic reasoning layer.
 
-## Dual-Angle Measurements
+## Future Memory Layer
 
-Orchestra exports are dual-angle runs (forward 12.78° + back 174.7°), which
-report different apparent sizes at each angle. Blending them hides real
-structure, so each `Measurement` also carries `angle_summaries`: one
-`AngleSummary` per angle with its count, mean Z-average, mean PDI, max Z, and a
-representative primary peak / D50 from the intensity replicates classified to
-that angle. Per-angle averaged curves are stored under
-`distributions["angle_forward"]` / `["angle_back"]`, and
-`view_models.build_angle_table` returns a per-lot/per-angle table for display.
+LabAssistant should eventually remember prior experiments and compare new data
+against historical results:
 
-Angle assignment is size-based, not positional: the summary measurement table is
-grouped by its reported scattering angle (robust when runs are not cleanly
-alternating), and each intensity replicate is matched to the angle whose mean
-Z-average is nearest in log space. `count` (measurements) and `replicate_count`
-(classified intensity curves) can legitimately differ when the intensity export
-contains only a subset of the runs.
+- Have we seen this pattern before?
+- Which experiments are most similar?
+- Did similar patterns later fail stability testing?
+- Are there long-term trends across batches or formulations?
+- Which variables correlate with better outcomes?
 
-These are exposed on `Measurement.derived_metrics` and in the metrics table via
-`build_metrics_table`, so the dashboard and interpretation layers can use them.
+The current local history implementation is intentionally small:
 
-Validation: the importer and metric engine are covered against trimmed copies of
-real Orchestra Zetasizer exports (lot 446-01) in `tests/fixtures/` via
-`tests/test_real_fixtures.py`.
+- Store uploaded experiments with `history.save_experiment`.
+- Compare new uploads to previous runs with `history.compare_to_history`.
+- Track Z-average and PDI trends with `history.trend_table`.
+- Search saved experiments with `history.find_similar_samples`.
 
-Streamlit reruns the script whenever chart controls change. Imported samples are
-therefore cached in `st.session_state` using the current uploaded-file batch
-signature. Keep the preview/import button as the explicit gate, but keep all
-post-import controls, such as reference sample and Delta/Overlay view, reading
-from cached imported samples so they do not force the user to import again.
+The long-term memory layer should compare observations across instruments and
+over time, not only compare one uploaded dataset to another.
 
-## Product Direction
+## Documentation Map
 
-Near-term improvements should help users answer this in under 30 seconds:
+Start here when changing product or architecture direction:
 
-> Are these samples okay, and which one should I care about?
-
-History features let LabAssistant remember previous experiments:
-
-- Store uploaded experiments (`history.save_experiment`, local JSONL)
-- Compare new uploads to previous runs (`history.compare_experiments` /
-  `compare_to_history`: per-sample Z-average and PDI drift with drift flags,
-  shown in the Experiment History panel as "Change vs last saved experiment")
-- Track Z-average and PDI over time (`history.trend_table` + trend charts)
-- Flag trends and drift (drift thresholds: Z-average ±20%, PDI ±0.10)
-- Search past experiments / identify similar samples
-  (`history.find_similar_samples`: ranks saved samples by a unit-aware distance —
-  log10 ratio for size features, absolute difference for PDI — surfaced in the
-  Experiment History panel as "Find similar past runs")
-
-## Project Workflow
-
-Current phase: Phase 3 derived-metric engine and dual-angle handling are done and
-validated against real Orchestra exports; Phase 4 dashboard now includes the
-per-angle breakdown; Phase 5 history includes storage, trends, and experiment
-comparison.
-
-- [x] Build the baseline Streamlit CSV upload app
-- [x] Expand the app into a DLS comparison dashboard
-- [x] Add a decision brief and shorter analyst-style summary
-- [x] Move secondary charts into expandable diagnostic sections
-- [x] Smoke test the empty dashboard state
-- [x] Validate parser behavior with representative distribution and replicate-summary data
-- [x] Build the first `Measurement` data model
-- [x] Convert current parsed samples into `Measurement` objects
-- [x] Extract derived metric calculations into reusable backend modules
-- [x] Extract DLS table parsing and column inference helpers into importers
-- [x] Move DLS upload parsing workflow behind a backend importer result
-- [x] Move importer-result to `Measurement` conversion into backend modules
-- [x] Extract decision brief and interpretation logic into backend modules
-- [x] Add multi-file import preview for summary/intensity/correlogram files
-- [x] Normalize project lot names so `446-01` and `Lot 1` merge correctly
-- [x] Merge grouped files into one `Measurement` per lot
-- [x] Use intensity data for distribution-derived metrics and correlogram data
-  for signal-quality diagnostics
-- [x] Start Phase 4 dashboard redesign with a decision-first layout, sidebar
-      import workflow, health strip, and prioritized primary review surface
-- [x] Add local Measurement-backed experiment history storage
-- [x] Add saved-experiment summary and Z-average/PDI trend views
-- [x] Add LabAssistant-derived shape metrics (peak count/width/symmetry,
-      skewness, aggregation risk, quality score) with real correlogram baseline noise
-- [x] Validate the importer and metrics against real Orchestra Zetasizer exports
-      (lots 446-01/02/03) and lock in trimmed fixtures + regression tests
-- [x] Capture dual scattering angle (forward 12.78° / back 174.7°) and
-      measurement datetime from the Orchestra summary workbook
-- [x] Group intensity replicates by angle into per-angle curves and metrics
-- [x] Render the per-angle view in the dashboard (Scattering Angle Breakdown:
-      per-angle table plus forward/back Z-average and primary-peak charts)
-- [x] Expand history into experiment comparison (Z-average/PDI drift vs the last
-      saved run, with drift flags)
-- [x] Add similar-run search across saved experiments (rank past samples by
-      unit-aware distance to a chosen current sample)
-- [x] Add dual-angle protein aggregation detection (Aggregation Index) as a
-      headline scientific interpretation feature with a prominent dashboard panel
-- [ ] Polish parser and dashboard edge cases found during real-file validation
+1. `docs/VISION.md` - product vision and platform principles.
+2. `docs/ROADMAP.md` - incremental roadmap from DLS workflow to lab
+   intelligence platform.
+3. `docs/ARCHITECTURE.md` - target module boundaries and current migration
+   guidance.
+4. `docs/AGENT_HANDOFF.md` - current implementation state and next best moves.
+5. `LabAssistant_Vision_and_Roadmap.md` - legacy compatibility pointer to the
+   newer split docs.
 
 ## Local Setup
 
 Create and activate a virtual environment:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -248,56 +186,80 @@ pip install -r requirements.txt
 Run the app:
 
 ```bash
-streamlit run app.py
+scripts/run
 ```
 
-If `streamlit` is not on your shell path, run it through Python:
+Or run it through the activated virtual environment:
 
 ```bash
-python3 -m streamlit run app.py
+python -m streamlit run app.py
 ```
 
 Run tests:
 
 ```bash
-python3 -m pytest -q
+scripts/test -q
 ```
 
 ## Project Structure
 
+Current structure:
+
 ```text
 LabAssistant/
-  app.py                           # Current Streamlit app and analysis logic
-  requirements.txt                 # Python dependencies
-  README.md                        # Setup notes and project overview
-  LabAssistant_Vision_and_Roadmap.md # Product vision and phased roadmap
+  app.py
+  requirements.txt
+  README.md
+  LabAssistant_Vision_and_Roadmap.md
   labassistant/
-    importers/file_classifier.py    # Classifies uploads by export role
-    importers/lot_grouper.py         # Normalizes lot keys and builds preview rows
-    importers/measurement_importer.py # Multi-file preview and Measurement merge
-    importers/dls.py                # DLS table parsing and column inference
-    aggregation.py                  # Dual-angle protein aggregation detection
-    history.py                      # Local experiment history persistence
-    interpretation.py               # Decision brief and analyst summaries
-    measurements.py                 # Importer result to Measurement conversion
-    metrics.py                      # Pure derived metric calculations
-    models.py                      # Measurement dataclasses
-    quality.py                     # Warning thresholds and statuses
-    view_models.py                  # Dashboard-compatible sample view models
-  tests/                           # Model and adapter tests
+    aggregation.py
+    history.py
+    interpretation.py
+    measurements.py
+    metrics.py
+    models.py
+    quality.py
+    trend_analysis.py
+    view_models.py
+    importers/
+      dls.py
+      file_classifier.py
+      lot_grouper.py
+      measurement_importer.py
+  tests/
   docs/
-    AGENT_HANDOFF.md               # Current state and next move for agents
-    ARCHITECTURE.md                # Intended backend architecture
+    AGENT_HANDOFF.md
+    ARCHITECTURE.md
+    ROADMAP.md
+    VISION.md
 ```
 
-## Agent Handoff
+Preferred long-term direction:
 
-Future agents should start with:
+```text
+labassistant/
+  ingestion/
+    zetasizer.py
+    hplc.py
+    sec.py
+    uvvis.py
+  metrics/
+    particle_size.py
+    chromatography.py
+    spectroscopy.py
+  reasoning/
+    trend_analysis.py
+    anomaly_detection.py
+    reproducibility.py
+    quality_assessment.py
+    experiment_brief.py
+    hypothesis_engine.py
+  reports/
+    export.py
+  models/
+    experiment.py
+    measurement.py
+```
 
-1. `docs/AGENT_HANDOFF.md`
-2. `LabAssistant_Vision_and_Roadmap.md`
-3. `docs/ARCHITECTURE.md`
-
-The next best move is to validate the DLS importer against real CSV/XLS/XLSX
-exports, especially real Orchestra summary workbooks plus matching intensity and
-correlogram exports. Add fixture-based regression tests for any edge cases found.
+Do not force that full split in one rewrite. Move one stable backend boundary at
+a time and keep the current Zetasizer workflow covered by tests.

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import html
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+from uuid import uuid4
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -19,6 +23,14 @@ from labassistant.interpretation import (
     review_evidence,
 )
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
+from labassistant.importers.chromatography import (
+    assess_chromatography_mass_balance,
+    chromatography_observations,
+    parse_chromatography_csv,
+    peak_area_trend_table,
+    total_area_trend_table,
+)
+from labassistant.importers.openlab_olax import build_experiment_from_olax
 from labassistant.history import (
     compare_experiments,
     find_similar_samples,
@@ -30,6 +42,19 @@ from labassistant.history import (
 )
 from labassistant.metrics import (
     find_local_peaks,
+)
+from labassistant.chromatography import mass_balance_hypotheses
+from labassistant.context_engine import ContextRetriever, KnowledgeStore, ResearchJournal
+from labassistant.models import Experiment
+from labassistant.observations import (
+    build_experiment_brief_from_observations,
+    observation_table,
+    observations_from_samples,
+)
+from labassistant.trend_analysis import (
+    build_data_story,
+    control_chart_table,
+    replicate_statistics_table,
 )
 from labassistant.quality import (
     REVIEW_WARNINGS,
@@ -45,6 +70,13 @@ from labassistant.view_models import (
     sample_from_measurement,
     sample_status,
 )
+
+
+CHROMATOGRAPHY_FIXTURE_PATH = Path("sample_data/chromatography/mass_balance_demo.csv")
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def render_metric_row(label: str, value: str) -> str:
@@ -128,6 +160,28 @@ def render_ai_summary(samples: list[ParsedSample], metrics: pd.DataFrame) -> Non
             )
 
 
+def render_data_story(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
+    story = build_data_story(samples, metrics)
+
+    st.subheader("Data Story")
+    st.caption("Trend-aware summary of stability, variability, and signals worth checking first.")
+
+    story_columns = st.columns(3)
+    for column, (title, items) in zip(story_columns, story.items()):
+        with column:
+            st.markdown(
+                f"""
+                <div class="summary-card">
+                    <div class="summary-title">{html.escape(title)}</div>
+                    <ul>
+                        {''.join(f'<li>{html.escape(item)}</li>' for item in items)}
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
 def render_decision_brief(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
     decision = build_decision_brief(samples, metrics)
     attention = decision["attention"]
@@ -171,16 +225,493 @@ def render_decision_brief(samples: list[ParsedSample], metrics: pd.DataFrame) ->
         st.dataframe(display[["Sample", "Status", "Attention Score", "Reason", "Warnings"]], use_container_width=True, hide_index=True)
 
 
+def render_experiment_brief(samples: list[ParsedSample]) -> None:
+    observations = observations_from_samples(samples)
+    brief = build_experiment_brief_from_observations(observations, sample_count=len(samples))
+
+    st.subheader("Experiment Brief")
+    st.caption("Generated from normalized observations derived from the current DLS measurements.")
+
+    columns = st.columns(4)
+    for column, (question, answers) in zip(columns, brief.items()):
+        with column:
+            st.markdown(
+                f"""
+                <div class="summary-card">
+                    <div class="summary-title">{html.escape(question)}</div>
+                    <ul>
+                        {''.join(f'<li>{html.escape(answer)}</li>' for answer in answers)}
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with st.expander("Observations", expanded=any(observation.severity in {"review", "watch"} for observation in observations)):
+        table = observation_table(observations)
+        if table.empty:
+            st.info("No observations generated yet.")
+        else:
+            display_columns = ["sample_name", "label", "category", "severity", "confidence", "evidence", "recommendation"]
+            display = table[[column for column in display_columns if column in table.columns]].rename(
+                columns={
+                    "sample_name": "Sample",
+                    "label": "Observation",
+                    "category": "Category",
+                    "severity": "Severity",
+                    "confidence": "Confidence",
+                    "evidence": "Evidence",
+                    "recommendation": "Recommended Next Check",
+                }
+            )
+            st.dataframe(display, use_container_width=True, hide_index=True)
+
+
+def dls_experiment_from_samples(
+    samples: list[ParsedSample],
+    *,
+    label: str = "",
+    source_files: list[str] | None = None,
+) -> Experiment:
+    observations = observations_from_samples(samples)
+    experiment_label = label.strip() or "DLS experiment"
+    metadata = {
+        "sample_count": len(samples),
+        "source_files": list(source_files or []),
+    }
+    return Experiment(
+        experiment_id=uuid4().hex,
+        label=experiment_label,
+        instrument="DLS",
+        technique="DLS",
+        source_path=None,
+        created_at=_utc_now(),
+        measurements=[sample.measurement for sample in samples],
+        observations=observations,
+        metadata=metadata,
+    )
+
+
+def chromatography_experiment_from_preview(
+    preview: dict,
+    *,
+    label: str = "",
+    source_name: str | None = None,
+) -> Experiment:
+    if "openlab_experiment" in preview:
+        experiment = preview["openlab_experiment"]
+        if label.strip():
+            experiment.label = label.strip()
+        if source_name:
+            experiment.source_path = source_name
+            experiment.metadata["source_name"] = source_name
+        return experiment
+
+    observations = list(preview.get("observations") or [])
+    hypotheses = list(preview.get("hypotheses") or [])
+    assessment = preview.get("assessment")
+    experiment_label = label.strip() or "Chromatography experiment"
+    unsupported_sections = []
+    if not any(observation.label == "Peak table available" for observation in observations):
+        unsupported_sections.append("Chromatography CSV import does not include raw detector signal traces.")
+    return Experiment(
+        experiment_id=uuid4().hex,
+        label=experiment_label,
+        instrument="Chromatography",
+        technique="HPLC",
+        source_path=source_name,
+        created_at=_utc_now(),
+        measurements=list(preview.get("measurements") or []),
+        observations=observations,
+        unsupported_sections=unsupported_sections,
+        metadata={
+            "source_name": source_name,
+            "hypotheses": hypotheses,
+            "assessment": assessment.to_dict() if hasattr(assessment, "to_dict") else {},
+        },
+    )
+
+
+def save_experiment_to_memory(
+    experiment: Experiment,
+    *,
+    human_note: str = "",
+    project_id: str | None = None,
+    tags: list[str] | None = None,
+) -> None:
+    store = KnowledgeStore()
+    store.add_experiment(experiment, project_id=project_id, tags=tags or [])
+    for hypothesis in experiment.metadata.get("hypotheses", []):
+        store.add_hypothesis(
+            str(hypothesis),
+            experiment_id=experiment.experiment_id,
+            project_id=project_id,
+            instrument_id=experiment.instrument,
+            tags=[experiment.technique or "", "hypothesis"],
+        )
+    for recommendation in experiment.metadata.get("recommendations", []):
+        store.add_recommendation(
+            str(recommendation),
+            experiment_id=experiment.experiment_id,
+            project_id=project_id,
+            instrument_id=experiment.instrument,
+            tags=[experiment.technique or "", "recommendation"],
+        )
+    if human_note.strip():
+        store.add_note(
+            human_note.strip(),
+            title=f"Note: {experiment.label}",
+            experiment_id=experiment.experiment_id,
+            project_id=project_id,
+            instrument_id=experiment.instrument,
+            tags=[experiment.technique or "", "human_note"],
+        )
+
+
+def _packet_items_table(items) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "Title": item.title,
+                "Layer": item.layer,
+                "Type": item.entity_type,
+                "Confidence": item.confidence,
+                "Text": item.text,
+            }
+            for item in items
+        ]
+    )
+
+
+def render_context_packet(packet) -> None:
+    st.markdown(f"**Confidence:** {packet.confidence}")
+    if packet.caveats:
+        for caveat in packet.caveats:
+            st.caption(caveat)
+
+    sections = [
+        ("Relevant experiments", packet.relevant_experiments),
+        ("Relevant observations", packet.relevant_observations),
+        ("Supporting evidence", packet.supporting_evidence),
+        ("Related notes", packet.related_notes),
+        ("Source files", packet.source_files),
+    ]
+    for title, items in sections:
+        st.markdown(f"**{title}**")
+        table = _packet_items_table(items)
+        if table.empty:
+            st.caption("No matching items.")
+        else:
+            st.dataframe(table, use_container_width=True, hide_index=True)
+
+    if packet.hypotheses:
+        st.markdown("**Hypotheses**")
+        for item in packet.hypotheses:
+            st.markdown(f"- {item.text}")
+    if packet.recommendations:
+        st.markdown("**Recommendations**")
+        for item in packet.recommendations:
+            st.markdown(f"- {item.text}")
+    if packet.missing_information:
+        st.markdown("**Missing information**")
+        for item in packet.missing_information:
+            st.warning(item)
+
+
+def render_memory_panel(
+    *,
+    dls_experiment: Experiment | None = None,
+    chromatography_experiment: Experiment | None = None,
+) -> None:
+    available = []
+    if dls_experiment is not None:
+        available.append(("DLS", dls_experiment))
+    if chromatography_experiment is not None:
+        available.append(("Chromatography", chromatography_experiment))
+
+    with st.expander("LabAssistant Memory", expanded=False):
+        st.caption("Save selected outputs to local memory, then retrieve compact context. No LLM or chat is used.")
+        if available:
+            labels = [label for label, _ in available]
+            selected_label = st.selectbox("Experiment to save", labels, key="memory_experiment_choice")
+            selected_experiment = next(experiment for label, experiment in available if label == selected_label)
+            memory_label = st.text_input(
+                "Memory label",
+                value=selected_experiment.label,
+                key="memory_label",
+            )
+            project_id = st.text_input("Project tag", value="", key="memory_project")
+            human_note = st.text_area("Human notes", value="", key="memory_human_note")
+            if st.button("Save to LabAssistant Memory", use_container_width=True):
+                selected_experiment.label = memory_label.strip() or selected_experiment.label
+                save_experiment_to_memory(
+                    selected_experiment,
+                    human_note=human_note,
+                    project_id=project_id.strip() or None,
+                    tags=[selected_label, selected_experiment.technique or ""],
+                )
+                st.success(f"Saved {selected_experiment.label} to local LabAssistant Memory.")
+        else:
+            st.info("Import DLS or chromatography data before saving to memory.")
+
+        st.divider()
+        st.markdown("**Ask memory / Retrieve context**")
+        question = st.text_input("Keyword question", value="", key="memory_question")
+        if st.button("Retrieve context", use_container_width=True):
+            if question.strip():
+                packet = ContextRetriever(KnowledgeStore()).retrieve(question)
+                st.session_state["memory_context_packet"] = packet
+            else:
+                st.warning("Enter a keyword question before retrieving context.")
+        packet = st.session_state.get("memory_context_packet")
+        if packet is not None:
+            render_context_packet(packet)
+
+
+def _journal_entries_table(entries) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "Date/time": entry.created_at,
+                "Experiment": entry.title,
+                "Instrument": entry.instrument,
+                "Tags": ", ".join(entry.tags),
+                "Samples": ", ".join(entry.samples),
+                "Observations": "\n".join(entry.key_observations[:4]),
+                "Hypotheses": "\n".join(entry.hypotheses[:3]),
+                "Recommendations": "\n".join(entry.recommendations[:3]),
+                "Source files": ", ".join(entry.source_files),
+                "Notes": "\n".join(entry.notes[:3]),
+            }
+            for entry in entries
+        ]
+    )
+
+
+def render_research_journal_panel() -> None:
+    with st.expander("Research Journal", expanded=False):
+        st.caption("A local journal view over saved experiments and manual notes. No LLM generation is used.")
+        store = KnowledgeStore()
+        journal = ResearchJournal(store)
+
+        st.markdown("**Standalone journal note**")
+        note_cols = st.columns([1, 1, 1])
+        note_title = note_cols[0].text_input("Note title", value="", key="journal_note_title")
+        note_tags = note_cols[1].text_input("Tags", value="", key="journal_note_tags", help="Comma-separated")
+        note_instrument = note_cols[2].text_input("Instrument", value="", key="journal_note_instrument")
+        note_text = st.text_area("Note text", value="", key="journal_note_text")
+        if st.button("Add journal note", use_container_width=True):
+            if note_text.strip():
+                store.add_note(
+                    note_text.strip(),
+                    title=note_title.strip() or "Research note",
+                    instrument_id=note_instrument.strip() or None,
+                    tags=[tag.strip() for tag in note_tags.split(",") if tag.strip()],
+                )
+                st.success("Journal note added.")
+            else:
+                st.warning("Write a note before adding it to the journal.")
+
+        st.divider()
+        st.markdown("**Search / filter**")
+        filter_cols = st.columns(4)
+        keyword = filter_cols[0].text_input("Keyword", value="", key="journal_filter_keyword")
+        tag = filter_cols[1].text_input("Tag", value="", key="journal_filter_tag")
+        instrument = filter_cols[2].text_input("Instrument", value="", key="journal_filter_instrument")
+        sample = filter_cols[3].text_input("Sample", value="", key="journal_filter_sample")
+
+        entries = journal.entries(keyword=keyword, tag=tag, instrument=instrument, sample=sample)
+        if not entries:
+            st.info("No research journal entries matched the current filters.")
+        else:
+            st.dataframe(_journal_entries_table(entries), use_container_width=True, hide_index=True)
+
+        markdown = journal.export_markdown(keyword=keyword, tag=tag, instrument=instrument, sample=sample)
+        st.download_button(
+            "Export journal to Markdown",
+            data=markdown,
+            file_name="labassistant_research_journal.md",
+            mime="text/markdown",
+            use_container_width=True,
+        )
+
+
 def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
-    render_decision_brief(samples, metrics)
+    render_experiment_brief(samples)
     render_health_strip(samples, metrics)
+    render_decision_brief(samples, metrics)
+    render_data_story(samples, metrics)
 
     finding_col, review_col = st.columns([1.45, 1])
     with finding_col:
-        render_ai_summary(samples, metrics)
+        render_control_charts(samples, metrics)
     with review_col:
         st.subheader("Samples To Inspect")
         render_aggregation_review(samples)
+
+
+def load_chromatography_preview(source) -> dict:
+    source_name = getattr(source, "name", None) or str(source)
+    if source_name.lower().endswith(".olax"):
+        return load_openlab_olax_preview(source, source_name=source_name)
+
+    measurements = parse_chromatography_csv(source)
+    assessment = assess_chromatography_mass_balance(measurements)
+    observations = chromatography_observations(measurements, assessment)
+    hypotheses = mass_balance_hypotheses(observations)
+    return {
+        "measurements": measurements,
+        "assessment": assessment,
+        "observations": observations,
+        "hypotheses": hypotheses,
+        "source_name": source_name,
+        "peak_area_trend": peak_area_trend_table(measurements),
+        "total_area_trend": total_area_trend_table(measurements),
+    }
+
+
+def load_openlab_olax_preview(source, *, source_name: str) -> dict:
+    if isinstance(source, (str, Path)):
+        experiment = build_experiment_from_olax(source, label=Path(source_name).name)
+    else:
+        source.seek(0)
+        data = source.read()
+        with tempfile.NamedTemporaryFile(suffix=".olax") as temporary:
+            temporary.write(data)
+            temporary.flush()
+            experiment = build_experiment_from_olax(temporary.name, label=Path(source_name).name)
+    experiment.source_path = source_name
+    experiment.metadata["source_name"] = source_name
+    return {
+        "openlab_experiment": experiment,
+        "measurements": experiment.measurements,
+        "observations": experiment.observations,
+        "hypotheses": [],
+        "source_name": source_name,
+    }
+
+
+def render_chromatography_preview(preview: dict) -> None:
+    if "openlab_experiment" in preview:
+        render_openlab_preview(preview["openlab_experiment"])
+        return
+
+    assessment = preview["assessment"]
+    observations = preview["observations"]
+    hypotheses = preview["hypotheses"]
+
+    st.subheader("Chromatography / Mass Balance Preview")
+    st.caption("Proof of concept: simple CSV to chromatography measurements, observations, and mass-balance hypotheses.")
+
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Parent Area", format_metric(assessment.parent_area_percent, "%"))
+    metric_cols[1].metric("Known Impurity", format_metric(assessment.known_impurity_area_percent, "%"))
+    metric_cols[2].metric("Unknown Area", format_metric(assessment.unknown_area_percent, "%"))
+    metric_cols[3].metric("Total Area Change", format_metric(assessment.total_area_change_percent, "%"))
+    metric_cols[4].metric("Replicate RSD", format_metric(assessment.replicate_rsd_percent, "%"))
+
+    trend_cols = st.columns([1.3, 1])
+    with trend_cols[0]:
+        st.markdown("**Peak area trend**")
+        peak_trend = preview["peak_area_trend"].copy()
+        for column in peak_trend.columns:
+            if column != "Timepoint":
+                peak_trend[column] = pd.to_numeric(peak_trend[column], errors="coerce").round(2)
+        st.dataframe(peak_trend, use_container_width=True, hide_index=True)
+    with trend_cols[1]:
+        st.markdown("**Total area trend**")
+        total_trend = preview["total_area_trend"].copy()
+        for column in ["Total Area", "Change vs Start %"]:
+            total_trend[column] = pd.to_numeric(total_trend[column], errors="coerce").round(2)
+        st.dataframe(total_trend, use_container_width=True, hide_index=True)
+
+    obs_cols = st.columns([1.4, 1])
+    with obs_cols[0]:
+        st.markdown("**Generated observations**")
+        table = observation_table(observations)
+        if table.empty:
+            st.info("No chromatography observations generated.")
+        else:
+            display_columns = ["sample_name", "label", "category", "severity", "evidence", "recommendation"]
+            display = table[[column for column in display_columns if column in table.columns]].rename(
+                columns={
+                    "sample_name": "Sample",
+                    "label": "Observation",
+                    "category": "Category",
+                    "severity": "Severity",
+                    "evidence": "Evidence",
+                    "recommendation": "Recommended Next Check",
+                }
+            )
+            st.dataframe(display, use_container_width=True, hide_index=True)
+    with obs_cols[1]:
+        st.markdown("**Possible hypotheses**")
+        if hypotheses:
+            for hypothesis in hypotheses:
+                st.markdown(f"- {hypothesis}")
+        else:
+            st.info("No mass-balance hypotheses generated.")
+
+
+def render_openlab_preview(experiment: Experiment) -> None:
+    observations = list(experiment.observations)
+    metadata = experiment.metadata
+
+    st.subheader("OpenLab (.olax) Preview")
+    st.caption("Agilent OpenLab archive import: sequence, injections, detector packages, methods, and structured observations.")
+
+    metric_cols = st.columns(5)
+    metric_cols[0].metric("Injections", len(experiment.measurements))
+    metric_cols[1].metric("Detector files", len(metadata.get("detector_files", [])))
+    metric_cols[2].metric("Peak tables", len(metadata.get("peak_table_files", [])))
+    metric_cols[3].metric("Methods", len(metadata.get("acquisition_method_files", [])))
+    metric_cols[4].metric("Audit files", len(metadata.get("audit_files", [])))
+
+    rows = []
+    for measurement in experiment.measurements:
+        rows.append(
+            {
+                "Injection": measurement.injection_id,
+                "Sample": measurement.sample_name,
+                "Method": measurement.method_name,
+                "Signal files": len(measurement.metadata.get("openlab_signal_files", [])),
+                "Peaks parsed": len(measurement.peaks),
+                "Raw data file": measurement.metadata.get("raw_data_file"),
+                "Acquired": measurement.metadata.get("measurement_datetime"),
+            }
+        )
+    st.markdown("**Injections**")
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    obs_cols = st.columns([1.35, 1])
+    with obs_cols[0]:
+        st.markdown("**Generated observations**")
+        table = observation_table(observations)
+        if table.empty:
+            st.info("No OpenLab observations generated.")
+        else:
+            display_columns = ["sample_name", "label", "category", "severity", "confidence", "evidence", "recommendation"]
+            display = table[[column for column in display_columns if column in table.columns]].rename(
+                columns={
+                    "sample_name": "Sample",
+                    "label": "Observation",
+                    "category": "Category",
+                    "severity": "Severity",
+                    "confidence": "Confidence",
+                    "evidence": "Evidence",
+                    "recommendation": "Recommended Next Check",
+                }
+            )
+            st.dataframe(display, use_container_width=True, hide_index=True)
+    with obs_cols[1]:
+        st.markdown("**Unsupported / missing**")
+        if experiment.unsupported_sections:
+            for section in experiment.unsupported_sections:
+                st.warning(section)
+        else:
+            st.caption("No unsupported sections reported.")
+        if not metadata.get("peak_table_files"):
+            st.caption("No peak/result table was detected, so quantitative peak interpretation is limited.")
 
 
 def add_page_style() -> None:
@@ -813,6 +1344,46 @@ def render_correlogram_quality_chart(samples: list[ParsedSample]) -> None:
     st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
 
 
+def render_control_charts(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
+    chart_data = control_chart_table(samples, metrics)
+    st.subheader("Control Chart Signals")
+    if chart_data.empty:
+        st.info("At least two parsed values are needed to calculate warning and action limits.")
+        return
+
+    metric_options = chart_data["Metric"].drop_duplicates().tolist()
+    selected_metric = st.selectbox("Metric", metric_options, key="control_chart_metric")
+    working = chart_data[chart_data["Metric"] == selected_metric]
+    colors = working["Zone"].map({"In control": "#047857", "Warning": "#b45309", "Action": "#b91c1c"}).fillna("#2563eb")
+
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter(
+            x=working["Sample"],
+            y=working["Value"],
+            mode="lines+markers",
+            marker={"size": 11, "color": colors},
+            line={"color": "#64748b", "width": 1.8},
+            text=working["Zone"],
+            hovertemplate="<b>%{x}</b><br>Value: %{y:.3g}<br>%{text}<extra></extra>",
+        )
+    )
+    first = working.iloc[0]
+    figure.add_hline(y=first["Mean"], line_color="#0f172a", line_width=1, annotation_text="mean")
+    figure.add_hline(y=first["Warning High"], line_dash="dot", line_color="#b45309", annotation_text="+2 SD")
+    figure.add_hline(y=first["Warning Low"], line_dash="dot", line_color="#b45309", annotation_text="-2 SD")
+    figure.add_hline(y=first["Action High"], line_dash="dash", line_color="#b91c1c", annotation_text="+3 SD")
+    figure.add_hline(y=first["Action Low"], line_dash="dash", line_color="#b91c1c", annotation_text="-3 SD")
+    figure.update_layout(
+        template="plotly_white",
+        height=330,
+        margin={"l": 52, "r": 24, "t": 36, "b": 62},
+        xaxis={"title": "Imported order"},
+        yaxis={"title": selected_metric, "gridcolor": "#e8eef5"},
+    )
+    st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
+
+
 def render_aggregation_review(samples: list[ParsedSample]) -> None:
     flagged = [sample for sample in samples if sample_status(sample) != STATUS_NORMAL]
 
@@ -1315,17 +1886,48 @@ def main() -> None:
     add_page_style()
 
     st.title("LabAssistant")
-    st.caption("DLS batch comparison and aggregation review")
+    st.caption("Experiment intelligence platform: DLS review plus chromatography/mass-balance proof of concept")
 
     with st.sidebar:
         st.header("Data")
         uploaded_files = st.file_uploader("Upload DLS files", type=["csv", "xlsx", "xls"], accept_multiple_files=True)
+        st.divider()
+        st.header("Chromatography Preview")
+        chromatography_file = st.file_uploader("Upload chromatography CSV or OpenLab .olax", type=["csv", "olax"], accept_multiple_files=False)
+        load_fixture = st.button("Load sample chromatography fixture", use_container_width=True)
+
+    chromatography_preview = None
+    chromatography_error = None
+    if chromatography_file is not None:
+        try:
+            chromatography_preview = load_chromatography_preview(chromatography_file)
+        except Exception as exc:  # pragma: no cover - surfaced in Streamlit
+            chromatography_error = str(exc)
+    elif load_fixture:
+        try:
+            chromatography_preview = load_chromatography_preview(CHROMATOGRAPHY_FIXTURE_PATH)
+        except Exception as exc:  # pragma: no cover - surfaced in Streamlit
+            chromatography_error = str(exc)
 
     if not uploaded_files:
         st.session_state.pop("imported_upload_signature", None)
         st.session_state.pop("imported_samples", None)
         st.session_state.pop("import_errors", None)
         render_empty_state()
+        if chromatography_error:
+            st.error(f"Chromatography preview failed: {chromatography_error}")
+        if chromatography_preview is not None:
+            render_chromatography_preview(chromatography_preview)
+            render_memory_panel(
+                chromatography_experiment=chromatography_experiment_from_preview(
+                    chromatography_preview,
+                    label="Chromatography preview",
+                    source_name=chromatography_preview.get("source_name"),
+                )
+            )
+        else:
+            render_memory_panel()
+        render_research_journal_panel()
         return
 
     upload_signature = upload_batch_signature(uploaded_files)
@@ -1379,12 +1981,36 @@ def main() -> None:
         st.caption("Report export is coming soon.")
 
     metrics = build_metrics_table(samples)
+    source_file_names = [uploaded_file.name for uploaded_file in uploaded_files]
+    dls_memory_experiment = dls_experiment_from_samples(
+        samples,
+        label=history_label or "DLS experiment",
+        source_files=source_file_names,
+    )
+    chromatography_memory_experiment = (
+        chromatography_experiment_from_preview(
+            chromatography_preview,
+            label="Chromatography preview",
+            source_name=chromatography_preview.get("source_name"),
+        )
+        if chromatography_preview is not None
+        else None
+    )
 
     render_decision_workbench(samples, metrics)
+    if chromatography_error:
+        st.error(f"Chromatography preview failed: {chromatography_error}")
+    if chromatography_preview is not None:
+        render_chromatography_preview(chromatography_preview)
     render_data_completeness(preview.groups)
     render_aggregation_detection(samples)
     render_import_details(preview, import_errors)
     render_history_panel(samples)
+    render_memory_panel(
+        dls_experiment=dls_memory_experiment,
+        chromatography_experiment=chromatography_memory_experiment,
+    )
+    render_research_journal_panel()
 
     render_primary_visualization(samples, distribution_mode, normalize, show_peaks)
 
@@ -1405,6 +2031,15 @@ def main() -> None:
         render_angle_breakdown(samples)
 
         render_data_analysis(samples, metrics)
+        render_ai_summary(samples, metrics)
+
+        replicate_stats = replicate_statistics_table(samples)
+        if not replicate_stats.empty:
+            st.subheader("Replicate Trend Statistics")
+            display = replicate_stats.copy()
+            for column in ["Mean", "SD", "%RSD"]:
+                display[column] = pd.to_numeric(display[column], errors="coerce").round(3)
+            st.dataframe(display, use_container_width=True, hide_index=True)
 
         comparison_cols = st.columns(2)
         with comparison_cols[0]:

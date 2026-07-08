@@ -34,6 +34,7 @@ class ParsedDLSResult:
     warnings: list[str]
     source_text: str
     angle_summaries: list[dict] = field(default_factory=list)
+    replicate_metrics: dict[str, list[float]] = field(default_factory=dict)
 
 
 def read_uploaded_text(uploaded_file) -> str:
@@ -422,6 +423,18 @@ def count_column_values(data: pd.DataFrame, column: str | None) -> int | None:
     return int(pd.to_numeric(data[column], errors="coerce").dropna().count())
 
 
+def replicate_metric_values(data: pd.DataFrame, columns: dict[str, str | None]) -> dict[str, list[float]]:
+    """Numeric replicate values in source order for columns parsed from summary exports."""
+    replicates = {}
+    for metric, column in columns.items():
+        if not column or column not in data:
+            continue
+        values = pd.to_numeric(data[column], errors="coerce").dropna()
+        if len(values) >= 2:
+            replicates[metric] = [float(value) for value in values.tolist()]
+    return replicates
+
+
 def choose_distribution_section(sections: list[dict]) -> pd.DataFrame:
     dataframes = [section_to_dataframe(section) for section in sections]
 
@@ -668,6 +681,13 @@ def parse_dls_upload(uploaded_file) -> ParsedDLSResult:
     measurement_count = count_column_values(data, z_average_column or pdi_column)
     max_pdi = extract_summary_stat(data, [r"\bpdi\b", r"poly.*dispers"], ["maximum"]) if has_summary_stats else max_column_value(data, pdi_column)
     max_z_average = extract_summary_stat(data, [r"\bz[-\s]?average\b", r"\bz[-\s]?avg\b"], ["maximum"]) if has_summary_stats else max_column_value(data, z_average_column)
+    replicate_metrics = replicate_metric_values(
+        data,
+        {
+            "Z-Average": z_average_column,
+            "PDI": pdi_column,
+        },
+    ) if has_repeated_measurements else {}
     scattering_angles = []
     if scattering_angle_column:
         scattering_angles = sorted(pd.to_numeric(data[scattering_angle_column], errors="coerce").dropna().unique().tolist())
@@ -747,4 +767,5 @@ def parse_dls_upload(uploaded_file) -> ParsedDLSResult:
         warnings=warnings,
         source_text=source_text,
         angle_summaries=angle_summaries,
+        replicate_metrics=replicate_metrics,
     )

@@ -167,6 +167,7 @@ def measurement_from_dls_result(result: ParsedDLSResult) -> Measurement:
         provenance={
             "data_type": result.metrics.get("Data Type"),
             "preferred_distribution": result.metrics.get("Preferred Distribution"),
+            "replicate_metrics": result.replicate_metrics,
             "source_text_preview": result.source_text[:1000],
         },
     )
