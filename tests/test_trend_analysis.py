@@ -1,11 +1,15 @@
 import pandas as pd
 
-from labassistant.models import Measurement, MeasurementMetadata, SummaryMetrics
+from labassistant.models import AngleSummary, Measurement, MeasurementMetadata, SummaryMetrics
 from labassistant.trend_analysis import (
     analyze_series,
     build_data_story,
+    build_forward_scatter_trend_analysis,
     control_chart_table,
+    forward_angle_summary,
+    pearson_correlation,
     replicate_statistics_table,
+    relationship_strength,
 )
 from labassistant.view_models import ParsedSample, build_metrics_table
 
@@ -82,6 +86,15 @@ def make_sample(name: str, z_average: float, pdi: float, replicate_z: list[float
     )
 
 
+def make_forward_sample(name: str, forward_z: float | None, forward_pdi: float | None) -> ParsedSample:
+    sample = make_sample(name, z_average=forward_z or 100, pdi=forward_pdi or 0.2, replicate_z=[100, 101, 102])
+    sample.measurement.angle_summaries = [
+        AngleSummary(label="Back 173°", angle_degrees=173.0, position="back", z_average=250.0, pdi=0.30),
+        AngleSummary(label="Forward 12.8°", angle_degrees=12.8, position="forward", z_average=forward_z, pdi=forward_pdi),
+    ]
+    return sample
+
+
 def test_data_story_and_tables_surface_replicate_variability():
     samples = [
         make_sample("A", 100, 0.20, [99, 100, 101]),
@@ -99,3 +112,71 @@ def test_data_story_and_tables_surface_replicate_variability():
     assert replicate_table.loc[replicate_table["Sample"] == "B", "%RSD"].iloc[0] > 5
     assert not chart_table.empty
     assert {"Warning Low", "Warning High", "Action Low", "Action High"}.issubset(chart_table.columns)
+
+
+def test_forward_scatter_trend_uses_explicit_sample_time_mapping():
+    samples = [
+        make_forward_sample("Sample A", 100.0, 0.20),
+        make_forward_sample("Sample B", 160.0, 0.30),
+        make_forward_sample("Sample C", 220.0, 0.40),
+    ]
+
+    analysis = build_forward_scatter_trend_analysis(samples, {"Sample A": 10, "Sample B": 20, "Sample C": 30})
+
+    assert [point.sample for point in analysis.points] == ["Sample A", "Sample B", "Sample C"]
+    assert analysis.z_average.valid_count == 3
+    assert analysis.z_average.pearson_r is not None
+    assert round(analysis.z_average.pearson_r, 2) == 1.0
+    assert analysis.z_average.relationship == "strong"
+    assert analysis.pdi.relationship == "strong"
+    assert "correlation only" in analysis.z_average.message
+
+
+def test_forward_scatter_trend_requires_three_distinct_circulation_times():
+    samples = [
+        make_forward_sample("Sample A", 100.0, 0.20),
+        make_forward_sample("Sample B", 150.0, 0.30),
+        make_forward_sample("Sample C", 220.0, 0.45),
+    ]
+
+    analysis = build_forward_scatter_trend_analysis(samples, {"Sample A": 10, "Sample B": 10, "Sample C": 20})
+
+    assert analysis.z_average.pearson_r is None
+    assert "3 distinct circulation times" in analysis.z_average.message
+
+
+def test_forward_scatter_trend_ignores_samples_without_entered_time():
+    samples = [
+        make_forward_sample("Sample A", 100.0, 0.20),
+        make_forward_sample("Sample B", 150.0, 0.30),
+        make_forward_sample("Sample C", 220.0, 0.45),
+    ]
+
+    analysis = build_forward_scatter_trend_analysis(samples, {"Sample A": 10, "Sample B": 20})
+
+    assert [point.sample for point in analysis.points] == ["Sample A", "Sample B"]
+    assert analysis.z_average.pearson_r is None
+    assert "At least 3 valid samples" in analysis.z_average.message
+
+
+def test_forward_angle_summary_falls_back_to_low_angle_metadata():
+    measurement = Measurement(
+        metadata=MeasurementMetadata(sample_name="fallback"),
+        summary_metrics=SummaryMetrics(z_average=100.0, pdi=0.2),
+        angle_summaries=[
+            AngleSummary(label="Back 173°", angle_degrees=173.0, z_average=260.0),
+            AngleSummary(label="Forward 12°", angle_degrees=12.0, z_average=120.0),
+        ],
+    )
+
+    summary = forward_angle_summary(measurement)
+
+    assert summary is not None
+    assert summary.label == "Forward 12°"
+
+
+def test_pearson_and_relationship_strength_helpers_are_restrained():
+    assert round(pearson_correlation([1, 2, 3], [1, 3, 5]), 2) == 1.0
+    assert relationship_strength(0.1) == "weak"
+    assert relationship_strength(0.5) == "moderate"
+    assert relationship_strength(-0.9) == "strong"

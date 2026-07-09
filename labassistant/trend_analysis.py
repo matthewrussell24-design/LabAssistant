@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from labassistant.interpretation import format_metric
-from labassistant.models import Measurement
+from labassistant.models import AngleSummary, Measurement
 from labassistant.view_models import ParsedSample
 
 
@@ -49,6 +49,33 @@ class SeriesAnalysis:
         return self.drift == "stable" and not self.outlier_indices and self.change_point_index is None
 
 
+@dataclass
+class ForwardScatterPoint:
+    sample: str
+    circulation_time: float
+    forward_z_average: float | None
+    forward_pdi: float | None
+
+
+@dataclass
+class RelationshipAnalysis:
+    metric: str
+    unit: str
+    points: list[ForwardScatterPoint]
+    valid_count: int
+    distinct_circulation_times: int
+    pearson_r: float | None = None
+    relationship: str | None = None
+    message: str = ""
+
+
+@dataclass
+class ForwardScatterTrendAnalysis:
+    points: list[ForwardScatterPoint]
+    z_average: RelationshipAnalysis
+    pdi: RelationshipAnalysis
+
+
 def analyze_series(metric: str, values: list[float | int | None], unit: str = "", labels: list[str] | None = None) -> SeriesAnalysis:
     clean_values = [float(value) for value in values if value is not None and not pd.isna(value)]
     analysis = SeriesAnalysis(metric=metric, values=clean_values, unit=unit, labels=labels or [])
@@ -75,6 +102,113 @@ def analyze_series(metric: str, values: list[float | int | None], unit: str = ""
         analysis.drift = "stable" if not analysis.outlier_indices else "outlier"
 
     return analysis
+
+
+def forward_angle_summary(measurement: Measurement) -> AngleSummary | None:
+    """Return the forward-angle summary already parsed from DLS evidence."""
+    positioned = [summary for summary in measurement.angle_summaries if summary.position == "forward"]
+    if positioned:
+        return positioned[0]
+
+    angled = [
+        summary
+        for summary in measurement.angle_summaries
+        if summary.angle_degrees is not None and summary.angle_degrees < 90
+    ]
+    if angled:
+        return sorted(angled, key=lambda summary: summary.angle_degrees or 0)[0]
+    return None
+
+
+def build_forward_scatter_trend_analysis(
+    samples: list[ParsedSample],
+    circulation_times: dict[str, float | int | None],
+) -> ForwardScatterTrendAnalysis:
+    points: list[ForwardScatterPoint] = []
+    for sample in samples:
+        circulation_time = circulation_times.get(sample.name)
+        if circulation_time is None or pd.isna(circulation_time):
+            continue
+        summary = forward_angle_summary(sample.measurement)
+        points.append(
+            ForwardScatterPoint(
+                sample=sample.name,
+                circulation_time=float(circulation_time),
+                forward_z_average=summary.z_average if summary else None,
+                forward_pdi=summary.pdi if summary else None,
+            )
+        )
+
+    return ForwardScatterTrendAnalysis(
+        points=points,
+        z_average=analyze_relationship("Forward Z-Average", "nm", points, "forward_z_average"),
+        pdi=analyze_relationship("Forward PDI", "", points, "forward_pdi"),
+    )
+
+
+def analyze_relationship(
+    metric: str,
+    unit: str,
+    points: list[ForwardScatterPoint],
+    value_attribute: str,
+) -> RelationshipAnalysis:
+    valid_points = [
+        point
+        for point in points
+        if getattr(point, value_attribute) is not None and not pd.isna(getattr(point, value_attribute))
+    ]
+    distinct_times = len({point.circulation_time for point in valid_points})
+    analysis = RelationshipAnalysis(
+        metric=metric,
+        unit=unit,
+        points=valid_points,
+        valid_count=len(valid_points),
+        distinct_circulation_times=distinct_times,
+    )
+
+    if len(valid_points) < 3:
+        analysis.message = f"At least 3 valid samples are needed to estimate correlation for {metric}."
+        return analysis
+    if distinct_times < 3:
+        analysis.message = "At least 3 distinct circulation times are needed; repeated or missing times would make the statistic misleading."
+        return analysis
+
+    x_values = [point.circulation_time for point in valid_points]
+    y_values = [float(getattr(point, value_attribute)) for point in valid_points]
+    if len(set(y_values)) < 2:
+        analysis.message = f"{metric} does not vary across the valid samples, so Pearson correlation is not informative."
+        return analysis
+
+    analysis.pearson_r = pearson_correlation(x_values, y_values)
+    analysis.relationship = relationship_strength(analysis.pearson_r)
+    analysis.message = (
+        f"Pearson r = {analysis.pearson_r:.2f}, a {analysis.relationship} relationship in this dataset. "
+        "This is correlation only, not evidence of causation."
+    )
+    return analysis
+
+
+def pearson_correlation(x_values: list[float], y_values: list[float]) -> float:
+    if len(x_values) != len(y_values) or len(x_values) < 2:
+        raise ValueError("Pearson correlation requires paired vectors of equal length.")
+
+    x = pd.Series(x_values, dtype=float)
+    y = pd.Series(y_values, dtype=float)
+    x_centered = x - x.mean()
+    y_centered = y - y.mean()
+    denominator = math.sqrt(float((x_centered**2).sum()) * float((y_centered**2).sum()))
+    if math.isclose(denominator, 0.0):
+        raise ValueError("Pearson correlation requires variation in both variables.")
+    return float((x_centered * y_centered).sum() / denominator)
+
+
+def relationship_strength(correlation: float) -> str:
+    magnitude = abs(correlation)
+    if magnitude < 0.3:
+        return "weak"
+    if magnitude < 0.7:
+        return "moderate"
+    return "strong"
 
 
 def regression_trend(values: list[float]) -> tuple[float, float]:

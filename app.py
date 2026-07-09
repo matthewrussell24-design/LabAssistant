@@ -52,7 +52,10 @@ from labassistant.observations import (
     observations_from_samples,
 )
 from labassistant.trend_analysis import (
+    ForwardScatterPoint,
+    RelationshipAnalysis,
     build_data_story,
+    build_forward_scatter_trend_analysis,
     control_chart_table,
     replicate_statistics_table,
 )
@@ -1689,8 +1692,146 @@ AGGREGATION_CATEGORY_COLORS = {
 CHECK_ICONS = {"supports": "✅", "neutral": "➖", "insufficient": "❔"}
 
 
+def render_forward_scatter_trend_explorer(samples: list[ParsedSample]) -> None:
+    st.subheader("Forward-Scatter Trend Explorer")
+    st.caption(
+        "Enter total circulation time explicitly for each imported DLS sample. "
+        "LabAssistant uses the current sample names as mapping keys and does not infer experimental variables from lot numbers or import order."
+    )
+
+    input_columns = st.columns(min(3, len(samples)))
+    circulation_times: dict[str, float] = {}
+    invalid_time_samples: list[str] = []
+    for index, sample in enumerate(samples):
+        with input_columns[index % len(input_columns)]:
+            raw_value = st.text_input(
+                sample.name,
+                key=f"circulation_time::{sample.name}",
+                placeholder="e.g. 45",
+                help="Total circulation time for this sample. Leave blank if it was not measured.",
+            )
+        parsed_value = parse_optional_float(raw_value)
+        if parsed_value is not None:
+            circulation_times[sample.name] = parsed_value
+        elif str(raw_value).strip():
+            invalid_time_samples.append(sample.name)
+
+    if invalid_time_samples:
+        st.warning("Enter numeric circulation times for: " + ", ".join(invalid_time_samples))
+
+    analysis = build_forward_scatter_trend_analysis(samples, circulation_times)
+    if not analysis.points:
+        st.info("Enter circulation times for samples with forward-angle summaries to begin direct relationship analysis.")
+        render_filtration_hypothesis_callout()
+        return
+
+    trend_table = pd.DataFrame(
+        {
+            "Sample": [point.sample for point in analysis.points],
+            "Total Circulation Time": [point.circulation_time for point in analysis.points],
+            "Forward Z-Average": [point.forward_z_average for point in analysis.points],
+            "Forward PDI": [point.forward_pdi for point in analysis.points],
+        }
+    )
+    display = trend_table.copy()
+    display["Total Circulation Time"] = pd.to_numeric(display["Total Circulation Time"], errors="coerce").round(3)
+    display["Forward Z-Average"] = pd.to_numeric(display["Forward Z-Average"], errors="coerce").round(1)
+    display["Forward PDI"] = pd.to_numeric(display["Forward PDI"], errors="coerce").round(3)
+    st.dataframe(display, use_container_width=True, hide_index=True)
+
+    chart_columns = st.columns(2)
+    with chart_columns[0]:
+        st.plotly_chart(
+            _forward_scatter_trend_chart(
+                analysis.points,
+                "forward_z_average",
+                "Forward Z-Average vs Total Circulation Time",
+                "Forward Z-Average (nm)",
+            ),
+            use_container_width=True,
+            config={"displaylogo": False},
+        )
+        render_relationship_summary(analysis.z_average)
+    with chart_columns[1]:
+        st.plotly_chart(
+            _forward_scatter_trend_chart(
+                analysis.points,
+                "forward_pdi",
+                "Forward PDI vs Total Circulation Time",
+                "Forward PDI",
+            ),
+            use_container_width=True,
+            config={"displaylogo": False},
+        )
+        render_relationship_summary(analysis.pdi)
+
+    render_filtration_hypothesis_callout()
+
+
+def parse_optional_float(value: str | float | int | None) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _forward_scatter_trend_chart(
+    points: list[ForwardScatterPoint],
+    value_attribute: str,
+    title: str,
+    y_title: str,
+) -> go.Figure:
+    chart_points = [
+        point
+        for point in points
+        if getattr(point, value_attribute) is not None and not pd.isna(getattr(point, value_attribute))
+    ]
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter(
+            x=[point.circulation_time for point in chart_points],
+            y=[getattr(point, value_attribute) for point in chart_points],
+            mode="markers+text",
+            text=[point.sample for point in chart_points],
+            textposition="top center",
+            marker={"size": 11, "color": "#2563eb", "line": {"width": 1, "color": "#1e3a8a"}},
+            hovertemplate="<b>%{text}</b><br>Circulation time: %{x:.3g}<br>%{y:.3g}<extra></extra>",
+        )
+    )
+    figure.update_layout(
+        template="plotly_white",
+        height=340,
+        title=title,
+        margin={"l": 52, "r": 24, "t": 52, "b": 58},
+        xaxis={"title": "Total Circulation Time", "gridcolor": "#e8eef5"},
+        yaxis={"title": y_title, "gridcolor": "#e8eef5"},
+    )
+    return figure
+
+
+def render_relationship_summary(analysis: RelationshipAnalysis) -> None:
+    if analysis.pearson_r is None:
+        st.info(analysis.message)
+    else:
+        st.metric(f"{analysis.metric} correlation", f"r = {analysis.pearson_r:.2f}", analysis.relationship)
+        st.caption(analysis.message)
+
+
+def render_filtration_hypothesis_callout() -> None:
+    st.info(
+        "Working hypothesis: total circulation time may relate to forward-scatter size/PDI, "
+        "and those forward-scatter attributes may relate to filtration difficulty. "
+        "The planned filtration device run is an orthogonal follow-up measurement; it may strengthen or weaken this relationship hypothesis."
+    )
+
+
 def render_aggregation_detection(samples: list[ParsedSample]) -> None:
-    """Prominent dual-angle protein-aggregation detection panel.
+    """Supporting dual-angle comparison panel.
 
     Renders only when at least one sample has a forward + backscatter angle pair.
     """
@@ -1699,14 +1840,17 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
     if not available:
         return
 
-    st.subheader("Dual-Angle Aggregation Detection")
+    st.subheader("Dual-Angle Comparison (Supporting Evidence)")
     st.caption(
         "Forward scatter (~12.8°) is far more sensitive to large species than backscatter "
         "(~173°). Aggregation Index = Z-average(forward) / Z-average(backscatter) − 1. Near 0 "
         "the angles agree; an elevated index points to forward-angle large-species enrichment — a "
-        "screening signal that requires corroboration, not proof of aggregation. The corroboration "
-        "checklist below shows the supporting evidence. Reference baseline (Malvern "
-        "AN101104/AN140527): ~0.05 stable, ~0.1 at aggregation onset."
+        "screening signal that requires corroboration, not proof of aggregation. For this larger-particle "
+        "system, the direct forward-scatter relationship to explicitly entered experiment variables is the "
+        "primary trend analysis; the Aggregation Index does not gate or override it. The Malvern-derived "
+        "Aggregation Index was designed for small-protein aggregation around 1-10 nm, so its published "
+        "reference thresholds may not transfer directly here. Reference baseline (Malvern AN101104/AN140527): "
+        "~0.05 stable, ~0.1 at aggregation onset."
     )
 
     cards = st.columns(len(available))
@@ -1740,7 +1884,7 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
     else:
         st.plotly_chart(paired, use_container_width=True, config={"displaylogo": False})
 
-    st.markdown("**Corroboration checklist** — why the interpretation was assigned")
+    st.markdown("**Corroboration checklist** — supporting evidence for the dual-angle comparison")
     checklist_name = st.selectbox("Sample", [sample.name for sample, _ in available], key="aggregation_checklist_sample")
     _, checklist_assessment = next((sample, assessment) for sample, assessment in available if sample.name == checklist_name)
     color = AGGREGATION_CATEGORY_COLORS.get(checklist_assessment.category, "#7f8c8d")
@@ -1837,7 +1981,7 @@ def render_angle_breakdown(samples: list[ParsedSample]) -> None:
     """Per-angle detail table for dual-angle runs (secondary diagnostic).
 
     The forward vs backscatter comparison and paired overlay live in the
-    Dual-Angle Aggregation Detection panel; this is the full per-angle table with
+    Dual-Angle Comparison panel; this is the full per-angle table with
     counts, replicates, PDI, and per-angle peak/D50. Renders only when a
     dual-angle run is present.
     """
@@ -2004,6 +2148,7 @@ def main() -> None:
     if chromatography_preview is not None:
         render_chromatography_preview(chromatography_preview)
     render_data_completeness(preview.groups)
+    render_forward_scatter_trend_explorer(samples)
     render_aggregation_detection(samples)
     render_import_details(preview, import_errors)
     render_history_panel(samples)

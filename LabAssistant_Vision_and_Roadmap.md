@@ -25,6 +25,29 @@ trustworthy, why it matters, and what to do next.
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
 
+Current scientific direction: LabAssistant should reason from experimentally
+relevant relationships first. For the active DLS work, the primary investigation
+is whether explicitly entered total circulation time relates to forward-angle
+mean Z-average and forward-angle mean PDI. Circulation time must be entered or
+imported as an experimental variable; it should not be inferred from lot number,
+file order, or other incidental metadata.
+
+The next planned orthogonal experiment is filtration testing on the same
+samples. The working hypothesis chain is:
+
+```text
+circulation time -> forward-scatter size/PDI -> filtration difficulty
+```
+
+Filtration is expected to strengthen or weaken the relationship hypothesis
+because it measures sample behavior outside the DLS analysis itself.
+
+The Malvern-derived dual-angle Aggregation Index remains useful supporting
+multi-detector evidence, but it is no longer the headline trend metric for this
+larger-particle system. Its published small-protein aggregation thresholds may
+not transfer directly and should not gate or override direct forward-scatter
+trend analysis.
+
 Every experiment should answer:
 
 1. What happened?
@@ -37,16 +60,13 @@ Every experiment should answer:
 The safest next move is not a rewrite. Keep the working Zetasizer workflow stable
 while introducing compatibility-first experiment-centered boundaries:
 
-1. Add a first-class `Experiment` model/envelope around the current
-   `Measurement` list.
-2. Add an `ingestion/zetasizer.py` facade over the current DLS importer.
-3. Add a `reasoning/experiment_brief.py` facade over the current decision brief
-   logic.
-4. Extract pure reproducibility and anomaly helpers from `trend_analysis.py`
-   behind compatibility imports.
-5. Add a non-conflicting `particle_size_metrics.py` module behind the existing
-   `metrics.py` compatibility module; later convert to `metrics/particle_size.py`
-   when the package split is worth the churn.
-6. Add tests that prove old and new import paths both work.
+1. Preserve the current `Experiment` / `Observation` / `Measurement` structure.
+2. Keep chromatography import, mass-balance reasoning, OpenLab OLAX work,
+   KnowledgeStore/context retrieval, and Research Journal behavior stable.
+3. Keep pure relationship, reproducibility, and anomaly helpers in
+   `trend_analysis.py` or similarly small reusable modules rather than burying
+   scientific logic directly in Streamlit UI code.
+4. Continue adding tests that prove compatibility boundaries and scientific
+   helper behavior.
 
 See `docs/ROADMAP.md` for the full phased plan.

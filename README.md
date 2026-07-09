@@ -33,7 +33,9 @@ exports:
 - Merge summary/statistics exports, intensity size distributions, and
   correlogram files into one `Measurement` per lot.
 - Calculate LabAssistant-derived scientific metrics.
-- Detect dual-angle aggregation signals.
+- Explore forward-angle size/PDI relationships against explicitly entered
+  experiment variables.
+- Use dual-angle Aggregation Index as supporting multi-detector evidence.
 - Summarize quality, reproducibility, drift, and historical similarity.
 - Start the dashboard with an Experiment Brief instead of raw charts.
 
@@ -60,6 +62,11 @@ batches, formulations, and time.
 
 Reports should describe experiments, not datasets. Instrument exports and
 measurements are supporting evidence inside an experiment-level narrative.
+LabAssistant should analyze experimentally relevant relationships directly
+rather than force every interpretation through a predefined literature metric.
+Experiment variables must be explicitly entered or imported from source data;
+they should not be inferred from lot names, file order, or other incidental
+metadata.
 
 The current DLS concepts should evolve into broader platform concepts:
 
@@ -75,7 +82,33 @@ The current DLS concepts should evolve into broader platform concepts:
 
 ## Current DLS Capabilities
 
-### Dual-Angle Aggregation Detection
+### Forward-Scatter Trend Explorer
+
+The current DLS investigation is relationship-first: total circulation time is
+entered explicitly for each imported sample, keyed by the current sample name,
+and LabAssistant extracts the forward-angle summary from
+`Measurement.angle_summaries`. It then analyzes:
+
+- circulation time vs forward-angle mean Z-average
+- circulation time vs forward-angle mean PDI
+
+When at least three valid samples with distinct circulation times are available,
+LabAssistant reports Pearson correlation with restrained relationship language
+such as weak, moderate, or strong. The statistic is presented as correlation,
+not causation or proof. If there are too few observations or no circulation-time
+variation, the app says so instead of producing a misleading statistic.
+
+The planned orthogonal follow-up is to run the same samples on a filtration
+device and test the working hypothesis chain:
+
+```text
+circulation time -> forward-scatter size/PDI -> filtration difficulty
+```
+
+Filtration may strengthen or weaken the relationship hypothesis because it is a
+separate measurement of sample behavior rather than another DLS-derived metric.
+
+### Dual-Angle Comparison as Supporting Evidence
 
 LabAssistant implements Malvern Panalytical's dual-angle protein-aggregation
 method (application notes AN101104 and AN140527). Forward scatter (~12.8 deg) is
@@ -86,10 +119,14 @@ a gap between the two angles can be an early aggregation signal:
 Aggregation Index = Z-average(forward) / Z-average(backscatter) - 1
 ```
 
-The index is treated as a screening signal, not proof of aggregation. The
-assessment checks index magnitude, forward/backscatter Z-average separation,
-intensity distribution evidence, correlogram confidence, and replicate
-consistency before recommending review, repeat, or orthogonal confirmation.
+The index is treated as supporting multi-detector evidence, not the primary
+trend metric for the current larger-particle system and not proof of
+aggregation. The Malvern application note was designed for small-protein
+aggregation around 1-10 nm, so the published reference thresholds may not
+transfer directly. The assessment still checks index magnitude,
+forward/backscatter Z-average separation, intensity distribution evidence,
+correlogram confidence, and replicate consistency, but it does not gate or
+override the direct forward-scatter relationship analysis.
 
 ### Multi-File Import Workflow
 
