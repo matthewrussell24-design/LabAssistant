@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import fields, is_dataclass
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from typing import Any
 
 import pandas as pd
-
-from labassistant.models import FiltrationMeasurement, FiltrationTrace
 
 
 FILTRATION_DIFFICULTY_RUBRIC = {
@@ -29,6 +27,45 @@ PRESSURE_UNIT_LABELS = {
     "bar": "bar",
     "psi": "psi",
 }
+
+
+@dataclass
+class FiltrationTrace:
+    """Generic filtration-device trace without device-specific assumptions."""
+
+    time_values: list[float] = field(default_factory=list)
+    time_unit: str | None = None
+    time_minutes: list[float] = field(default_factory=list)
+    pressure_values: list[float] = field(default_factory=list)
+    pressure_unit: str | None = None
+    pressure_kpa: list[float] = field(default_factory=list)
+    flow_rate_values: list[float] = field(default_factory=list)
+    flow_rate_unit: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class FiltrationMeasurement:
+    """Orthogonal filtration evidence for one sample."""
+
+    sample_name: str
+    technique: str = "Filtration"
+    difficulty_score: float | None = None
+    filtration_time_minutes: float | None = None
+    pressure: float | None = None
+    pressure_unit: str | None = None
+    pressure_kpa: float | None = None
+    filter_type: str | None = None
+    clogging_observed: bool | None = None
+    notes: str | None = None
+    source: str = "manual_entry"
+    source_file: str | None = None
+    warnings: list[str] = field(default_factory=list)
+    trace: FiltrationTrace | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 def normalize_pressure(value: float | int, unit: str) -> float:

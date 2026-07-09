@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from labassistant.interpretation import format_metric
-from labassistant.filtration import filtration_measurement_from_dict
-from labassistant.models import AngleSummary, FiltrationMeasurement, Measurement
+from labassistant.filtration import FiltrationMeasurement, filtration_measurement_from_dict
+from labassistant.models import AngleSummary, Measurement
 from labassistant.view_models import ParsedSample
 
 

@@ -6,8 +6,7 @@ from typing import BinaryIO, TextIO
 
 import pandas as pd
 
-from labassistant.filtration import normalize_pressure, normalize_pressure_unit, validate_difficulty_score
-from labassistant.models import FiltrationMeasurement
+from labassistant.filtration import FiltrationMeasurement, normalize_pressure, normalize_pressure_unit, validate_difficulty_score
 
 
 COLUMN_ALIASES = {

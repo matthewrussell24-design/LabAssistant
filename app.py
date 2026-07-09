@@ -49,13 +49,14 @@ from labassistant.chromatography import mass_balance_hypotheses
 from labassistant.context_engine import ContextRetriever, KnowledgeStore, ResearchJournal
 from labassistant.filtration import (
     FILTRATION_DIFFICULTY_RUBRIC,
+    FiltrationMeasurement,
     PRESSURE_UNIT_LABELS,
     PRESSURE_UNITS_TO_KPA,
     filtration_measurement_to_table_row,
     normalize_pressure,
     validate_difficulty_score,
 )
-from labassistant.models import Experiment, FiltrationMeasurement
+from labassistant.models import Experiment
 from labassistant.observations import (
     build_experiment_brief_from_observations,
     observation_table,
