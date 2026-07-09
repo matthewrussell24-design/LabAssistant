@@ -4,6 +4,7 @@ from labassistant.models import (
     ChromatographyPeak,
     DerivedMetrics,
     DistributionData,
+    FiltrationMeasurement,
     MassBalanceAssessment,
     Measurement,
     MeasurementFlag,
@@ -139,3 +140,22 @@ def test_chromatography_models_serialize_to_plain_dicts():
     payload = assessment.to_dict()
     assert payload["observations"][0]["label"] == "Parent peak decreased"
     assert payload["hypotheses"] == ["Degradation into detected impurities"]
+
+
+def test_filtration_measurement_serializes_to_plain_dict():
+    measurement = FiltrationMeasurement(
+        sample_name="Lot 1",
+        difficulty_score=4.0,
+        filtration_time_minutes=12.5,
+        pressure=15.0,
+        pressure_unit="psi",
+        filter_type="0.22 um PES",
+        clogging_observed=True,
+        notes="Slow near the end.",
+    )
+
+    payload = measurement.to_dict()
+
+    assert payload["sample_name"] == "Lot 1"
+    assert payload["difficulty_score"] == 4.0
+    assert payload["clogging_observed"] is True

@@ -169,6 +169,30 @@ class ChromatographyMeasurement:
 
 
 @dataclass
+class FiltrationMeasurement:
+    """Orthogonal filtration evidence for one sample.
+
+    This is intentionally small: it lets LabAssistant relate DLS forward-scatter
+    attributes to a separate filtration behavior measurement without treating
+    filtration as another DLS-derived metric.
+    """
+
+    sample_name: str
+    technique: str = "Filtration"
+    difficulty_score: float | None = None
+    filtration_time_minutes: float | None = None
+    pressure: float | None = None
+    pressure_unit: str | None = None
+    filter_type: str | None = None
+    clogging_observed: bool | None = None
+    notes: str | None = None
+    source: str = "manual_entry"
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class MassBalanceAssessment:
     """Mass-balance interpretation over chromatographic evidence."""
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from labassistant.interpretation import format_metric
-from labassistant.models import AngleSummary, Measurement
+from labassistant.models import AngleSummary, FiltrationMeasurement, Measurement
 from labassistant.view_models import ParsedSample
 
 
@@ -18,6 +18,12 @@ TREND_METRICS = {
     "Tail Index": "%",
     "Width Ratio": "",
     "Quality Score": "",
+}
+
+CIRCULATION_TIME_UNITS_TO_MINUTES = {
+    "seconds": 1 / 60,
+    "minutes": 1.0,
+    "hours": 60.0,
 }
 
 
@@ -55,6 +61,17 @@ class ForwardScatterPoint:
     circulation_time: float
     forward_z_average: float | None
     forward_pdi: float | None
+    circulation_time_value: float | None = None
+    circulation_time_unit: str | None = None
+
+
+@dataclass
+class FiltrationTrendPoint:
+    sample: str
+    difficulty_score: float
+    forward_z_average: float | None
+    forward_pdi: float | None
+    circulation_time_minutes: float | None = None
 
 
 @dataclass
@@ -74,6 +91,14 @@ class ForwardScatterTrendAnalysis:
     points: list[ForwardScatterPoint]
     z_average: RelationshipAnalysis
     pdi: RelationshipAnalysis
+
+
+@dataclass
+class FiltrationTrendAnalysis:
+    points: list[FiltrationTrendPoint]
+    z_average: RelationshipAnalysis
+    pdi: RelationshipAnalysis
+    circulation_time: RelationshipAnalysis
 
 
 def analyze_series(metric: str, values: list[float | int | None], unit: str = "", labels: list[str] | None = None) -> SeriesAnalysis:
@@ -136,6 +161,8 @@ def build_forward_scatter_trend_analysis(
                 circulation_time=float(circulation_time),
                 forward_z_average=summary.z_average if summary else None,
                 forward_pdi=summary.pdi if summary else None,
+                circulation_time_value=float(circulation_time),
+                circulation_time_unit="minutes",
             )
         )
 
@@ -146,34 +173,162 @@ def build_forward_scatter_trend_analysis(
     )
 
 
+def build_forward_scatter_trend_analysis_from_measurements(samples: list[ParsedSample]) -> ForwardScatterTrendAnalysis:
+    points = [
+        point
+        for sample in samples
+        if (point := forward_scatter_point_from_measurement(sample)) is not None
+    ]
+    return ForwardScatterTrendAnalysis(
+        points=points,
+        z_average=analyze_relationship("Forward Z-Average", "nm", points, "forward_z_average"),
+        pdi=analyze_relationship("Forward PDI", "", points, "forward_pdi"),
+    )
+
+
+def forward_scatter_point_from_measurement(sample: ParsedSample) -> ForwardScatterPoint | None:
+    entry = circulation_time_from_measurement(sample.measurement)
+    if entry is None:
+        return None
+    summary = forward_angle_summary(sample.measurement)
+    return ForwardScatterPoint(
+        sample=sample.name,
+        circulation_time=entry["minutes"],
+        circulation_time_value=entry["value"],
+        circulation_time_unit=entry["unit"],
+        forward_z_average=summary.z_average if summary else None,
+        forward_pdi=summary.pdi if summary else None,
+    )
+
+
+def normalize_circulation_time(value: float | int, unit: str) -> float:
+    if unit not in CIRCULATION_TIME_UNITS_TO_MINUTES:
+        raise ValueError(f"Unsupported circulation time unit: {unit}")
+    return float(value) * CIRCULATION_TIME_UNITS_TO_MINUTES[unit]
+
+
+def apply_circulation_time(
+    measurement: Measurement,
+    value: float | int | None,
+    unit: str | None,
+    *,
+    source: str = "manual_entry",
+) -> None:
+    if value is None or unit is None or pd.isna(value):
+        measurement.provenance.pop("total_circulation_time", None)
+        return
+    minutes = normalize_circulation_time(float(value), unit)
+    measurement.provenance["total_circulation_time"] = {
+        "value": float(value),
+        "unit": unit,
+        "minutes": minutes,
+        "source": source,
+    }
+
+
+def circulation_time_from_measurement(measurement: Measurement) -> dict[str, float | str] | None:
+    entry = measurement.provenance.get("total_circulation_time")
+    if not isinstance(entry, dict):
+        return None
+    try:
+        minutes = float(entry["minutes"])
+        value = float(entry.get("value", minutes))
+    except (KeyError, TypeError, ValueError):
+        return None
+    unit = str(entry.get("unit") or "minutes")
+    return {"minutes": minutes, "value": value, "unit": unit}
+
+
+def apply_filtration_measurement(measurement: Measurement, filtration: FiltrationMeasurement | None) -> None:
+    if filtration is None or filtration.difficulty_score is None:
+        measurement.provenance.pop("filtration_follow_up", None)
+        return
+    measurement.provenance["filtration_follow_up"] = filtration.to_dict()
+
+
+def filtration_measurement_from_provenance(measurement: Measurement) -> FiltrationMeasurement | None:
+    payload = measurement.provenance.get("filtration_follow_up")
+    if not isinstance(payload, dict):
+        return None
+    return FiltrationMeasurement(
+        sample_name=str(payload.get("sample_name") or measurement.sample_name),
+        difficulty_score=_optional_float(payload.get("difficulty_score")),
+        filtration_time_minutes=_optional_float(payload.get("filtration_time_minutes")),
+        pressure=_optional_float(payload.get("pressure")),
+        pressure_unit=payload.get("pressure_unit"),
+        filter_type=payload.get("filter_type"),
+        clogging_observed=payload.get("clogging_observed"),
+        notes=payload.get("notes"),
+        source=str(payload.get("source") or "manual_entry"),
+    )
+
+
+def build_filtration_trend_analysis(samples: list[ParsedSample]) -> FiltrationTrendAnalysis:
+    points: list[FiltrationTrendPoint] = []
+    for sample in samples:
+        filtration = filtration_measurement_from_provenance(sample.measurement)
+        if filtration is None or filtration.difficulty_score is None:
+            continue
+        summary = forward_angle_summary(sample.measurement)
+        circulation_time = circulation_time_from_measurement(sample.measurement)
+        points.append(
+            FiltrationTrendPoint(
+                sample=sample.name,
+                difficulty_score=filtration.difficulty_score,
+                forward_z_average=summary.z_average if summary else None,
+                forward_pdi=summary.pdi if summary else None,
+                circulation_time_minutes=float(circulation_time["minutes"]) if circulation_time else None,
+            )
+        )
+
+    return FiltrationTrendAnalysis(
+        points=points,
+        z_average=analyze_relationship("Filtration Difficulty vs Forward Z-Average", "", points, "forward_z_average", x_attribute="difficulty_score"),
+        pdi=analyze_relationship("Filtration Difficulty vs Forward PDI", "", points, "forward_pdi", x_attribute="difficulty_score"),
+        circulation_time=analyze_relationship(
+            "Filtration Difficulty vs Circulation Time",
+            "",
+            points,
+            "circulation_time_minutes",
+            x_attribute="difficulty_score",
+        ),
+    )
+
+
 def analyze_relationship(
     metric: str,
     unit: str,
-    points: list[ForwardScatterPoint],
+    points: list[ForwardScatterPoint] | list[FiltrationTrendPoint],
     value_attribute: str,
+    *,
+    x_attribute: str = "circulation_time",
 ) -> RelationshipAnalysis:
     valid_points = [
         point
         for point in points
-        if getattr(point, value_attribute) is not None and not pd.isna(getattr(point, value_attribute))
+        if getattr(point, x_attribute) is not None
+        and not pd.isna(getattr(point, x_attribute))
+        and getattr(point, value_attribute) is not None
+        and not pd.isna(getattr(point, value_attribute))
     ]
-    distinct_times = len({point.circulation_time for point in valid_points})
+    distinct_x_values = len({float(getattr(point, x_attribute)) for point in valid_points})
     analysis = RelationshipAnalysis(
         metric=metric,
         unit=unit,
         points=valid_points,
         valid_count=len(valid_points),
-        distinct_circulation_times=distinct_times,
+        distinct_circulation_times=distinct_x_values,
     )
 
     if len(valid_points) < 3:
         analysis.message = f"At least 3 valid samples are needed to estimate correlation for {metric}."
         return analysis
-    if distinct_times < 3:
-        analysis.message = "At least 3 distinct circulation times are needed; repeated or missing times would make the statistic misleading."
+    if distinct_x_values < 3:
+        variable = "circulation times" if x_attribute == "circulation_time" else "x-axis values"
+        analysis.message = f"At least 3 distinct {variable} are needed; repeated or missing values would make the statistic misleading."
         return analysis
 
-    x_values = [point.circulation_time for point in valid_points]
+    x_values = [float(getattr(point, x_attribute)) for point in valid_points]
     y_values = [float(getattr(point, value_attribute)) for point in valid_points]
     if len(set(y_values)) < 2:
         analysis.message = f"{metric} does not vary across the valid samples, so Pearson correlation is not informative."
@@ -209,6 +364,15 @@ def relationship_strength(correlation: float) -> str:
     if magnitude < 0.7:
         return "moderate"
     return "strong"
+
+
+def _optional_float(value) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def regression_trend(values: list[float]) -> tuple[float, float]:

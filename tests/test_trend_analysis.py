@@ -1,12 +1,19 @@
 import pandas as pd
 
-from labassistant.models import AngleSummary, Measurement, MeasurementMetadata, SummaryMetrics
+from labassistant.models import AngleSummary, FiltrationMeasurement, Measurement, MeasurementMetadata, SummaryMetrics
 from labassistant.trend_analysis import (
+    apply_circulation_time,
+    apply_filtration_measurement,
     analyze_series,
+    build_filtration_trend_analysis,
     build_data_story,
     build_forward_scatter_trend_analysis,
+    build_forward_scatter_trend_analysis_from_measurements,
+    circulation_time_from_measurement,
     control_chart_table,
+    filtration_measurement_from_provenance,
     forward_angle_summary,
+    normalize_circulation_time,
     pearson_correlation,
     replicate_statistics_table,
     relationship_strength,
@@ -180,3 +187,51 @@ def test_pearson_and_relationship_strength_helpers_are_restrained():
     assert relationship_strength(0.1) == "weak"
     assert relationship_strength(0.5) == "moderate"
     assert relationship_strength(-0.9) == "strong"
+
+
+def test_circulation_time_is_stored_with_unit_and_normalized_minutes():
+    sample = make_forward_sample("Sample A", 100.0, 0.20)
+
+    apply_circulation_time(sample.measurement, 2, "hours")
+    entry = circulation_time_from_measurement(sample.measurement)
+    analysis = build_forward_scatter_trend_analysis_from_measurements([sample])
+
+    assert entry == {"minutes": 120.0, "value": 2.0, "unit": "hours"}
+    assert analysis.points[0].circulation_time == 120.0
+    assert analysis.points[0].circulation_time_value == 2.0
+    assert normalize_circulation_time(90, "seconds") == 1.5
+
+
+def test_filtration_measurement_is_stored_as_orthogonal_follow_up():
+    sample = make_forward_sample("Sample A", 100.0, 0.20)
+    filtration = FiltrationMeasurement(sample_name="Sample A", difficulty_score=4, filtration_time_minutes=12)
+
+    apply_filtration_measurement(sample.measurement, filtration)
+    stored = filtration_measurement_from_provenance(sample.measurement)
+
+    assert stored is not None
+    assert stored.sample_name == "Sample A"
+    assert stored.difficulty_score == 4.0
+    assert stored.filtration_time_minutes == 12.0
+
+
+def test_filtration_trend_analysis_relates_forward_scatter_to_difficulty():
+    samples = [
+        make_forward_sample("Sample A", 100.0, 0.20),
+        make_forward_sample("Sample B", 160.0, 0.30),
+        make_forward_sample("Sample C", 220.0, 0.40),
+    ]
+    for index, sample in enumerate(samples, start=1):
+        apply_circulation_time(sample.measurement, index * 10, "minutes")
+        apply_filtration_measurement(
+            sample.measurement,
+            FiltrationMeasurement(sample_name=sample.name, difficulty_score=float(index)),
+        )
+
+    analysis = build_filtration_trend_analysis(samples)
+
+    assert [point.sample for point in analysis.points] == ["Sample A", "Sample B", "Sample C"]
+    assert round(analysis.z_average.pearson_r, 2) == 1.0
+    assert analysis.z_average.relationship == "strong"
+    assert analysis.pdi.relationship == "strong"
+    assert analysis.circulation_time.relationship == "strong"

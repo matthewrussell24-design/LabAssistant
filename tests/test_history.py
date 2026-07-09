@@ -25,6 +25,17 @@ def make_measurement(name: str, z_average: float, pdi: float, flags=None, primar
 def test_save_and_load_experiment_history(tmp_path):
     history_path = tmp_path / "experiments.jsonl"
     measurement = make_measurement("Lot 1", 125.0, 0.21)
+    measurement.provenance["total_circulation_time"] = {
+        "value": 2.0,
+        "unit": "hours",
+        "minutes": 120.0,
+        "source": "manual_entry",
+    }
+    measurement.provenance["filtration_follow_up"] = {
+        "sample_name": "Lot 1",
+        "difficulty_score": 4.0,
+        "source": "manual_entry",
+    }
 
     saved = save_experiment([measurement], label="Run A", history_path=history_path)
     records = load_history(history_path)
@@ -33,6 +44,8 @@ def test_save_and_load_experiment_history(tmp_path):
     assert records[0].id == saved.id
     assert records[0].label == "Run A"
     assert records[0].measurements[0]["metadata"]["sample_name"] == "Lot 1"
+    assert records[0].measurements[0]["provenance"]["total_circulation_time"]["minutes"] == 120.0
+    assert records[0].measurements[0]["provenance"]["filtration_follow_up"]["difficulty_score"] == 4.0
 
 
 def test_history_and_trend_tables_summarize_records(tmp_path):

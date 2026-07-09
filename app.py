@@ -45,18 +45,25 @@ from labassistant.metrics import (
 )
 from labassistant.chromatography import mass_balance_hypotheses
 from labassistant.context_engine import ContextRetriever, KnowledgeStore, ResearchJournal
-from labassistant.models import Experiment
+from labassistant.models import Experiment, FiltrationMeasurement
 from labassistant.observations import (
     build_experiment_brief_from_observations,
     observation_table,
     observations_from_samples,
 )
 from labassistant.trend_analysis import (
+    CIRCULATION_TIME_UNITS_TO_MINUTES,
     ForwardScatterPoint,
+    FiltrationTrendPoint,
     RelationshipAnalysis,
+    apply_circulation_time,
+    apply_filtration_measurement,
     build_data_story,
-    build_forward_scatter_trend_analysis,
+    build_filtration_trend_analysis,
+    build_forward_scatter_trend_analysis_from_measurements,
+    circulation_time_from_measurement,
     control_chart_table,
+    filtration_measurement_from_provenance,
     replicate_statistics_table,
 )
 from labassistant.quality import (
@@ -1692,49 +1699,93 @@ AGGREGATION_CATEGORY_COLORS = {
 CHECK_ICONS = {"supports": "✅", "neutral": "➖", "insufficient": "❔"}
 
 
+def apply_session_experimental_variables(samples: list[ParsedSample]) -> None:
+    for sample in samples:
+        time_value = parse_optional_float(st.session_state.get(f"circulation_time::{sample.name}"))
+        time_unit = st.session_state.get(f"circulation_time_unit::{sample.name}")
+        if time_value is not None and time_unit in CIRCULATION_TIME_UNITS_TO_MINUTES:
+            apply_circulation_time(sample.measurement, time_value, str(time_unit))
+
+        difficulty_score = parse_optional_float(st.session_state.get(f"filtration_difficulty::{sample.name}"))
+        if difficulty_score is None:
+            continue
+        filtration_time = parse_optional_float(st.session_state.get(f"filtration_time::{sample.name}"))
+        pressure = parse_optional_float(st.session_state.get(f"filtration_pressure::{sample.name}"))
+        clogging_value = st.session_state.get(f"filtration_clogging::{sample.name}", "Not recorded")
+        clogging_observed = {"Yes": True, "No": False}.get(str(clogging_value))
+        apply_filtration_measurement(
+            sample.measurement,
+            FiltrationMeasurement(
+                sample_name=sample.name,
+                difficulty_score=difficulty_score,
+                filtration_time_minutes=filtration_time,
+                pressure=pressure,
+                pressure_unit=st.session_state.get(f"filtration_pressure_unit::{sample.name}") or None,
+                filter_type=(st.session_state.get(f"filtration_filter::{sample.name}") or "").strip() or None,
+                clogging_observed=clogging_observed,
+                notes=(st.session_state.get(f"filtration_notes::{sample.name}") or "").strip() or None,
+            ),
+        )
+
+
 def render_forward_scatter_trend_explorer(samples: list[ParsedSample]) -> None:
     st.subheader("Forward-Scatter Trend Explorer")
     st.caption(
         "Enter total circulation time explicitly for each imported DLS sample. "
-        "LabAssistant uses the current sample names as mapping keys and does not infer experimental variables from lot numbers or import order."
+        "LabAssistant uses the current sample names as mapping keys, normalizes time to minutes for statistics, and does not infer experimental variables from lot numbers or import order."
     )
 
     input_columns = st.columns(min(3, len(samples)))
-    circulation_times: dict[str, float] = {}
     invalid_time_samples: list[str] = []
     for index, sample in enumerate(samples):
+        existing_time = circulation_time_from_measurement(sample.measurement)
+        time_key = f"circulation_time::{sample.name}"
+        unit_key = f"circulation_time_unit::{sample.name}"
+        if existing_time and time_key not in st.session_state:
+            st.session_state[time_key] = str(existing_time["value"])
+        if existing_time and unit_key not in st.session_state:
+            st.session_state[unit_key] = str(existing_time["unit"])
+
         with input_columns[index % len(input_columns)]:
             raw_value = st.text_input(
                 sample.name,
-                key=f"circulation_time::{sample.name}",
+                key=time_key,
                 placeholder="e.g. 45",
                 help="Total circulation time for this sample. Leave blank if it was not measured.",
             )
+            st.selectbox(
+                "Unit",
+                list(CIRCULATION_TIME_UNITS_TO_MINUTES),
+                key=unit_key,
+                help="Time is stored with this unit and normalized to minutes for charts and correlation.",
+            )
         parsed_value = parse_optional_float(raw_value)
-        if parsed_value is not None:
-            circulation_times[sample.name] = parsed_value
-        elif str(raw_value).strip():
+        if parsed_value is None and str(raw_value).strip():
             invalid_time_samples.append(sample.name)
 
     if invalid_time_samples:
         st.warning("Enter numeric circulation times for: " + ", ".join(invalid_time_samples))
 
-    analysis = build_forward_scatter_trend_analysis(samples, circulation_times)
+    apply_session_experimental_variables(samples)
+    analysis = build_forward_scatter_trend_analysis_from_measurements(samples)
     if not analysis.points:
         st.info("Enter circulation times for samples with forward-angle summaries to begin direct relationship analysis.")
-        render_filtration_hypothesis_callout()
+        render_filtration_follow_up(samples)
         return
 
     trend_table = pd.DataFrame(
         {
             "Sample": [point.sample for point in analysis.points],
-            "Total Circulation Time": [point.circulation_time for point in analysis.points],
+            "Entered Circulation Time": [point.circulation_time_value for point in analysis.points],
+            "Unit": [point.circulation_time_unit for point in analysis.points],
+            "Circulation Time (min)": [point.circulation_time for point in analysis.points],
             "Forward Z-Average": [point.forward_z_average for point in analysis.points],
             "Forward PDI": [point.forward_pdi for point in analysis.points],
         }
     )
     display = trend_table.copy()
-    display["Total Circulation Time"] = pd.to_numeric(display["Total Circulation Time"], errors="coerce").round(3)
+    display["Entered Circulation Time"] = pd.to_numeric(display["Entered Circulation Time"], errors="coerce").round(3)
+    display["Circulation Time (min)"] = pd.to_numeric(display["Circulation Time (min)"], errors="coerce").round(3)
     display["Forward Z-Average"] = pd.to_numeric(display["Forward Z-Average"], errors="coerce").round(1)
     display["Forward PDI"] = pd.to_numeric(display["Forward PDI"], errors="coerce").round(3)
     st.dataframe(display, use_container_width=True, hide_index=True)
@@ -1765,7 +1816,7 @@ def render_forward_scatter_trend_explorer(samples: list[ParsedSample]) -> None:
         )
         render_relationship_summary(analysis.pdi)
 
-    render_filtration_hypothesis_callout()
+    render_filtration_follow_up(samples)
 
 
 def parse_optional_float(value: str | float | int | None) -> float | None:
@@ -1808,7 +1859,7 @@ def _forward_scatter_trend_chart(
         height=340,
         title=title,
         margin={"l": 52, "r": 24, "t": 52, "b": 58},
-        xaxis={"title": "Total Circulation Time", "gridcolor": "#e8eef5"},
+        xaxis={"title": "Total Circulation Time (min)", "gridcolor": "#e8eef5"},
         yaxis={"title": y_title, "gridcolor": "#e8eef5"},
     )
     return figure
@@ -1828,6 +1879,155 @@ def render_filtration_hypothesis_callout() -> None:
         "and those forward-scatter attributes may relate to filtration difficulty. "
         "The planned filtration device run is an orthogonal follow-up measurement; it may strengthen or weaken this relationship hypothesis."
     )
+
+
+def render_filtration_follow_up(samples: list[ParsedSample]) -> None:
+    render_filtration_hypothesis_callout()
+    with st.expander("Filtration Follow-Up (Orthogonal Measurement)", expanded=False):
+        st.caption(
+            "Optionally enter filtration results for the same samples. These values are stored separately from DLS metrics and used to test whether forward-scatter attributes relate to filtration difficulty."
+        )
+        columns = st.columns(min(3, len(samples)))
+        invalid_scores: list[str] = []
+        for index, sample in enumerate(samples):
+            existing = filtration_measurement_from_provenance(sample.measurement)
+            difficulty_key = f"filtration_difficulty::{sample.name}"
+            time_key = f"filtration_time::{sample.name}"
+            pressure_key = f"filtration_pressure::{sample.name}"
+            pressure_unit_key = f"filtration_pressure_unit::{sample.name}"
+            filter_key = f"filtration_filter::{sample.name}"
+            clogging_key = f"filtration_clogging::{sample.name}"
+            notes_key = f"filtration_notes::{sample.name}"
+            if existing and difficulty_key not in st.session_state and existing.difficulty_score is not None:
+                st.session_state[difficulty_key] = str(existing.difficulty_score)
+            if existing and time_key not in st.session_state and existing.filtration_time_minutes is not None:
+                st.session_state[time_key] = str(existing.filtration_time_minutes)
+            if existing and pressure_key not in st.session_state and existing.pressure is not None:
+                st.session_state[pressure_key] = str(existing.pressure)
+            if existing and pressure_unit_key not in st.session_state and existing.pressure_unit:
+                st.session_state[pressure_unit_key] = existing.pressure_unit
+            if existing and filter_key not in st.session_state and existing.filter_type:
+                st.session_state[filter_key] = existing.filter_type
+            if existing and clogging_key not in st.session_state and existing.clogging_observed is not None:
+                st.session_state[clogging_key] = "Yes" if existing.clogging_observed else "No"
+            if existing and notes_key not in st.session_state and existing.notes:
+                st.session_state[notes_key] = existing.notes
+
+            with columns[index % len(columns)]:
+                st.markdown(f"**{sample.name}**")
+                raw_score = st.text_input(
+                    "Difficulty score",
+                    key=difficulty_key,
+                    placeholder="1-5",
+                    help="Explicit filtration difficulty score. Use a consistent scale across samples, such as 1 easy to 5 difficult.",
+                )
+                st.text_input("Filtration time (min)", key=time_key, placeholder="optional")
+                st.text_input("Pressure", key=pressure_key, placeholder="optional")
+                st.text_input("Pressure unit", key=pressure_unit_key, placeholder="optional")
+                st.text_input("Filter type", key=filter_key, placeholder="optional")
+                st.selectbox("Clogging observed", ["Not recorded", "No", "Yes"], key=clogging_key)
+                st.text_area("Notes", key=notes_key, height=70)
+            if parse_optional_float(raw_score) is None and str(raw_score).strip():
+                invalid_scores.append(sample.name)
+
+        if invalid_scores:
+            st.warning("Enter numeric filtration difficulty scores for: " + ", ".join(invalid_scores))
+
+        apply_session_experimental_variables(samples)
+        filtration_analysis = build_filtration_trend_analysis(samples)
+        if not filtration_analysis.points:
+            st.info("Enter filtration difficulty scores for at least three samples to compare filtration behavior with DLS forward-scatter attributes.")
+            return
+
+        render_filtration_trend_table(filtration_analysis.points)
+        chart_columns = st.columns(3)
+        with chart_columns[0]:
+            st.plotly_chart(
+                _filtration_trend_chart(
+                    filtration_analysis.points,
+                    "forward_z_average",
+                    "Forward Z-Average vs Filtration Difficulty",
+                    "Forward Z-Average (nm)",
+                ),
+                use_container_width=True,
+                config={"displaylogo": False},
+            )
+            render_relationship_summary(filtration_analysis.z_average)
+        with chart_columns[1]:
+            st.plotly_chart(
+                _filtration_trend_chart(
+                    filtration_analysis.points,
+                    "forward_pdi",
+                    "Forward PDI vs Filtration Difficulty",
+                    "Forward PDI",
+                ),
+                use_container_width=True,
+                config={"displaylogo": False},
+            )
+            render_relationship_summary(filtration_analysis.pdi)
+        with chart_columns[2]:
+            st.plotly_chart(
+                _filtration_trend_chart(
+                    filtration_analysis.points,
+                    "circulation_time_minutes",
+                    "Circulation Time vs Filtration Difficulty",
+                    "Circulation Time (min)",
+                ),
+                use_container_width=True,
+                config={"displaylogo": False},
+            )
+            render_relationship_summary(filtration_analysis.circulation_time)
+
+
+def render_filtration_trend_table(points: list[FiltrationTrendPoint]) -> None:
+    table = pd.DataFrame(
+        {
+            "Sample": [point.sample for point in points],
+            "Difficulty Score": [point.difficulty_score for point in points],
+            "Forward Z-Average": [point.forward_z_average for point in points],
+            "Forward PDI": [point.forward_pdi for point in points],
+            "Circulation Time (min)": [point.circulation_time_minutes for point in points],
+        }
+    )
+    display = table.copy()
+    for column in ["Difficulty Score", "Forward Z-Average", "Circulation Time (min)"]:
+        display[column] = pd.to_numeric(display[column], errors="coerce").round(2)
+    display["Forward PDI"] = pd.to_numeric(display["Forward PDI"], errors="coerce").round(3)
+    st.dataframe(display, use_container_width=True, hide_index=True)
+
+
+def _filtration_trend_chart(
+    points: list[FiltrationTrendPoint],
+    value_attribute: str,
+    title: str,
+    y_title: str,
+) -> go.Figure:
+    chart_points = [
+        point
+        for point in points
+        if getattr(point, value_attribute) is not None and not pd.isna(getattr(point, value_attribute))
+    ]
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter(
+            x=[point.difficulty_score for point in chart_points],
+            y=[getattr(point, value_attribute) for point in chart_points],
+            mode="markers+text",
+            text=[point.sample for point in chart_points],
+            textposition="top center",
+            marker={"size": 11, "color": "#0f766e", "line": {"width": 1, "color": "#134e4a"}},
+            hovertemplate="<b>%{text}</b><br>Filtration difficulty: %{x:.3g}<br>%{y:.3g}<extra></extra>",
+        )
+    )
+    figure.update_layout(
+        template="plotly_white",
+        height=330,
+        title=title,
+        margin={"l": 52, "r": 24, "t": 52, "b": 58},
+        xaxis={"title": "Filtration Difficulty Score", "gridcolor": "#e8eef5"},
+        yaxis={"title": y_title, "gridcolor": "#e8eef5"},
+    )
+    return figure
 
 
 def render_aggregation_detection(samples: list[ParsedSample]) -> None:
@@ -2112,6 +2312,8 @@ def main() -> None:
             for error in import_errors:
                 st.error(error)
         return
+
+    apply_session_experimental_variables(samples)
 
     with st.sidebar:
         st.divider()
