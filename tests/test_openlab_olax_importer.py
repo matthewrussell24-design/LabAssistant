@@ -31,9 +31,9 @@ def make_olax(path: Path) -> None:
     """
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr("Sequence/sequence.xml", sequence_xml)
-        archive.writestr("Data/Injection_001/signal.ch", b"\x01\x02raw")
-        archive.writestr("Data/Injection_002/signal.ch", b"\x01\x02raw")
-        archive.writestr("Data/Injection_003/signal.ch", b"\x01\x02raw")
+        archive.writestr("Data/Injection_001/signal.ch", "time_min,intensity\n0.0,10\n0.5,15\n1.0,12\n")
+        archive.writestr("Data/Injection_002/signal.ch", "time_min,intensity\n0.0,20\n0.5,25\n1.0,22\n")
+        archive.writestr("Data/Injection_003/signal.ch", "time_min,intensity\n0.0,30\n0.5,35\n1.0,32\n")
         archive.writestr("Results/peak_table.csv", "sample,peak,area\nSample A,parent,1000\n")
 
 
@@ -61,6 +61,15 @@ def test_inspect_openlab_olax_extracts_archive_metadata(tmp_path):
     assert result.measurements[0].metadata["openlab_signal_files"] == ["Data/Injection_001/signal.ch"]
     assert result.measurements[1].metadata["openlab_signal_files"] == ["Data/Injection_002/signal.ch"]
     assert result.measurements[2].metadata["openlab_signal_files"] == ["Data/Injection_003/signal.ch"]
+    assert len(result.decoded_signal_traces) == 3
+    assert result.unsupported_signal_files == []
+    assert len(result.measurements[2].chromatogram_traces) == 1
+    trace = result.measurements[2].chromatogram_traces[0]
+    assert trace.source_file == "Data/Injection_003/signal.ch"
+    assert trace.time_min == [0.0, 0.5, 1.0]
+    assert trace.intensity == [30.0, 35.0, 32.0]
+    assert len(trace.time_min) == len(trace.intensity)
+    assert trace.time_min == sorted(trace.time_min)
 
 
 def test_openlab_olax_generates_import_observations(tmp_path):
@@ -74,6 +83,7 @@ def test_openlab_olax_generates_import_observations(tmp_path):
     assert "Injections found" in labels
     assert "Blanks/standards/samples identified" in labels
     assert "Chromatogram signal available" in labels
+    assert "Chromatogram trace decoded" in labels
     assert "Missing peak table" not in labels
     assert "Peak table available" in labels
 
@@ -89,6 +99,9 @@ def test_openlab_olax_reports_missing_peak_table(tmp_path):
 
     assert [injection.sample_name for injection in result.injections] == ["Sample A"]
     assert result.measurements[0].method_name == "M"
+    assert result.decoded_signal_traces == []
+    assert result.measurements[0].chromatogram_traces == []
+    assert result.unsupported_signal_files == ["data/signal_001.ch"]
     assert "Missing peak table" in [observation.label for observation in result.observations]
     assert "Peak/result files: none found" in report
 
@@ -129,7 +142,7 @@ def test_openlab_olax_reads_realistic_nested_result_package(tmp_path):
     dx_payload = tmp_path / "dx.zip"
     with zipfile.ZipFile(dx_payload, "w") as dx:
         dx.writestr("[Content_Types].xml", "<Types />")
-        dx.writestr("Base/Signal", b"binary detector trace")
+        dx.writestr("Base/Signal", "time_min,response\n0.0,100\n0.25,125\n0.50,110\n")
     sqx_payload = tmp_path / "sqx.zip"
     with zipfile.ZipFile(sqx_payload, "w") as sqx:
         sqx.writestr("SampleListPart/SampleListPart", "<SampleList />")
@@ -157,8 +170,15 @@ def test_openlab_olax_reads_realistic_nested_result_package(tmp_path):
     assert result.acquisition_method_files
     assert result.audit_files
     assert result.measurements[0].metadata["openlab_signal_files"] == result.signal_files
+    assert len(result.decoded_signal_traces) == 1
+    assert result.decoded_signal_traces[0].metadata["payload_path"] == "Base/Signal"
+    assert result.decoded_signal_traces[0].time_min == [0.0, 0.25, 0.5]
+    assert result.decoded_signal_traces[0].intensity == [100.0, 125.0, 110.0]
+    assert result.measurements[0].chromatogram_traces == result.decoded_signal_traces
+    assert result.measurements[1].chromatogram_traces == []
     labels = [observation.label for observation in result.observations]
     assert "Chromatogram signal available" in labels
+    assert "Chromatogram trace decoded" in labels
     assert "Acquisition method available" in labels
     assert "Audit trail available" in labels
 

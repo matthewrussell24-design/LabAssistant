@@ -13,7 +13,7 @@ from typing import Any
 from uuid import uuid4
 from xml.etree import ElementTree
 
-from labassistant.models import ChromatographyMeasurement, ChromatographyPeak, Experiment, Observation
+from labassistant.models import ChromatogramTrace, ChromatographyMeasurement, ChromatographyPeak, Experiment, Observation
 
 
 TEXT_SUFFIXES = {
@@ -70,6 +70,8 @@ class OpenLabOlaxImportResult:
     peak_table_files: list[str] = field(default_factory=list)
     detector_files: list[str] = field(default_factory=list)
     unknown_detector_files: list[str] = field(default_factory=list)
+    decoded_signal_traces: list[ChromatogramTrace] = field(default_factory=list)
+    unsupported_signal_files: list[str] = field(default_factory=list)
     acquisition_method_files: list[str] = field(default_factory=list)
     processing_method_files: list[str] = field(default_factory=list)
     audit_files: list[str] = field(default_factory=list)
@@ -91,6 +93,7 @@ class OpenLabOlaxImportResult:
             f"Sequence metadata keys: {', '.join(sorted(self.sequence_metadata)) or 'none'}",
             f"Injections found: {len(self.injections)}",
             f"Chromatogram signal files: {len(self.signal_files)}",
+            f"Decoded chromatogram traces: {len(self.decoded_signal_traces)}",
             f"Peak/result table files: {len(self.peak_table_files)}",
             f"Measurements created: {len(self.measurements)}",
             f"Observations generated: {len(self.observations)}",
@@ -142,6 +145,10 @@ def inspect_openlab_olax(path: str | Path) -> OpenLabOlaxImportResult:
             result.signal_files = _locate_signal_files(result.archive_entries)
             result.peak_table_files = _locate_peak_table_files(result.archive_entries)
             result.detector_files, result.unknown_detector_files = _classify_detector_files(result.signal_files)
+            result.decoded_signal_traces, result.unsupported_signal_files = _decode_signal_traces(
+                archive,
+                result.detector_files,
+            )
             result.acquisition_method_files = _locate_by_hints(result.archive_entries, ACQ_METHOD_HINTS)
             result.processing_method_files = _locate_by_hints(result.archive_entries, PROCESSING_METHOD_HINTS)
             result.audit_files = _locate_by_hints(result.archive_entries, AUDIT_HINTS)
@@ -165,6 +172,7 @@ def inspect_openlab_olax(path: str | Path) -> OpenLabOlaxImportResult:
         result.peak_table_files,
         result.peaks_by_sample,
         result.unassigned_peaks,
+        result.decoded_signal_traces,
     )
     result.observations = _observations_from_result(result)
     return result
@@ -196,6 +204,8 @@ def build_experiment_from_olax(path: str | Path, *, label: str | None = None) ->
             "sequence_metadata": result.sequence_metadata,
             "archive_entry_count": len(result.archive_entries),
             "signal_files": result.signal_files,
+            "decoded_signal_traces": [trace.source_file for trace in result.decoded_signal_traces],
+            "unsupported_signal_files": result.unsupported_signal_files,
             "peak_table_files": result.peak_table_files,
             "detector_files": result.detector_files,
             "unknown_detector_files": result.unknown_detector_files,
@@ -260,10 +270,15 @@ def _classify_detector_files(signal_files: list[str]) -> tuple[list[str], list[s
 def _detect_unsupported_sections(result: "OpenLabOlaxImportResult") -> list[str]:
     """List archive sections present but not yet decoded, for honest reporting."""
     unsupported: list[str] = []
-    if result.signal_files:
+    if result.unsupported_signal_files:
         unsupported.append(
-            "Raw chromatogram signal traces are located but not decoded to time/intensity arrays "
-            f"({len(result.signal_files)} file(s))."
+            "Some raw chromatogram signal traces are located but not decoded to time/intensity arrays "
+            f"({len(result.unsupported_signal_files)} file(s): {', '.join(result.unsupported_signal_files[:5])})."
+        )
+    if result.unknown_detector_files:
+        unsupported.append(
+            "Signal-like detector files are located but not decoded because the detector/container type is unknown "
+            f"({len(result.unknown_detector_files)} file(s): {', '.join(result.unknown_detector_files[:5])})."
         )
     if result.audit_files:
         unsupported.append(
@@ -326,6 +341,259 @@ def _read_nested_text_payloads(archive: zipfile.ZipFile, entry: str) -> dict[str
     except (zipfile.BadZipFile, OSError):
         return payloads
     return payloads
+
+
+def _decode_signal_traces(
+    archive: zipfile.ZipFile,
+    detector_files: list[str],
+) -> tuple[list[ChromatogramTrace], list[str]]:
+    """Decode only confirmed structured signal payloads.
+
+    OpenLab detector files can be proprietary binary blobs. This function does
+    not infer binary layouts. It decodes a detector file only when the payload is
+    transparently structured as CSV/TSV text, XML, or JSON with numeric
+    time/intensity pairs. Opaque packages remain unsupported.
+    """
+    traces: list[ChromatogramTrace] = []
+    unsupported: list[str] = []
+    for entry in detector_files:
+        entry_traces = _decode_signal_entry(archive, entry)
+        if entry_traces:
+            traces.extend(entry_traces)
+        else:
+            unsupported.append(entry)
+    return traces, unsupported
+
+
+def _decode_signal_entry(archive: zipfile.ZipFile, entry: str) -> list[ChromatogramTrace]:
+    try:
+        data = archive.read(entry)
+    except (KeyError, RuntimeError, zipfile.BadZipFile):
+        return []
+
+    nested = io.BytesIO(data)
+    if zipfile.is_zipfile(nested):
+        nested.seek(0)
+        return _decode_nested_signal_package(nested, entry)
+
+    trace = _decode_signal_payload(data, source_file=_entry_name(entry))
+    return [trace] if trace else []
+
+
+def _decode_nested_signal_package(package: io.BytesIO, source_entry: str) -> list[ChromatogramTrace]:
+    traces: list[ChromatogramTrace] = []
+    try:
+        with zipfile.ZipFile(package) as nested_archive:
+            for info in nested_archive.infolist():
+                if info.is_dir():
+                    continue
+                nested_name = _entry_name(info.filename)
+                lower = nested_name.lower()
+                if not any(hint in lower for hint in ("signal", "chrom", "trace", "data")):
+                    continue
+                try:
+                    payload = nested_archive.read(info.filename)
+                except (KeyError, RuntimeError, zipfile.BadZipFile):
+                    continue
+                trace = _decode_signal_payload(
+                    payload,
+                    source_file=_entry_name(source_entry),
+                    payload_path=nested_name,
+                )
+                if trace:
+                    traces.append(trace)
+    except (zipfile.BadZipFile, OSError):
+        return []
+    return traces
+
+
+def _decode_signal_payload(
+    data: bytes,
+    *,
+    source_file: str,
+    payload_path: str | None = None,
+) -> ChromatogramTrace | None:
+    text = _decode_text_payload(data)
+    if not text.strip():
+        return None
+
+    parsed = _trace_from_json_text(text)
+    format_name = "json" if parsed else None
+    if parsed is None and text.lstrip().startswith("<"):
+        parsed = _trace_from_xml_text(text)
+        format_name = "xml" if parsed else None
+    if parsed is None:
+        parsed = _trace_from_delimited_text(text)
+        format_name = "delimited_text" if parsed else None
+    if parsed is None:
+        return None
+
+    times, intensities, metadata = parsed
+    if not _valid_trace_arrays(times, intensities):
+        return None
+
+    detector = _infer_detector_name(source_file)
+    return ChromatogramTrace(
+        source_file=source_file,
+        detector=detector,
+        signal_name=detector,
+        time_min=times,
+        intensity=intensities,
+        metadata={
+            "payload_path": payload_path,
+            "encoding": format_name,
+            **metadata,
+        },
+    )
+
+
+def _trace_from_delimited_text(text: str) -> tuple[list[float], list[float], dict[str, Any]] | None:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    sample = "\n".join(lines[:10])
+    try:
+        dialect = csv.Sniffer().sniff(sample, delimiters=",\t; ")
+    except csv.Error:
+        dialect = csv.excel_tab if "\t" in lines[0] else csv.excel
+
+    try:
+        rows = list(csv.reader(io.StringIO("\n".join(lines)), dialect))
+    except csv.Error:
+        return None
+    rows = [row for row in rows if len(row) >= 2]
+    if len(rows) < 2:
+        return None
+
+    first_row_numbers = [_to_float(value) for value in rows[0][:2]]
+    has_header = any(value is None for value in first_row_numbers)
+    data_rows = rows[1:] if has_header else rows
+    time_index, intensity_index = _signal_column_indexes(rows[0] if has_header else [])
+    if time_index is None or intensity_index is None:
+        time_index, intensity_index = 0, 1
+
+    times: list[float] = []
+    intensities: list[float] = []
+    for row in data_rows:
+        if len(row) <= max(time_index, intensity_index):
+            continue
+        time_value = _to_float(row[time_index])
+        intensity_value = _to_float(row[intensity_index])
+        if time_value is None or intensity_value is None:
+            continue
+        times.append(time_value)
+        intensities.append(intensity_value)
+
+    return times, intensities, {"row_count": len(times), "has_header": has_header}
+
+
+def _trace_from_json_text(text: str) -> tuple[list[float], list[float], dict[str, Any]] | None:
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(payload, dict):
+        time_values = _first_value(payload, "time_min", "time", "times", "x")
+        intensity_values = _first_value(payload, "intensity", "intensities", "signal", "signals", "y")
+        if isinstance(time_values, list) and isinstance(intensity_values, list):
+            return _numeric_pair_lists(time_values, intensity_values, {"json_shape": "column_arrays"})
+        for key in ("points", "data", "trace", "chromatogram"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return _trace_from_json_points(value)
+    if isinstance(payload, list):
+        return _trace_from_json_points(payload)
+    return None
+
+
+def _trace_from_json_points(points: list[Any]) -> tuple[list[float], list[float], dict[str, Any]] | None:
+    times: list[float] = []
+    intensities: list[float] = []
+    for point in points:
+        if isinstance(point, dict):
+            time_value = _to_float(_first_value(point, "time_min", "time", "x"))
+            intensity_value = _to_float(_first_value(point, "intensity", "signal", "y"))
+        elif isinstance(point, (list, tuple)) and len(point) >= 2:
+            time_value = _to_float(point[0])
+            intensity_value = _to_float(point[1])
+        else:
+            continue
+        if time_value is None or intensity_value is None:
+            continue
+        times.append(time_value)
+        intensities.append(intensity_value)
+    return times, intensities, {"json_shape": "points"}
+
+
+def _trace_from_xml_text(text: str) -> tuple[list[float], list[float], dict[str, Any]] | None:
+    try:
+        root = ElementTree.fromstring(text)
+    except ElementTree.ParseError:
+        return None
+    times: list[float] = []
+    intensities: list[float] = []
+    for element in root.iter():
+        fields = {_normalize_key(key): value for key, value in element.attrib.items()}
+        for child in element:
+            value = (child.text or "").strip()
+            if value:
+                fields[_normalize_key(_strip_namespace(child.tag))] = value
+        time_value = _to_float(_first_value(fields, "time_min", "time", "x"))
+        intensity_value = _to_float(_first_value(fields, "intensity", "signal", "y", "value"))
+        if time_value is None or intensity_value is None:
+            continue
+        times.append(time_value)
+        intensities.append(intensity_value)
+    return times, intensities, {"xml_points": len(times)}
+
+
+def _numeric_pair_lists(
+    time_values: list[Any],
+    intensity_values: list[Any],
+    metadata: dict[str, Any],
+) -> tuple[list[float], list[float], dict[str, Any]] | None:
+    if len(time_values) != len(intensity_values):
+        return None
+    times: list[float] = []
+    intensities: list[float] = []
+    for time_value, intensity_value in zip(time_values, intensity_values):
+        time_numeric = _to_float(time_value)
+        intensity_numeric = _to_float(intensity_value)
+        if time_numeric is None or intensity_numeric is None:
+            return None
+        times.append(time_numeric)
+        intensities.append(intensity_numeric)
+    metadata["row_count"] = len(times)
+    return times, intensities, metadata
+
+
+def _valid_trace_arrays(times: list[float], intensities: list[float]) -> bool:
+    return bool(times) and len(times) == len(intensities) and all(
+        earlier <= later for earlier, later in zip(times, times[1:])
+    )
+
+
+def _signal_column_indexes(headers: list[str]) -> tuple[int | None, int | None]:
+    normalized = [_normalize_key(header) for header in headers]
+    time_index = next(
+        (index for index, header in enumerate(normalized) if header in {"time", "time_min", "rt", "retention_time"}),
+        None,
+    )
+    intensity_index = next(
+        (
+            index
+            for index, header in enumerate(normalized)
+            if header in {"intensity", "signal", "response", "absorbance", "counts"}
+        ),
+        None,
+    )
+    return time_index, intensity_index
+
+
+def _infer_detector_name(source_file: str) -> str | None:
+    stem = Path(_entry_name(source_file)).stem
+    match = re.search(r"\b([A-Z]{2,4}\d*[A-Z]?)\b", stem, flags=re.IGNORECASE)
+    return match.group(1).upper() if match else None
 
 
 def _decode_text_payload(data: bytes) -> str:
@@ -562,12 +830,15 @@ def _measurements_from_injections(
     peak_table_files: list[str],
     peaks_by_sample: dict[str, list[ChromatographyPeak]] | None = None,
     unassigned_peaks: list[ChromatographyPeak] | None = None,
+    decoded_signal_traces: list[ChromatogramTrace] | None = None,
 ) -> list[ChromatographyMeasurement]:
     measurements = []
     peaks_by_sample = peaks_by_sample or {}
     unassigned_peaks = unassigned_peaks or []
+    decoded_signal_traces = decoded_signal_traces or []
     for injection in injections:
-        injection_signal_files = _signal_files_for_injection(injection, signal_files)
+        injection_signal_files = _signal_files_for_injection(injection, signal_files, len(injections))
+        chromatogram_traces = _traces_for_signal_files(injection_signal_files, decoded_signal_traces)
         peaks = _peaks_for_injection(injection, peaks_by_sample, unassigned_peaks, len(injections))
         source_files = _unique(
             ([injection.source_file] if injection.source_file else [])
@@ -582,9 +853,11 @@ def _measurements_from_injections(
                 injection_id=str(injection.injection_order) if injection.injection_order is not None else injection.sample_name,
                 source_files=source_files,
                 peaks=peaks,
+                chromatogram_traces=chromatogram_traces,
                 total_area=_sum_peak_area(peaks),
                 notes=[
                     f"Signal files associated: {len(injection_signal_files)}",
+                    f"Chromatogram traces decoded: {len(chromatogram_traces)}",
                     f"Peak/result files detected: {len(peak_table_files)}",
                     f"Peaks parsed: {len(peaks)}",
                 ],
@@ -596,6 +869,7 @@ def _measurements_from_injections(
                     "openlab_signal_files": injection_signal_files,
                     "openlab_all_signal_files": signal_files,
                     "openlab_peak_table_files": peak_table_files,
+                    "openlab_decoded_signal_files": [trace.source_file for trace in chromatogram_traces],
                 },
             )
         )
@@ -666,34 +940,48 @@ def _peaks_from_delimited_table(name: str, text: str) -> list[tuple[Chromatograp
     return peaks
 
 
-def _signal_files_for_injection(injection: OpenLabInjection, signal_files: list[str]) -> list[str]:
+def _signal_files_for_injection(
+    injection: OpenLabInjection,
+    signal_files: list[str],
+    injection_count: int,
+) -> list[str]:
     if not signal_files:
         return []
 
     matches: list[str] = []
     sample_key = _sample_key(injection.sample_name)
     order = injection.injection_order
-    order_patterns = []
-    if order is not None:
-        order_patterns = [
-            rf"(^|[^0-9]){order}([^0-9]|$)",
-            rf"(^|[^0-9]){order:02d}([^0-9]|$)",
-            rf"(^|[^0-9]){order:03d}([^0-9]|$)",
-        ]
+    raw_data_file = _entry_name(injection.raw_data_file) if injection.raw_data_file else None
 
     for signal_file in signal_files:
-        lower = _entry_name(signal_file).lower()
+        normalized_signal_file = _entry_name(signal_file)
+        lower = normalized_signal_file.lower()
         normalized_path = _sample_key(signal_file)
-        order_match = bool(order_patterns and any(re.search(pattern, lower) for pattern in order_patterns))
+        raw_file_match = bool(raw_data_file and Path(raw_data_file).name.lower() == Path(lower).name)
+        order_match = order is not None and _signal_file_matches_order(normalized_signal_file, order)
         sample_match = bool(sample_key and sample_key in normalized_path)
-        if order_match or sample_match:
+        if raw_file_match or order_match or sample_match:
             matches.append(signal_file)
 
     if matches:
         return matches
-    if len(signal_files) == 1:
+    if len(signal_files) == 1 and injection_count == 1:
         return list(signal_files)
     return []
+
+
+def _signal_file_matches_order(signal_file: str, order: int) -> bool:
+    if _openlab_order_from_entry(signal_file) == order:
+        return True
+    order_tokens = {str(order), f"{order:02d}", f"{order:03d}"}
+    for part in Path(_entry_name(signal_file)).parts:
+        normalized = part.lower()
+        if "injection" not in normalized and "inj" not in normalized:
+            continue
+        tokens = re.split(r"[^0-9]+", normalized)
+        if any(token in order_tokens for token in tokens if token):
+            return True
+    return False
 
 
 def _peaks_for_injection(
@@ -707,6 +995,18 @@ def _peaks_for_injection(
     if not peaks and injection_count == 1:
         peaks.extend(unassigned_peaks)
     return peaks
+
+
+def _traces_for_signal_files(
+    signal_files: list[str],
+    decoded_signal_traces: list[ChromatogramTrace],
+) -> list[ChromatogramTrace]:
+    normalized_signal_files = {_entry_name(signal_file) for signal_file in signal_files}
+    return [
+        trace
+        for trace in decoded_signal_traces
+        if _entry_name(trace.source_file) in normalized_signal_files
+    ]
 
 
 def _sum_peak_area(peaks: list[ChromatographyPeak]) -> float | None:
@@ -844,6 +1144,20 @@ def _observations_from_result(result: OpenLabOlaxImportResult) -> list[Observati
                 result,
                 label="Chromatogram signal available",
                 evidence=f"{len(result.detector_files)} recognized detector signal file(s) located.",
+            )
+        )
+
+    if result.decoded_signal_traces:
+        point_count = sum(len(trace.time_min) for trace in result.decoded_signal_traces)
+        observations.append(
+            _import_observation(
+                result,
+                label="Chromatogram trace decoded",
+                confidence="high",
+                evidence=(
+                    f"{len(result.decoded_signal_traces)} trace(s) decoded to time/intensity arrays "
+                    f"with {point_count} total point(s)."
+                ),
             )
         )
 

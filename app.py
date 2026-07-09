@@ -704,12 +704,13 @@ def render_openlab_preview(experiment: Experiment) -> None:
             )
             st.dataframe(display, use_container_width=True, hide_index=True)
     with obs_cols[1]:
-        st.markdown("**Unsupported / missing**")
+        st.markdown("**Import limitations**")
         if experiment.unsupported_sections:
+            st.caption("The OLAX archive was imported successfully, but some internal data sections are not yet decoded.")
             for section in experiment.unsupported_sections:
                 st.warning(section)
         else:
-            st.caption("No unsupported sections reported.")
+            st.caption("The OLAX archive was imported successfully and no import limitations were reported.")
         if not metadata.get("peak_table_files"):
             st.caption("No peak/result table was detected, so quantitative peak interpretation is limited.")
 

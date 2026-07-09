@@ -126,6 +126,19 @@ class ChromatographyPeak:
 
 
 @dataclass
+class ChromatogramTrace:
+    """Decoded raw chromatogram time/intensity evidence for one detector signal."""
+
+    source_file: str
+    time_min: list[float] = field(default_factory=list)
+    intensity: list[float] = field(default_factory=list)
+    detector: str | None = None
+    signal_name: str | None = None
+    unit: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class ChromatographyMeasurement:
     """Raw chromatographic evidence from one analytical run.
 
@@ -141,6 +154,7 @@ class ChromatographyMeasurement:
     replicate_id: str | None = None
     source_files: list[str] = field(default_factory=list)
     peaks: list[ChromatographyPeak] = field(default_factory=list)
+    chromatogram_traces: list[ChromatogramTrace] = field(default_factory=list)
     total_area: float | None = None
     parent_peak_id: str | None = None
     recovery_percent: float | None = None
