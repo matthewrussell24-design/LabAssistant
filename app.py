@@ -38,7 +38,6 @@ from labassistant.history import (
     history_table,
     latest_experiment,
     load_history,
-    measurements_from_record,
     save_experiment,
     trend_table,
 )
@@ -56,7 +55,16 @@ from labassistant.filtration import (
     normalize_pressure,
     validate_difficulty_score,
 )
-from labassistant.models import Experiment
+from labassistant.models import (
+    AngleSummary,
+    DerivedMetrics,
+    DistributionData,
+    Experiment,
+    Measurement,
+    MeasurementFlag,
+    MeasurementMetadata,
+    SummaryMetrics,
+)
 from labassistant.observations import (
     build_experiment_brief_from_observations,
     observation_table,
@@ -1548,13 +1556,57 @@ def render_saved_experiment_loader() -> None:
     selected_label = st.selectbox("Saved experiment", labels, key="saved_experiment_to_load")
     selected_record = compatible_records[labels.index(selected_label)]
     if st.button("Load saved experiment into workspace", use_container_width=True):
-        measurements = measurements_from_record(selected_record)
+        measurements = measurements_from_saved_record(selected_record)
         st.session_state["imported_upload_signature"] = ("history", selected_record.id)
         st.session_state["imported_samples"] = [sample_from_measurement(measurement) for measurement in measurements]
         st.session_state["import_errors"] = []
         st.session_state["loaded_history_record"] = selected_record.to_dict()
         st.session_state["history_label"] = f"{selected_record.label} (updated)"
         st.rerun()
+
+
+def measurements_from_saved_record(record) -> list[Measurement]:
+    measurements = []
+    for payload in record.measurements:
+        measurement = measurement_from_saved_dict(payload)
+        measurement.provenance["loaded_from_history"] = {
+            "record_id": record.id,
+            "label": record.label,
+            "saved_at": record.saved_at,
+        }
+        measurements.append(measurement)
+    return measurements
+
+
+def measurement_from_saved_dict(payload: dict) -> Measurement:
+    return Measurement(
+        metadata=_model_from_dict(MeasurementMetadata, payload.get("metadata") or {}),
+        summary_metrics=_model_from_dict(SummaryMetrics, payload.get("summary_metrics") or {}),
+        distributions={
+            key: _model_from_dict(DistributionData, value)
+            for key, value in (payload.get("distributions") or {}).items()
+            if isinstance(value, dict)
+        },
+        correlogram=list(payload.get("correlogram") or []),
+        derived_metrics=_model_from_dict(DerivedMetrics, payload.get("derived_metrics") or {}),
+        angle_summaries=[
+            _model_from_dict(AngleSummary, value)
+            for value in payload.get("angle_summaries") or []
+            if isinstance(value, dict)
+        ],
+        flags=[
+            _model_from_dict(MeasurementFlag, value)
+            for value in payload.get("flags") or []
+            if isinstance(value, dict)
+        ],
+        interpretation=dict(payload.get("interpretation") or {}),
+        provenance=dict(payload.get("provenance") or {}),
+    )
+
+
+def _model_from_dict(model_type, payload: dict):
+    fields = set(model_type.__dataclass_fields__)
+    return model_type(**{key: value for key, value in payload.items() if key in fields})
 
 
 def upload_batch_signature(uploaded_files) -> tuple[tuple[str, int | None], ...]:
