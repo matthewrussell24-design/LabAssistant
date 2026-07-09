@@ -9,7 +9,15 @@ from uuid import uuid4
 
 import pandas as pd
 
-from labassistant.models import Measurement
+from labassistant.models import (
+    AngleSummary,
+    DerivedMetrics,
+    DistributionData,
+    Measurement,
+    MeasurementFlag,
+    MeasurementMetadata,
+    SummaryMetrics,
+)
 from labassistant.quality import status_from_warnings
 
 
@@ -58,6 +66,57 @@ class ExperimentRecord:
             label=str(payload.get("label") or "Untitled experiment"),
             measurements=list(payload.get("measurements") or []),
         )
+
+
+def measurements_from_record(record: ExperimentRecord) -> list[Measurement]:
+    measurements = []
+    for payload in record.measurements:
+        measurement = measurement_from_dict(payload)
+        measurement.provenance.setdefault("loaded_from_history", {})
+        measurement.provenance["loaded_from_history"] = {
+            "record_id": record.id,
+            "label": record.label,
+            "saved_at": record.saved_at,
+        }
+        measurements.append(measurement)
+    return measurements
+
+
+def measurement_from_dict(payload: dict) -> Measurement:
+    metadata = _dataclass_from_dict(MeasurementMetadata, payload.get("metadata") or {})
+    summary_metrics = _dataclass_from_dict(SummaryMetrics, payload.get("summary_metrics") or {})
+    derived_metrics = _dataclass_from_dict(DerivedMetrics, payload.get("derived_metrics") or {})
+    distributions = {
+        key: _dataclass_from_dict(DistributionData, value)
+        for key, value in (payload.get("distributions") or {}).items()
+        if isinstance(value, dict)
+    }
+    angle_summaries = [
+        _dataclass_from_dict(AngleSummary, value)
+        for value in payload.get("angle_summaries") or []
+        if isinstance(value, dict)
+    ]
+    flags = [
+        _dataclass_from_dict(MeasurementFlag, value)
+        for value in payload.get("flags") or []
+        if isinstance(value, dict)
+    ]
+    return Measurement(
+        metadata=metadata,
+        summary_metrics=summary_metrics,
+        distributions=distributions,
+        correlogram=list(payload.get("correlogram") or []),
+        derived_metrics=derived_metrics,
+        angle_summaries=angle_summaries,
+        flags=flags,
+        interpretation=dict(payload.get("interpretation") or {}),
+        provenance=dict(payload.get("provenance") or {}),
+    )
+
+
+def _dataclass_from_dict(dataclass_type, payload: dict):
+    names = set(dataclass_type.__dataclass_fields__)
+    return dataclass_type(**{key: value for key, value in payload.items() if key in names})
 
 
 def save_experiment(

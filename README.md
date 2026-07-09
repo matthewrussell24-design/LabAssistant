@@ -108,6 +108,55 @@ circulation time -> forward-scatter size/PDI -> filtration difficulty
 Filtration may strengthen or weaken the relationship hypothesis because it is a
 separate measurement of sample behavior rather than another DLS-derived metric.
 
+### Filtration Follow-Up Workflow
+
+LabAssistant supports a first generic filtration follow-up workflow for the
+same samples reviewed by DLS. Filtration evidence can be entered manually or
+imported from a simple CSV; it is stored on each DLS `Measurement` as orthogonal
+follow-up provenance.
+
+The filtration difficulty score is an ordinal, operator-assessed rubric, not a
+continuous physical measurement:
+
+| Score | Meaning |
+| --- | --- |
+| 1 | Filters easily; no meaningful resistance. |
+| 2 | Slight resistance or slower than baseline. |
+| 3 | Moderate filtration difficulty. |
+| 4 | High resistance, substantial slowdown, or strong clogging tendency. |
+| 5 | Severe filtration difficulty; near-failure or inability to complete normally. |
+
+Because difficulty is ordinal, LabAssistant uses Spearman rank correlation for
+relationships involving filtration difficulty, such as difficulty vs
+forward-angle Z-average, difficulty vs forward-angle PDI, and difficulty vs
+circulation time. Pearson correlation remains appropriate for continuous
+relationships such as circulation time vs forward-angle Z-average/PDI. All
+relationship language remains restrained and correlation-only.
+
+Pressure values preserve the originally entered value and unit while also
+normalizing supported units to kPa. Supported pressure units are `Pa`, `kPa`,
+`bar`, and `psi`; unsupported or missing units are reported rather than assumed.
+
+The generic filtration CSV importer supports conservative column matching for:
+
+```text
+sample name, difficulty score, filtration time, filtration time unit,
+pressure, pressure unit, filter type, clogging observed, notes
+```
+
+Rows with invalid sample names or non-rubric difficulty scores are skipped with
+row-level warnings. Extra columns are ignored and reported. This is intentionally
+not a proprietary device parser.
+
+Saved DLS experiments can be loaded back into the current editable workspace.
+History remains append-only: loading restores circulation-time and filtration
+values for editing, and saving creates a new saved version with lineage
+provenance rather than silently mutating the prior record.
+
+`FiltrationMeasurement` also has optional generic trace support for future
+device outputs: time values, normalized pressure-over-time, optional flow rate,
+and source/provenance metadata. No advanced curve analytics are implemented yet.
+
 ### Dual-Angle Comparison as Supporting Evidence
 
 LabAssistant implements Malvern Panalytical's dual-angle protein-aggregation

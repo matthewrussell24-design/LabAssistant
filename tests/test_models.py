@@ -5,6 +5,7 @@ from labassistant.models import (
     DerivedMetrics,
     DistributionData,
     FiltrationMeasurement,
+    FiltrationTrace,
     MassBalanceAssessment,
     Measurement,
     MeasurementFlag,
@@ -149,13 +150,17 @@ def test_filtration_measurement_serializes_to_plain_dict():
         filtration_time_minutes=12.5,
         pressure=15.0,
         pressure_unit="psi",
+        pressure_kpa=103.421,
         filter_type="0.22 um PES",
         clogging_observed=True,
         notes="Slow near the end.",
+        trace=FiltrationTrace(time_values=[0.0, 1.0], time_unit="minutes", pressure_kpa=[50.0, 80.0]),
     )
 
     payload = measurement.to_dict()
 
     assert payload["sample_name"] == "Lot 1"
     assert payload["difficulty_score"] == 4.0
+    assert payload["pressure_kpa"] == 103.421
     assert payload["clogging_observed"] is True
+    assert payload["trace"]["pressure_kpa"] == [50.0, 80.0]

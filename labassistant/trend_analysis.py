@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 from labassistant.interpretation import format_metric
+from labassistant.filtration import filtration_measurement_from_dict
 from labassistant.models import AngleSummary, FiltrationMeasurement, Measurement
 from labassistant.view_models import ParsedSample
 
@@ -81,7 +82,9 @@ class RelationshipAnalysis:
     points: list[ForwardScatterPoint]
     valid_count: int
     distinct_circulation_times: int
+    method: str = "Pearson"
     pearson_r: float | None = None
+    correlation: float | None = None
     relationship: str | None = None
     message: str = ""
 
@@ -250,17 +253,7 @@ def filtration_measurement_from_provenance(measurement: Measurement) -> Filtrati
     payload = measurement.provenance.get("filtration_follow_up")
     if not isinstance(payload, dict):
         return None
-    return FiltrationMeasurement(
-        sample_name=str(payload.get("sample_name") or measurement.sample_name),
-        difficulty_score=_optional_float(payload.get("difficulty_score")),
-        filtration_time_minutes=_optional_float(payload.get("filtration_time_minutes")),
-        pressure=_optional_float(payload.get("pressure")),
-        pressure_unit=payload.get("pressure_unit"),
-        filter_type=payload.get("filter_type"),
-        clogging_observed=payload.get("clogging_observed"),
-        notes=payload.get("notes"),
-        source=str(payload.get("source") or "manual_entry"),
-    )
+    return filtration_measurement_from_dict(payload, sample_name=measurement.sample_name)
 
 
 def build_filtration_trend_analysis(samples: list[ParsedSample]) -> FiltrationTrendAnalysis:
@@ -283,14 +276,29 @@ def build_filtration_trend_analysis(samples: list[ParsedSample]) -> FiltrationTr
 
     return FiltrationTrendAnalysis(
         points=points,
-        z_average=analyze_relationship("Filtration Difficulty vs Forward Z-Average", "", points, "forward_z_average", x_attribute="difficulty_score"),
-        pdi=analyze_relationship("Filtration Difficulty vs Forward PDI", "", points, "forward_pdi", x_attribute="difficulty_score"),
+        z_average=analyze_relationship(
+            "Filtration Difficulty vs Forward Z-Average",
+            "",
+            points,
+            "forward_z_average",
+            x_attribute="difficulty_score",
+            method="Spearman",
+        ),
+        pdi=analyze_relationship(
+            "Filtration Difficulty vs Forward PDI",
+            "",
+            points,
+            "forward_pdi",
+            x_attribute="difficulty_score",
+            method="Spearman",
+        ),
         circulation_time=analyze_relationship(
             "Filtration Difficulty vs Circulation Time",
             "",
             points,
             "circulation_time_minutes",
             x_attribute="difficulty_score",
+            method="Spearman",
         ),
     )
 
@@ -302,6 +310,7 @@ def analyze_relationship(
     value_attribute: str,
     *,
     x_attribute: str = "circulation_time",
+    method: str = "Pearson",
 ) -> RelationshipAnalysis:
     valid_points = [
         point
@@ -318,6 +327,7 @@ def analyze_relationship(
         points=valid_points,
         valid_count=len(valid_points),
         distinct_circulation_times=distinct_x_values,
+        method=method,
     )
 
     if len(valid_points) < 3:
@@ -331,13 +341,15 @@ def analyze_relationship(
     x_values = [float(getattr(point, x_attribute)) for point in valid_points]
     y_values = [float(getattr(point, value_attribute)) for point in valid_points]
     if len(set(y_values)) < 2:
-        analysis.message = f"{metric} does not vary across the valid samples, so Pearson correlation is not informative."
+        analysis.message = f"{metric} does not vary across the valid samples, so {method} correlation is not informative."
         return analysis
 
-    analysis.pearson_r = pearson_correlation(x_values, y_values)
-    analysis.relationship = relationship_strength(analysis.pearson_r)
+    correlation = spearman_correlation(x_values, y_values) if method == "Spearman" else pearson_correlation(x_values, y_values)
+    analysis.pearson_r = correlation if method == "Pearson" else None
+    analysis.correlation = correlation
+    analysis.relationship = relationship_strength(correlation)
     analysis.message = (
-        f"Pearson r = {analysis.pearson_r:.2f}, a {analysis.relationship} relationship in this dataset. "
+        f"{method} r = {correlation:.2f}, a {analysis.relationship} relationship in this dataset. "
         "This is correlation only, not evidence of causation."
     )
     return analysis
@@ -355,6 +367,14 @@ def pearson_correlation(x_values: list[float], y_values: list[float]) -> float:
     if math.isclose(denominator, 0.0):
         raise ValueError("Pearson correlation requires variation in both variables.")
     return float((x_centered * y_centered).sum() / denominator)
+
+
+def spearman_correlation(x_values: list[float], y_values: list[float]) -> float:
+    if len(x_values) != len(y_values) or len(x_values) < 2:
+        raise ValueError("Spearman correlation requires paired vectors of equal length.")
+    x_ranks = pd.Series(x_values, dtype=float).rank(method="average").tolist()
+    y_ranks = pd.Series(y_values, dtype=float).rank(method="average").tolist()
+    return pearson_correlation(x_ranks, y_ranks)
 
 
 def relationship_strength(correlation: float) -> str:

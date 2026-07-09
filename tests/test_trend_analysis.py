@@ -17,6 +17,7 @@ from labassistant.trend_analysis import (
     pearson_correlation,
     replicate_statistics_table,
     relationship_strength,
+    spearman_correlation,
 )
 from labassistant.view_models import ParsedSample, build_metrics_table
 
@@ -184,6 +185,7 @@ def test_forward_angle_summary_falls_back_to_low_angle_metadata():
 
 def test_pearson_and_relationship_strength_helpers_are_restrained():
     assert round(pearson_correlation([1, 2, 3], [1, 3, 5]), 2) == 1.0
+    assert round(spearman_correlation([1, 2, 3], [10, 30, 20]), 2) == 0.5
     assert relationship_strength(0.1) == "weak"
     assert relationship_strength(0.5) == "moderate"
     assert relationship_strength(-0.9) == "strong"
@@ -231,7 +233,9 @@ def test_filtration_trend_analysis_relates_forward_scatter_to_difficulty():
     analysis = build_filtration_trend_analysis(samples)
 
     assert [point.sample for point in analysis.points] == ["Sample A", "Sample B", "Sample C"]
-    assert round(analysis.z_average.pearson_r, 2) == 1.0
+    assert analysis.z_average.method == "Spearman"
+    assert round(analysis.z_average.correlation, 2) == 1.0
+    assert analysis.z_average.pearson_r is None
     assert analysis.z_average.relationship == "strong"
     assert analysis.pdi.relationship == "strong"
     assert analysis.circulation_time.relationship == "strong"

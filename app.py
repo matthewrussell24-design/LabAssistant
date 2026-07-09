@@ -30,6 +30,7 @@ from labassistant.importers.chromatography import (
     peak_area_trend_table,
     total_area_trend_table,
 )
+from labassistant.importers.filtration import FiltrationImportResult, parse_filtration_csv
 from labassistant.importers.openlab_olax import build_experiment_from_olax
 from labassistant.history import (
     compare_experiments,
@@ -37,6 +38,7 @@ from labassistant.history import (
     history_table,
     latest_experiment,
     load_history,
+    measurements_from_record,
     save_experiment,
     trend_table,
 )
@@ -45,6 +47,14 @@ from labassistant.metrics import (
 )
 from labassistant.chromatography import mass_balance_hypotheses
 from labassistant.context_engine import ContextRetriever, KnowledgeStore, ResearchJournal
+from labassistant.filtration import (
+    FILTRATION_DIFFICULTY_RUBRIC,
+    PRESSURE_UNIT_LABELS,
+    PRESSURE_UNITS_TO_KPA,
+    filtration_measurement_to_table_row,
+    normalize_pressure,
+    validate_difficulty_score,
+)
 from labassistant.models import Experiment, FiltrationMeasurement
 from labassistant.observations import (
     build_experiment_brief_from_observations,
@@ -1523,6 +1533,29 @@ def render_empty_state() -> None:
     st.info("Upload DLS files from the sidebar to start a decision-focused batch review.")
 
 
+def render_saved_experiment_loader() -> None:
+    records = load_history()
+    compatible_records = [record for record in records if record.measurements]
+    if not compatible_records:
+        return
+    st.subheader("Load Saved DLS Experiment")
+    st.caption("History is append-only. Loading a saved experiment restores editable UI state; saving again creates a new saved version.")
+    labels = [
+        f"{record.saved_at} · {record.label} · {len(record.measurements)} sample(s) · {record.id[:8]}"
+        for record in compatible_records
+    ]
+    selected_label = st.selectbox("Saved experiment", labels, key="saved_experiment_to_load")
+    selected_record = compatible_records[labels.index(selected_label)]
+    if st.button("Load saved experiment into workspace", use_container_width=True):
+        measurements = measurements_from_record(selected_record)
+        st.session_state["imported_upload_signature"] = ("history", selected_record.id)
+        st.session_state["imported_samples"] = [sample_from_measurement(measurement) for measurement in measurements]
+        st.session_state["import_errors"] = []
+        st.session_state["loaded_history_record"] = selected_record.to_dict()
+        st.session_state["history_label"] = f"{selected_record.label} (updated)"
+        st.rerun()
+
+
 def upload_batch_signature(uploaded_files) -> tuple[tuple[str, int | None], ...]:
     return tuple((uploaded_file.name, getattr(uploaded_file, "size", None)) for uploaded_file in uploaded_files)
 
@@ -1586,6 +1619,9 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
         if not records:
             st.info("No saved experiments yet.")
             return
+
+        render_saved_experiment_loader()
+        st.divider()
 
         previous = latest_experiment(records)
         if samples and previous is not None:
@@ -1706,21 +1742,24 @@ def apply_session_experimental_variables(samples: list[ParsedSample]) -> None:
         if time_value is not None and time_unit in CIRCULATION_TIME_UNITS_TO_MINUTES:
             apply_circulation_time(sample.measurement, time_value, str(time_unit))
 
-        difficulty_score = parse_optional_float(st.session_state.get(f"filtration_difficulty::{sample.name}"))
-        if difficulty_score is None:
+        ordinal_score = parse_filtration_score(st.session_state.get(f"filtration_difficulty::{sample.name}"))
+        if ordinal_score is None:
             continue
         filtration_time = parse_optional_float(st.session_state.get(f"filtration_time::{sample.name}"))
         pressure = parse_optional_float(st.session_state.get(f"filtration_pressure::{sample.name}"))
+        pressure_unit = st.session_state.get(f"filtration_pressure_unit::{sample.name}")
+        pressure_kpa = normalize_pressure(pressure, pressure_unit) if pressure is not None and pressure_unit in PRESSURE_UNITS_TO_KPA else None
         clogging_value = st.session_state.get(f"filtration_clogging::{sample.name}", "Not recorded")
         clogging_observed = {"Yes": True, "No": False}.get(str(clogging_value))
         apply_filtration_measurement(
             sample.measurement,
             FiltrationMeasurement(
                 sample_name=sample.name,
-                difficulty_score=difficulty_score,
+                difficulty_score=float(ordinal_score),
                 filtration_time_minutes=filtration_time,
                 pressure=pressure,
-                pressure_unit=st.session_state.get(f"filtration_pressure_unit::{sample.name}") or None,
+                pressure_unit=str(pressure_unit) if pressure_unit in PRESSURE_UNITS_TO_KPA else None,
+                pressure_kpa=pressure_kpa,
                 filter_type=(st.session_state.get(f"filtration_filter::{sample.name}") or "").strip() or None,
                 clogging_observed=clogging_observed,
                 notes=(st.session_state.get(f"filtration_notes::{sample.name}") or "").strip() or None,
@@ -1831,6 +1870,12 @@ def parse_optional_float(value: str | float | int | None) -> float | None:
         return None
 
 
+def parse_filtration_score(value: str | float | int | None) -> int | None:
+    if isinstance(value, str) and " - " in value:
+        value = value.split(" - ", 1)[0]
+    return validate_difficulty_score(value)
+
+
 def _forward_scatter_trend_chart(
     points: list[ForwardScatterPoint],
     value_attribute: str,
@@ -1866,10 +1911,10 @@ def _forward_scatter_trend_chart(
 
 
 def render_relationship_summary(analysis: RelationshipAnalysis) -> None:
-    if analysis.pearson_r is None:
+    if analysis.correlation is None:
         st.info(analysis.message)
     else:
-        st.metric(f"{analysis.metric} correlation", f"r = {analysis.pearson_r:.2f}", analysis.relationship)
+        st.metric(f"{analysis.metric} correlation", f"{analysis.method} r = {analysis.correlation:.2f}", analysis.relationship)
         st.caption(analysis.message)
 
 
@@ -1883,100 +1928,208 @@ def render_filtration_hypothesis_callout() -> None:
 
 def render_filtration_follow_up(samples: list[ParsedSample]) -> None:
     render_filtration_hypothesis_callout()
-    with st.expander("Filtration Follow-Up (Orthogonal Measurement)", expanded=False):
-        st.caption(
-            "Optionally enter filtration results for the same samples. These values are stored separately from DLS metrics and used to test whether forward-scatter attributes relate to filtration difficulty."
+    st.subheader("Filtration Follow-Up")
+    st.caption(
+        "Orthogonal filtration measurements can be entered manually or imported from a simple CSV. "
+        "Difficulty is an ordinal operator-assessed score, not a continuous physical measurement."
+    )
+
+    render_filtration_rubric()
+    manual_tab, csv_tab = st.tabs(["Manual Entry", "CSV Import"])
+    with manual_tab:
+        render_manual_filtration_entry(samples)
+    with csv_tab:
+        render_filtration_csv_import(samples)
+
+    apply_session_experimental_variables(samples)
+    render_attached_filtration_measurements(samples)
+
+    filtration_analysis = build_filtration_trend_analysis(samples)
+    if not filtration_analysis.points:
+        st.info("Attach filtration difficulty scores for at least three samples to compare filtration behavior with DLS forward-scatter attributes.")
+        return
+
+    render_filtration_trend_table(filtration_analysis.points)
+    chart_columns = st.columns(3)
+    with chart_columns[0]:
+        st.plotly_chart(
+            _filtration_trend_chart(
+                filtration_analysis.points,
+                "forward_z_average",
+                "Forward Z-Average vs Filtration Difficulty",
+                "Forward Z-Average (nm)",
+            ),
+            use_container_width=True,
+            config={"displaylogo": False},
         )
-        columns = st.columns(min(3, len(samples)))
-        invalid_scores: list[str] = []
-        for index, sample in enumerate(samples):
-            existing = filtration_measurement_from_provenance(sample.measurement)
-            difficulty_key = f"filtration_difficulty::{sample.name}"
-            time_key = f"filtration_time::{sample.name}"
-            pressure_key = f"filtration_pressure::{sample.name}"
-            pressure_unit_key = f"filtration_pressure_unit::{sample.name}"
-            filter_key = f"filtration_filter::{sample.name}"
-            clogging_key = f"filtration_clogging::{sample.name}"
-            notes_key = f"filtration_notes::{sample.name}"
-            if existing and difficulty_key not in st.session_state and existing.difficulty_score is not None:
-                st.session_state[difficulty_key] = str(existing.difficulty_score)
-            if existing and time_key not in st.session_state and existing.filtration_time_minutes is not None:
-                st.session_state[time_key] = str(existing.filtration_time_minutes)
-            if existing and pressure_key not in st.session_state and existing.pressure is not None:
-                st.session_state[pressure_key] = str(existing.pressure)
-            if existing and pressure_unit_key not in st.session_state and existing.pressure_unit:
-                st.session_state[pressure_unit_key] = existing.pressure_unit
-            if existing and filter_key not in st.session_state and existing.filter_type:
-                st.session_state[filter_key] = existing.filter_type
-            if existing and clogging_key not in st.session_state and existing.clogging_observed is not None:
-                st.session_state[clogging_key] = "Yes" if existing.clogging_observed else "No"
-            if existing and notes_key not in st.session_state and existing.notes:
-                st.session_state[notes_key] = existing.notes
+        render_relationship_summary(filtration_analysis.z_average)
+    with chart_columns[1]:
+        st.plotly_chart(
+            _filtration_trend_chart(
+                filtration_analysis.points,
+                "forward_pdi",
+                "Forward PDI vs Filtration Difficulty",
+                "Forward PDI",
+            ),
+            use_container_width=True,
+            config={"displaylogo": False},
+        )
+        render_relationship_summary(filtration_analysis.pdi)
+    with chart_columns[2]:
+        st.plotly_chart(
+            _filtration_trend_chart(
+                filtration_analysis.points,
+                "circulation_time_minutes",
+                "Circulation Time vs Filtration Difficulty",
+                "Circulation Time (min)",
+            ),
+            use_container_width=True,
+            config={"displaylogo": False},
+        )
+        render_relationship_summary(filtration_analysis.circulation_time)
 
-            with columns[index % len(columns)]:
-                st.markdown(f"**{sample.name}**")
-                raw_score = st.text_input(
-                    "Difficulty score",
-                    key=difficulty_key,
-                    placeholder="1-5",
-                    help="Explicit filtration difficulty score. Use a consistent scale across samples, such as 1 easy to 5 difficult.",
-                )
-                st.text_input("Filtration time (min)", key=time_key, placeholder="optional")
-                st.text_input("Pressure", key=pressure_key, placeholder="optional")
-                st.text_input("Pressure unit", key=pressure_unit_key, placeholder="optional")
-                st.text_input("Filter type", key=filter_key, placeholder="optional")
-                st.selectbox("Clogging observed", ["Not recorded", "No", "Yes"], key=clogging_key)
-                st.text_area("Notes", key=notes_key, height=70)
-            if parse_optional_float(raw_score) is None and str(raw_score).strip():
-                invalid_scores.append(sample.name)
 
-        if invalid_scores:
-            st.warning("Enter numeric filtration difficulty scores for: " + ", ".join(invalid_scores))
+def render_filtration_rubric() -> None:
+    rubric = pd.DataFrame(
+        [{"Score": score, "Meaning": meaning} for score, meaning in FILTRATION_DIFFICULTY_RUBRIC.items()]
+    )
+    st.markdown("**Ordinal difficulty rubric**")
+    st.dataframe(rubric, use_container_width=True, hide_index=True)
 
-        apply_session_experimental_variables(samples)
-        filtration_analysis = build_filtration_trend_analysis(samples)
-        if not filtration_analysis.points:
-            st.info("Enter filtration difficulty scores for at least three samples to compare filtration behavior with DLS forward-scatter attributes.")
-            return
 
-        render_filtration_trend_table(filtration_analysis.points)
-        chart_columns = st.columns(3)
-        with chart_columns[0]:
-            st.plotly_chart(
-                _filtration_trend_chart(
-                    filtration_analysis.points,
-                    "forward_z_average",
-                    "Forward Z-Average vs Filtration Difficulty",
-                    "Forward Z-Average (nm)",
-                ),
-                use_container_width=True,
-                config={"displaylogo": False},
+def render_manual_filtration_entry(samples: list[ParsedSample]) -> None:
+    columns = st.columns(min(3, len(samples)))
+    invalid_pressure: list[str] = []
+    for index, sample in enumerate(samples):
+        existing = filtration_measurement_from_provenance(sample.measurement)
+        _prefill_filtration_session(sample.name, existing)
+        difficulty_key = f"filtration_difficulty::{sample.name}"
+        time_key = f"filtration_time::{sample.name}"
+        pressure_key = f"filtration_pressure::{sample.name}"
+        pressure_unit_key = f"filtration_pressure_unit::{sample.name}"
+        filter_key = f"filtration_filter::{sample.name}"
+        clogging_key = f"filtration_clogging::{sample.name}"
+        notes_key = f"filtration_notes::{sample.name}"
+
+        with columns[index % len(columns)]:
+            st.markdown(f"**{sample.name}**")
+            score_labels = ["Not recorded"] + [
+                f"{score} - {meaning}" for score, meaning in FILTRATION_DIFFICULTY_RUBRIC.items()
+            ]
+            st.selectbox(
+                "Ordinal difficulty score",
+                score_labels,
+                key=difficulty_key,
+                help="Operator-assessed ordinal score. Use the rubric above; do not treat as a continuous physical measurement.",
             )
-            render_relationship_summary(filtration_analysis.z_average)
-        with chart_columns[1]:
-            st.plotly_chart(
-                _filtration_trend_chart(
-                    filtration_analysis.points,
-                    "forward_pdi",
-                    "Forward PDI vs Filtration Difficulty",
-                    "Forward PDI",
-                ),
-                use_container_width=True,
-                config={"displaylogo": False},
+            st.text_input("Filtration time (min)", key=time_key, placeholder="optional")
+            pressure = st.text_input("Pressure", key=pressure_key, placeholder="optional")
+            st.selectbox(
+                "Pressure unit",
+                [""] + list(PRESSURE_UNIT_LABELS),
+                format_func=lambda unit: PRESSURE_UNIT_LABELS.get(unit, "Select unit"),
+                key=pressure_unit_key,
+                help="Pressure is stored in the original unit and normalized to kPa.",
             )
-            render_relationship_summary(filtration_analysis.pdi)
-        with chart_columns[2]:
-            st.plotly_chart(
-                _filtration_trend_chart(
-                    filtration_analysis.points,
-                    "circulation_time_minutes",
-                    "Circulation Time vs Filtration Difficulty",
-                    "Circulation Time (min)",
-                ),
-                use_container_width=True,
-                config={"displaylogo": False},
-            )
-            render_relationship_summary(filtration_analysis.circulation_time)
+            st.text_input("Filter type", key=filter_key, placeholder="optional")
+            st.selectbox("Clogging observed", ["Not recorded", "No", "Yes"], key=clogging_key)
+            st.text_area("Notes", key=notes_key, height=70)
+            parsed_pressure = parse_optional_float(pressure)
+            if parsed_pressure is not None:
+                pressure_unit = st.session_state.get(pressure_unit_key)
+                if pressure_unit in PRESSURE_UNITS_TO_KPA:
+                    st.caption(f"Normalized pressure: {normalize_pressure(parsed_pressure, pressure_unit):.3g} kPa")
+                else:
+                    st.warning("Select a supported pressure unit to normalize pressure.")
+            elif str(pressure).strip():
+                invalid_pressure.append(sample.name)
+
+    if invalid_pressure:
+        st.warning("Enter numeric pressure values for: " + ", ".join(invalid_pressure))
+
+
+def _prefill_filtration_session(sample_name: str, existing: FiltrationMeasurement | None, *, overwrite: bool = False) -> None:
+    if existing is None:
+        return
+    difficulty_key = f"filtration_difficulty::{sample_name}"
+    if (overwrite or difficulty_key not in st.session_state) and existing.difficulty_score is not None:
+        score = int(existing.difficulty_score)
+        st.session_state[difficulty_key] = f"{score} - {FILTRATION_DIFFICULTY_RUBRIC.get(score, '')}"
+    values = {
+        f"filtration_time::{sample_name}": existing.filtration_time_minutes,
+        f"filtration_pressure::{sample_name}": existing.pressure,
+        f"filtration_pressure_unit::{sample_name}": existing.pressure_unit,
+        f"filtration_filter::{sample_name}": existing.filter_type,
+        f"filtration_notes::{sample_name}": existing.notes,
+    }
+    for key, value in values.items():
+        if (overwrite or key not in st.session_state) and value not in (None, ""):
+            st.session_state[key] = str(value)
+    clogging_key = f"filtration_clogging::{sample_name}"
+    if (overwrite or clogging_key not in st.session_state) and existing.clogging_observed is not None:
+        st.session_state[clogging_key] = "Yes" if existing.clogging_observed else "No"
+
+
+def render_filtration_csv_import(samples: list[ParsedSample]) -> None:
+    st.caption("Supported CSV columns: sample name, difficulty score, filtration time, filtration time unit, pressure, pressure unit, filter type, clogging observed, notes.")
+    filtration_file = st.file_uploader("Upload filtration CSV", type=["csv"], accept_multiple_files=False, key="filtration_csv_upload")
+    if filtration_file is None:
+        return
+    result = parse_filtration_csv(filtration_file, source_name=filtration_file.name)
+    render_filtration_import_preview(result)
+    if result.measurements and st.button("Attach parsed filtration measurements", use_container_width=True):
+        attached, unmatched = attach_filtration_measurements(samples, result.measurements)
+        st.success(f"Attached filtration measurements to {attached} sample(s).")
+        if unmatched:
+            st.warning("No matching current DLS sample for: " + ", ".join(unmatched))
+
+
+def render_filtration_import_preview(result: FiltrationImportResult) -> None:
+    if result.missing_columns:
+        st.error("Missing required columns: " + ", ".join(result.missing_columns))
+    if result.unsupported_columns:
+        st.caption("Unsupported columns ignored: " + ", ".join(result.unsupported_columns))
+    for warning in result.warnings[:8]:
+        st.warning(warning)
+    for error in result.errors:
+        st.error(error)
+    if result.measurements:
+        st.dataframe(
+            pd.DataFrame([filtration_measurement_to_table_row(measurement) for measurement in result.measurements]),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+def attach_filtration_measurements(samples: list[ParsedSample], measurements: list[FiltrationMeasurement]) -> tuple[int, list[str]]:
+    by_name = {sample.name: sample for sample in samples}
+    attached = 0
+    unmatched = []
+    for measurement in measurements:
+        sample = by_name.get(measurement.sample_name)
+        if sample is None:
+            unmatched.append(measurement.sample_name)
+            continue
+        apply_filtration_measurement(sample.measurement, measurement)
+        _prefill_filtration_session(sample.name, measurement, overwrite=True)
+        attached += 1
+    return attached, unmatched
+
+
+def render_attached_filtration_measurements(samples: list[ParsedSample]) -> None:
+    measurements = [
+        measurement
+        for sample in samples
+        if (measurement := filtration_measurement_from_provenance(sample.measurement)) is not None
+    ]
+    if not measurements:
+        return
+    st.markdown("**Current attached filtration measurements**")
+    st.dataframe(
+        pd.DataFrame([filtration_measurement_to_table_row(measurement) for measurement in measurements]),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def render_filtration_trend_table(points: list[FiltrationTrendPoint]) -> None:
@@ -2254,11 +2407,12 @@ def main() -> None:
         except Exception as exc:  # pragma: no cover - surfaced in Streamlit
             chromatography_error = str(exc)
 
-    if not uploaded_files:
+    if not uploaded_files and not st.session_state.get("imported_samples"):
         st.session_state.pop("imported_upload_signature", None)
         st.session_state.pop("imported_samples", None)
         st.session_state.pop("import_errors", None)
         render_empty_state()
+        render_saved_experiment_loader()
         if chromatography_error:
             st.error(f"Chromatography preview failed: {chromatography_error}")
         if chromatography_preview is not None:
@@ -2275,23 +2429,26 @@ def main() -> None:
         render_research_journal_panel()
         return
 
-    upload_signature = upload_batch_signature(uploaded_files)
-    if st.session_state.get("imported_upload_signature") != upload_signature:
-        st.session_state.pop("imported_samples", None)
-        st.session_state.pop("import_errors", None)
+    preview = None
+    if uploaded_files:
+        upload_signature = upload_batch_signature(uploaded_files)
+        if st.session_state.get("imported_upload_signature") != upload_signature:
+            st.session_state.pop("imported_samples", None)
+            st.session_state.pop("import_errors", None)
 
-    preview = build_import_preview(uploaded_files)
-    if st.session_state.get("imported_upload_signature") != upload_signature:
-        import_preview_to_session(preview, upload_signature)
+        preview = build_import_preview(uploaded_files)
+        if st.session_state.get("imported_upload_signature") != upload_signature:
+            import_preview_to_session(preview, upload_signature)
 
     has_imported_samples = bool(st.session_state.get("imported_samples"))
     with st.sidebar:
-        st.divider()
-        st.header("Import")
-        st.dataframe(preview.table, use_container_width=True, hide_index=True)
-        import_label = "Re-import grouped measurements" if has_imported_samples else "Retry grouped import"
-        if st.button(import_label, use_container_width=True):
-            import_preview_to_session(preview, upload_signature)
+        if preview is not None:
+            st.divider()
+            st.header("Import")
+            st.dataframe(preview.table, use_container_width=True, hide_index=True)
+            import_label = "Re-import grouped measurements" if has_imported_samples else "Retry grouped import"
+            if st.button(import_label, use_container_width=True):
+                import_preview_to_session(preview, upload_signature)
         st.divider()
         st.header("Distribution")
         cached_samples = st.session_state.get("imported_samples", [])
@@ -2318,8 +2475,18 @@ def main() -> None:
     with st.sidebar:
         st.divider()
         st.header("History")
-        history_label = st.text_input("Experiment label", value="")
+        loaded_record = st.session_state.get("loaded_history_record")
+        if loaded_record:
+            st.caption(f"Loaded saved version: {loaded_record.get('label')} ({str(loaded_record.get('id', ''))[:8]}). Saving appends a new version.")
+        history_label = st.text_input("Experiment label", value=st.session_state.get("history_label", ""), key="history_label")
         if st.button("Save current experiment", use_container_width=True):
+            for sample in samples:
+                if loaded_record:
+                    sample.measurement.provenance["history_lineage"] = {
+                        "loaded_from_record_id": loaded_record.get("id"),
+                        "loaded_from_label": loaded_record.get("label"),
+                        "save_semantics": "append_new_version",
+                    }
             record = save_experiment([sample.measurement for sample in samples], history_label)
             st.success(f"Saved {record.label}")
         st.divider()
@@ -2328,7 +2495,7 @@ def main() -> None:
         st.caption("Report export is coming soon.")
 
     metrics = build_metrics_table(samples)
-    source_file_names = [uploaded_file.name for uploaded_file in uploaded_files]
+    source_file_names = [uploaded_file.name for uploaded_file in uploaded_files] if uploaded_files else [sample.file_name for sample in samples if sample.file_name]
     dls_memory_experiment = dls_experiment_from_samples(
         samples,
         label=history_label or "DLS experiment",
@@ -2349,10 +2516,12 @@ def main() -> None:
         st.error(f"Chromatography preview failed: {chromatography_error}")
     if chromatography_preview is not None:
         render_chromatography_preview(chromatography_preview)
-    render_data_completeness(preview.groups)
+    if preview is not None:
+        render_data_completeness(preview.groups)
     render_forward_scatter_trend_explorer(samples)
     render_aggregation_detection(samples)
-    render_import_details(preview, import_errors)
+    if preview is not None:
+        render_import_details(preview, import_errors)
     render_history_panel(samples)
     render_memory_panel(
         dls_experiment=dls_memory_experiment,

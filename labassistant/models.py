@@ -169,6 +169,21 @@ class ChromatographyMeasurement:
 
 
 @dataclass
+class FiltrationTrace:
+    """Generic filtration-device trace without device-specific assumptions."""
+
+    time_values: list[float] = field(default_factory=list)
+    time_unit: str | None = None
+    time_minutes: list[float] = field(default_factory=list)
+    pressure_values: list[float] = field(default_factory=list)
+    pressure_unit: str | None = None
+    pressure_kpa: list[float] = field(default_factory=list)
+    flow_rate_values: list[float] = field(default_factory=list)
+    flow_rate_unit: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class FiltrationMeasurement:
     """Orthogonal filtration evidence for one sample.
 
@@ -183,10 +198,15 @@ class FiltrationMeasurement:
     filtration_time_minutes: float | None = None
     pressure: float | None = None
     pressure_unit: str | None = None
+    pressure_kpa: float | None = None
     filter_type: str | None = None
     clogging_observed: bool | None = None
     notes: str | None = None
     source: str = "manual_entry"
+    source_file: str | None = None
+    warnings: list[str] = field(default_factory=list)
+    trace: FiltrationTrace | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

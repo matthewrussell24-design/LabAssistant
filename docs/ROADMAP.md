@@ -89,6 +89,11 @@ Near-term safe move:
 - Keep `labassistant/importers/dls.py` intact.
 - Add `labassistant/ingestion/zetasizer.py` as a compatibility facade that calls
   the existing DLS importer.
+- Keep the generic filtration CSV importer conservative: simple tabular
+  measurements only, row-level warnings, no proprietary device assumptions.
+- Preserve explicit experimental variables and orthogonal follow-up measurements
+  in provenance so saved experiments can be rehydrated into editable state
+  without mutating append-only history.
 - Add an experiment assembly layer that groups parsed measurements by
   experiment context, not only by upload batch or lot.
 - Gradually move generic file classification and lot grouping out of DLS-specific
@@ -163,6 +168,9 @@ Near-term safe move:
 
 - Keep local JSONL history.
 - Add stable experiment IDs and provenance.
+- Support append-only rehydration: loading a saved DLS experiment restores
+  editable circulation-time and filtration values, while saving creates a new
+  version with lineage provenance.
 - Avoid migrating to SQLite until query needs justify it.
 - Define historical comparison interfaces before changing storage.
 

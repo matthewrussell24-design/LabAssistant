@@ -7,6 +7,7 @@ from labassistant.history import (
     history_table,
     latest_experiment,
     load_history,
+    measurements_from_record,
     save_experiment,
     trend_table,
 )
@@ -46,6 +47,11 @@ def test_save_and_load_experiment_history(tmp_path):
     assert records[0].measurements[0]["metadata"]["sample_name"] == "Lot 1"
     assert records[0].measurements[0]["provenance"]["total_circulation_time"]["minutes"] == 120.0
     assert records[0].measurements[0]["provenance"]["filtration_follow_up"]["difficulty_score"] == 4.0
+
+    restored = measurements_from_record(records[0])
+    assert restored[0].sample_name == "Lot 1"
+    assert restored[0].summary_metrics.z_average == 125.0
+    assert restored[0].provenance["loaded_from_history"]["record_id"] == saved.id
 
 
 def test_history_and_trend_tables_summarize_records(tmp_path):

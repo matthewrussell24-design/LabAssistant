@@ -42,6 +42,23 @@ circulation time -> forward-scatter size/PDI -> filtration difficulty
 Filtration is expected to strengthen or weaken the relationship hypothesis
 because it measures sample behavior outside the DLS analysis itself.
 
+The first filtration workflow is intentionally conservative and reproducible:
+filtration difficulty is a 1-5 ordinal operator-assessed rubric, pressure is
+stored in the entered unit and normalized to kPa for supported units (`Pa`,
+`kPa`, `bar`, `psi`), and generic CSV import is limited to simple tabular
+measurements rather than proprietary device parsing. Relationships involving
+the ordinal difficulty score should use Spearman rank correlation; continuous
+DLS/circulation relationships can continue to use Pearson correlation when
+valid.
+
+Saved DLS experiments can be loaded back into editable UI state, but history
+remains append-only. Edited/restored experiments should be saved as new versions
+with lineage provenance rather than silently mutating historical records.
+
+`FiltrationMeasurement` includes optional generic trace fields for future
+pressure-over-time or flow-rate outputs so real device files can be supported
+without another model rewrite.
+
 The Malvern-derived dual-angle Aggregation Index remains useful supporting
 multi-detector evidence, but it is no longer the headline trend metric for this
 larger-particle system. Its published small-protein aggregation thresholds may
