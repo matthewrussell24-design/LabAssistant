@@ -13,7 +13,7 @@ compatible interface over the same scientific core.
 
 ## Framework Recommendation
 
-Use PySide6 6.10.1 for this prototype. It provides a native macOS Qt window and file
+Use PySide6 6.8.3 for this prototype. It provides a native macOS Qt window and file
 dialog, works with the repository's verified Homebrew Python 3.12 environment,
 and has a credible path to future packaging. The tradeoff is a large dependency
 compared with Tkinter. Tkinter was initially preferred for minimalism, but the
@@ -62,9 +62,9 @@ through `scripts/run`, and the full test suite passes.
   calculations.
 - Reconciled the post-prototype launch hardening: the launcher accepts optional
   paths for deterministic smoke testing, configures Qt's plugin directories,
-  pins PySide6 6.10.1 because 6.11.1 failed to register Cocoa on the target
-  macOS runtime, and rejects unrelated files instead of creating empty
-  measurements.
+  pins PySide6 6.8.3 because 6.11.1 and 6.10.1 failed to register Cocoa
+  reliably from the target Mac's login shell, and rejects unrelated files
+  instead of creating empty measurements.
 - Added `scripts/run-desktop` while retaining `scripts/run` for Streamlit.
 - Added focused application-contract and display-format tests using the
   representative DLS workbook dataset.
@@ -72,7 +72,7 @@ through `scripts/run`, and the full test suite passes.
 ## Test Results
 
 - Focused application, desktop, multi-file, and real-fixture tests: 27 passed.
-- Full suite: 133 passed in 2.69s.
+- Full suite: 133 passed in 2.53s.
 - Streamlit headless startup: successful on port 8765.
 - Native PySide6 window launch: successful with the project `.venv`; the
   representative three-file DLS dataset rendered one Lot 1 measurement with
