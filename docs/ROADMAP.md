@@ -54,6 +54,22 @@ removing or bypassing Streamlit.
 
 Status: delivered with PySide6 and `scripts/run-desktop` in task 008.
 
+## Phase 0b: Desktop Research Workspace
+
+Goal: turn the native proof into a professional daily-use shell without
+changing scientific behavior.
+
+- Establish reusable cards, badges, metric tiles, actions, history items, and
+  analysis sections.
+- Make Current Experiment the visual focus and replace raw text output with
+  concise, structured evidence views.
+- Keep future instrument and persisted-history actions honest and disabled
+  until application capabilities exist.
+- Preserve Streamlit and the shared DLS analysis contract.
+
+Status: delivered in task 009. Persisted desktop history and packaging remain
+separate future tasks.
+
 ## Phase 1: Rename The Product Concepts
 
 Goal: make the code and docs describe LabAssistant as a platform, while keeping

@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Native desktop prototype vertical slice over shared
-  DLS application contracts (task 008); inspect
+- Latest Completed Change: Polished native desktop research workspace over
+  unchanged DLS application contracts (task 009); inspect
   `git log -1 --oneline` for the resulting commit identifier.
-- Working Tree: Expected to contain only task 008 changes before commit;
+- Working Tree: Expected to contain only task 009 changes before commit;
   inspect `git status --short` before editing.
-- Last Successful Test: `133 passed in 2.53s` from `scripts/test -q` on
+- Last Successful Test: `136 passed in 3.04s` from `scripts/test -q` on
   2026-07-10; Streamlit and native PySide6 startup smoke tests also passed.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 by Codex for task 008.
+- Last Updated: 2026-07-10 by Codex for task 009.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 129 passing.
+- Tests: 🟢 Healthy — 136 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -55,6 +55,7 @@ use planned work to imply an active implementation commitment.
 - ⬜ Agent SDK
 - ⬜ Authentication
 - ✅ Desktop prototype
+- ✅ Polished desktop workspace
 - ⬜ Packaged desktop application
 - ⬜ Deployment
 
@@ -116,8 +117,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
 ```
 
 - `app.py` owns UI layout, widgets, session state, and visualization.
-- `labassistant.desktop` owns the prototype's Tk widgets, native file picker,
-  error presentation, and concise text rendering only.
+- `labassistant.desktop` owns Qt startup and application invocation;
+  `labassistant.ui` owns modular theme, presenter, component, and window code.
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
   persisted experiment retrieval, local DLS dataset analysis, and a
@@ -194,7 +195,8 @@ Until the application layer is mature, do not:
 - Split the application into microservices.
 - Migrate away from Streamlit.
 - Replace JSONL persistence.
-- Redesign the UI.
+- Redesign the compatible Streamlit UI or add scientific behavior in
+  presentation code.
 - Add an autonomous agent runtime or instrument-control path.
 
 Revisit a non-goal only through an explicitly scoped prompt with supporting
@@ -203,7 +205,9 @@ architecture rationale.
 ## Repository Structure
 
 - `app.py` — current Streamlit application shell.
-- `labassistant/desktop.py` — minimal native desktop prototype shell.
+- `labassistant/desktop.py` — native desktop startup/controller entry point.
+- `labassistant/ui/` — reusable desktop theme, presentation helpers,
+  components, and research-workspace window.
 - `labassistant/` — reusable application and scientific core.
 - `labassistant/application.py` — app-level contracts, capability registry, and
   experiment assembly.
@@ -248,6 +252,9 @@ architecture rationale.
 - Added a PySide6 desktop vertical slice and typed local DLS analysis
   capability, proving the core can serve a native shell without importing
   Streamlit (task 008).
+- Replaced the prototype text view with a polished, modular research workspace
+  using reusable cards, metric tiles, semantic status, structured analysis,
+  purposeful empty states, and clickable session history (task 009).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -263,8 +270,8 @@ architecture rationale.
 
 ## Active Work
 
-- Desktop prototype task 008 is complete pending commit.
-- No unrelated pre-existing changes were present when task 008 began.
+- Desktop redesign task 009 is complete pending commit.
+- No unrelated pre-existing changes were present when task 009 began.
 
 ## Known Risks
 
@@ -280,6 +287,8 @@ architecture rationale.
   services.
 - PySide6 proves native shell independence but is not yet packaged, notarized,
   or validated across target macOS versions.
+- Desktop history is session-only. Persisted timeline browsing/restoration is
+  intentionally disabled until an application query contract exists.
 - PySide6 6.11.1 and 6.10.1 failed to register their installed Cocoa plugin
   reliably from the target macOS 26 `zsh` login shell; the verified prototype
   pins 6.8.3, checks that version in the launcher, and initializes Qt plugin
@@ -300,7 +309,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `133 passed in 2.53s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `136 passed in 3.04s` from `scripts/test -q` on 2026-07-10.
 - Streamlit headless startup succeeded on port 8765; the PySide6 desktop window
   also launched successfully from `scripts/run-desktop`, opened its file
   picker, and rendered the representative Lot 1 DLS result end to end.
@@ -314,23 +323,25 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Validate the desktop prototype through a real macOS user run and
-  decide whether the next desktop step is packaging with PySide6 or continued
-  application-layer workflow extraction.
-- Why this is next: The vertical slice proves technical independence from
-  Streamlit; the next decision should be based on actual launch, file-picker,
-  readability, and Python/Qt compatibility evidence rather than speculative UI
-  expansion.
-- Expected files: A short validation record and, only if justified, a narrowly
-  scoped follow-up prompt. Do not begin packaging during validation.
-- Expected tests: Native launch on the target Mac, representative DLS selection,
-  result comparison with Streamlit, cancel/error behavior, and existing suites.
-- Estimated scope: Small validation task before another implementation slice.
-- Risks: Treating one local Qt installation as distributable evidence or
-  expanding visual scope before framework/packaging direction is decided.
-- Success criteria: The target user confirms the prototype launches and its
-  scientific summary agrees with Streamlit, producing an evidence-based next
-  desktop decision.
+- Objective: Promote persisted experiment listing into the application layer
+  and use it to populate the desktop History timeline and Open Existing
+  Experiment action.
+- Why this is next: The polished shell now exposes the missing boundary
+  honestly; persistent history is the most visible gap in an otherwise coherent
+  daily-use workspace.
+- Expected files: Application read contracts, history/application tests,
+  desktop timeline wiring, prompt 010, capability and architecture docs, and
+  this status page.
+- Expected tests: Empty/corrupt/tolerant listing behavior, immutable history
+  summaries, record restoration, timeline ordering/grouping, click-to-restore,
+  and the full suite.
+- Estimated scope: Medium; reuse existing JSONL persistence without redesigning
+  storage or adding desktop-specific history parsing.
+- Risks: Exposing mutable measurements through list results, confusing saved
+  records with session analyses, or letting the UI bypass application errors.
+- Success criteria: The desktop timeline lists persisted experiments through a
+  versioned application query and restores a selected record through the
+  existing retrieval capability.
 
 ## AI Context Window
 

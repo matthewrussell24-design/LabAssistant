@@ -7,12 +7,6 @@ from collections.abc import Sequence
 from labassistant.application import DLSAnalysisResult, analyze_dls_dataset
 
 
-SUPPORTED_DLS_FILE_FILTER = (
-    "Supported DLS files (*.csv *.txt *.tsv *.xlsx *.xls);;"
-    "CSV files (*.csv);;Excel workbooks (*.xlsx *.xls);;All files (*)"
-)
-
-
 def format_analysis_summary(result: DLSAnalysisResult) -> str:
     """Format an application result for compact human review."""
     snapshot = result.experiment
@@ -68,62 +62,16 @@ def run_desktop(initial_paths: Sequence[str] = ()) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", os.path.join(plugins_path, "platforms"))
     QCoreApplication.setLibraryPaths([plugins_path])
 
-    from PySide6.QtWidgets import (
-        QApplication,
-        QFileDialog,
-        QLabel,
-        QMessageBox,
-        QPushButton,
-        QTextEdit,
-        QVBoxLayout,
-        QWidget,
-    )
+    from PySide6.QtWidgets import QApplication
+
+    from labassistant.ui.desktop_window import DesktopWindow
+    from labassistant.ui.theme import APP_STYLESHEET
 
     application = QApplication.instance() or QApplication(sys.argv)
-    window = QWidget()
-    window.setWindowTitle("LabAssistant Desktop Prototype")
-    window.resize(760, 560)
-    window.setMinimumSize(620, 420)
-
-    layout = QVBoxLayout(window)
-    title = QLabel("LabAssistant")
-    title_font = title.font()
-    title_font.setPointSize(20)
-    title_font.setBold(True)
-    title.setFont(title_font)
-    layout.addWidget(title)
-    layout.addWidget(QLabel("Select an existing DLS dataset to run the shared LabAssistant analysis."))
-
-    select_button = QPushButton("Select DLS Dataset…")
-    layout.addWidget(select_button)
-    output = QTextEdit()
-    output.setReadOnly(True)
-    if initial_paths:
-        try:
-            output.setPlainText(analyze_paths_for_display(initial_paths))
-        except Exception as error:
-            output.setPlainText(f"DLS analysis failed: {error}")
-    else:
-        output.setPlainText("No dataset selected.")
-    layout.addWidget(output, stretch=1)
-
-    def select_dataset() -> None:
-        paths, _ = QFileDialog.getOpenFileNames(
-            window,
-            "Select DLS dataset files",
-            "",
-            SUPPORTED_DLS_FILE_FILTER,
-        )
-        if not paths:
-            return
-        try:
-            summary = analyze_paths_for_display(paths)
-        except Exception as error:
-            QMessageBox.critical(window, "DLS analysis failed", str(error))
-            return
-        output.setPlainText(summary)
-
-    select_button.clicked.connect(select_dataset)
+    application.setApplicationName("LabAssistant")
+    application.setOrganizationName("LabAssistant")
+    application.setStyleSheet(APP_STYLESHEET)
+    window = DesktopWindow(analyze_dls_dataset, initial_paths)
     window.show()
     application.exec()
 

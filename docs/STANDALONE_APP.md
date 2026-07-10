@@ -62,6 +62,24 @@ platform plugin reliably from the target Mac's normal `zsh` login shell. The
 checks the installed version and initializes Qt's plugin search paths
 explicitly for GUI-launch and remote-shell environments.
 
+## Desktop Research Workspace
+
+Task 009 moves the native shell beyond the prototype without changing the
+scientific core. The dashboard uses an off-white canvas, reusable white cards,
+system typography, semantic status colors, soft shadows, and a restrained blue
+accent. Its hierarchy is Workspace actions -> Current Experiment -> structured
+Analysis, with a session timeline alongside the active work.
+
+Presentation is split across `labassistant.ui.theme`, `.presenters`,
+`.components`, and `.desktop_window`. Reusable components include `Card`,
+`StatusBadge`, `MetricTile`, `WorkspaceAction`, `HistoryItem`, and
+`AnalysisSection`. The launcher/controller remains in `labassistant.desktop`.
+No presentation module calculates scientific values or imports `app.py`.
+
+The timeline intentionally covers the current desktop session only. Persisted
+history listing and restoration remain disabled until they are exposed through
+a tested application capability; the UI does not read JSONL storage directly.
+
 ## Agent-Access Layer
 
 Future agents should eventually be able to use LabAssistant, but the first

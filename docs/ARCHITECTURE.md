@@ -62,10 +62,18 @@ human shells:
   typed, read-only experiment/result summary after running the shared importer,
   metrics, and observation workflow.
 
-`app.py` remains the compatible Streamlit shell. `labassistant.desktop` is a
-minimal PySide6 shell that owns only native widgets, file selection, error
-display, and formatting. It imports no Streamlit code and contains no
-scientific logic. Both shells depend inward on application contracts.
+`app.py` remains the compatible Streamlit shell. `labassistant.desktop` owns
+Qt startup and application invocation; reusable desktop presentation lives in
+`labassistant.ui` as separate theme, presenter, component, and window modules.
+The PySide6 shell owns widgets, navigation, session-only view history, file
+selection, error display, and formatting. It imports no Streamlit code and
+contains no scientific calculations. Both shells depend inward on application
+contracts.
+
+Desktop analysis sections organize existing read-model values for human review.
+They must not infer causes or recommendations that are absent from the
+application result. Persisted history must enter through application queries;
+desktop components must not read JSONL storage directly.
 
 ## Preferred Long-Term Shape
 

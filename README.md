@@ -81,6 +81,10 @@ the summary, intensity-distribution, and correlogram files that make up an
 existing supported DLS dataset. PySide6 is installed through
 `requirements.txt`.
 
+The desktop app opens into a research workspace with reusable experiment,
+metric, analysis, and session-history cards. Streamlit remains available for
+the broader compatibility workflow.
+
 ## Product Direction
 
 LabAssistant should eventually support multiple analytical techniques:
