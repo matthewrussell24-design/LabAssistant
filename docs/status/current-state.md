@@ -18,6 +18,12 @@
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
 - Last Updated: 2026-07-10 by Codex for task 004.
 
+## North Star
+
+LabAssistant succeeds when a scientist can move from raw experimental data to a
+well-supported scientific conclusion faster, with greater confidence, and with
+full traceability.
+
 ## Project Health
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
