@@ -173,6 +173,11 @@ def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(FileNotFoundError, match="DLS file not found"):
         analyze_dls_dataset([tmp_path / "missing.csv"])
 
+    unrelated = tmp_path / "notes.txt"
+    unrelated.write_text("This is not an instrument export.", encoding="utf-8")
+    with raises(ValueError, match="No supported DLS summary or intensity"):
+        analyze_dls_dataset([unrelated])
+
 
 def test_save_experiment_to_memory_can_use_injected_store():
     experiment = Experiment(

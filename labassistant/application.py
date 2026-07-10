@@ -260,7 +260,10 @@ def analyze_dls_dataset(
         for path in source_paths:
             opened_files.append(path.open("rb"))
         preview = build_import_preview(opened_files)
-        imports = import_measurement_groups(preview.groups)
+        supported_groups = [group for group in preview.groups if group.summary_files or group.intensity_files]
+        if not supported_groups:
+            raise ValueError("No supported DLS summary or intensity distribution files were found.")
+        imports = import_measurement_groups(supported_groups)
     finally:
         for opened_file in opened_files:
             opened_file.close()

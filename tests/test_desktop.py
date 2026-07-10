@@ -1,5 +1,7 @@
+from pathlib import Path
+
 from labassistant.application import DLSAnalysisResult, DLSMeasurementSummary, ExperimentSnapshot
-from labassistant.desktop import format_analysis_summary
+from labassistant.desktop import analyze_paths_for_display, format_analysis_summary
 
 
 def test_desktop_summary_formats_application_result_without_scientific_logic():
@@ -38,3 +40,19 @@ def test_desktop_summary_formats_application_result_without_scientific_logic():
     assert "Observations: 2" in summary
     assert "Primary peak: 267 nm" in summary
     assert "Aggregation risk: High" in summary
+
+
+def test_desktop_can_analyze_paths_supplied_by_launcher():
+    fixture_dir = Path(__file__).parent / "fixtures"
+
+    summary = analyze_paths_for_display(
+        [
+            str(fixture_dir / "Orchestra_Zetasizer_Data_Lot_446-01.xlsx"),
+            str(fixture_dir / "Size Distribution by Intensity Lot 1.xlsx"),
+            str(fixture_dir / "Correlogram lot 1.xlsx"),
+        ]
+    )
+
+    assert "Measurements: 1" in summary
+    assert "Lot 1" in summary
+    assert "Primary peak: 267 nm" in summary

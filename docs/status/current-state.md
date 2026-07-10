@@ -14,7 +14,7 @@
   `git log -1 --oneline` for the resulting commit identifier.
 - Working Tree: Expected to contain only task 008 changes before commit;
   inspect `git status --short` before editing.
-- Last Successful Test: `132 passed in 2.18s` from `scripts/test -q` on
+- Last Successful Test: `133 passed in 2.69s` from `scripts/test -q` on
   2026-07-10; Streamlit and native PySide6 startup smoke tests also passed.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
 - Last Updated: 2026-07-10 by Codex for task 008.
@@ -280,6 +280,9 @@ architecture rationale.
   services.
 - PySide6 proves native shell independence but is not yet packaged, notarized,
   or validated across target macOS versions.
+- PySide6 6.11.1 failed to register its installed Cocoa plugin on the target
+  macOS 26 runtime; the verified prototype pins 6.10.1 and initializes Qt
+  plugin paths explicitly.
 - Cross-technique reasoning and provenance contracts are still early and may
   change as more instruments are integrated.
 
@@ -296,9 +299,10 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `132 passed in 2.18s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `133 passed in 2.69s` from `scripts/test -q` on 2026-07-10.
 - Streamlit headless startup succeeded on port 8765; the PySide6 desktop window
-  also launched successfully from `scripts/run-desktop`.
+  also launched successfully from `scripts/run-desktop`, opened its file
+  picker, and rendered the representative Lot 1 DLS result end to end.
 - Supported development version: Python 3.12; verification used Python 3.12.13.
 - Coverage includes models, DLS/multi-file ingestion, representative fixtures,
   metrics, aggregation, quality, history, filtration, chromatography/OpenLab,

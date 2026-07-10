@@ -44,7 +44,7 @@ shell, but that choice should not leak into the scientific core.
 
 ## Desktop Prototype
 
-The first desktop vertical slice uses PySide6 as a deliberately small native
+The first desktop vertical slice uses PySide6 6.10.1 as a deliberately small native
 macOS shell. `scripts/run-desktop` opens a Qt window, lets a scientist
 select existing supported DLS files, and displays a concise analysis summary.
 The desktop module calls `analyze_dls_dataset` from `labassistant.application`;
@@ -55,6 +55,11 @@ PySide6 adds a substantial dependency, but it works reliably with the project's
 Homebrew Python 3.12 environment and provides a credible packaging path. The
 framework remains isolated to the shell so another toolkit can replace it
 without changing scientific or application contracts.
+
+PySide6 is pinned because 6.11.1's Cocoa platform plugin did not initialize on
+the target macOS 26 runtime even though the binary was installed. The launcher
+also initializes Qt's plugin search paths explicitly for GUI-launch and remote
+shell environments.
 
 ## Agent-Access Layer
 

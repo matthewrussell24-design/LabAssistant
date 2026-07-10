@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from labassistant.application import DLSAnalysisResult, analyze_dls_dataset
 
 
@@ -46,9 +48,25 @@ def _format_metric(value: float | None, suffix: str = "") -> str:
     return "Unavailable" if value is None else f"{value:.3g}{suffix}"
 
 
-def run_desktop() -> None:
+def analyze_paths_for_display(paths: Sequence[str]) -> str:
+    """Analyze selected local paths and return desktop-ready text."""
+    return format_analysis_summary(analyze_dls_dataset(paths))
+
+
+def run_desktop(initial_paths: Sequence[str] = ()) -> None:
     """Open the native Qt desktop prototype."""
+    import os
     import sys
+
+    from PySide6.QtCore import QCoreApplication, QLibraryInfo
+
+    # GUI launchers and remote shells do not always inherit Qt's plugin path.
+    # Set it before QApplication is constructed so the macOS Cocoa plugin can
+    # be discovered reliably.
+    plugins_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)
+    os.environ.setdefault("QT_PLUGIN_PATH", plugins_path)
+    os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", os.path.join(plugins_path, "platforms"))
+    QCoreApplication.setLibraryPaths([plugins_path])
 
     from PySide6.QtWidgets import (
         QApplication,
@@ -80,7 +98,13 @@ def run_desktop() -> None:
     layout.addWidget(select_button)
     output = QTextEdit()
     output.setReadOnly(True)
-    output.setPlainText("No dataset selected.")
+    if initial_paths:
+        try:
+            output.setPlainText(analyze_paths_for_display(initial_paths))
+        except Exception as error:
+            output.setPlainText(f"DLS analysis failed: {error}")
+    else:
+        output.setPlainText("No dataset selected.")
     layout.addWidget(output, stretch=1)
 
     def select_dataset() -> None:
@@ -93,11 +117,11 @@ def run_desktop() -> None:
         if not paths:
             return
         try:
-            result = analyze_dls_dataset(paths)
+            summary = analyze_paths_for_display(paths)
         except Exception as error:
             QMessageBox.critical(window, "DLS analysis failed", str(error))
             return
-        output.setPlainText(format_analysis_summary(result))
+        output.setPlainText(summary)
 
     select_button.clicked.connect(select_dataset)
     window.show()
@@ -105,4 +129,6 @@ def run_desktop() -> None:
 
 
 if __name__ == "__main__":
-    run_desktop()
+    import sys
+
+    run_desktop(sys.argv[1:])
