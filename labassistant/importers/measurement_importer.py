@@ -82,8 +82,8 @@ def import_measurement_group(group: LotFileGroup) -> MeasurementImportResult:
             errors.append(f"{classified_file.file_name}: {error}")
 
     _refresh_correlogram_quality(measurement)
-    _refresh_distribution_metrics_from_intensity(measurement)
     _assign_replicates_to_angles(measurement)
+    _refresh_distribution_metrics_from_intensity(measurement)
     _apply_dual_angle_aggregation(measurement)
     measurement.metadata.sample_name = group.lot
     measurement.metadata.source_files = list(dict.fromkeys([classified.file_name for classified in group.files]))
@@ -161,7 +161,7 @@ def _merge_correlogram(measurement: Measurement, classified_file: ClassifiedFile
 
 
 def _refresh_distribution_metrics_from_intensity(measurement: Measurement) -> None:
-    distribution = measurement.distributions.get("particle_size")
+    distribution, source = _canonical_intensity_distribution(measurement)
     if distribution is None or not distribution.diameter_nm or not distribution.intensity:
         return
 
@@ -204,7 +204,48 @@ def _refresh_distribution_metrics_from_intensity(measurement: Measurement) -> No
         secondary_peak_nm=secondary_peak,
         correlogram_noise=derived.correlogram_noise_score,
     )
-    measurement.provenance["derived_metrics_source"] = "intensity distribution"
+    measurement.provenance["derived_metrics_source"] = source
+
+
+def _canonical_intensity_distribution(measurement: Measurement) -> tuple[DistributionData | None, str]:
+    """Select the intensity evidence used for lot-level derived metrics.
+
+    Backscatter is the canonical sizing view when a dual-angle run is
+    available; forward scatter remains separate evidence for aggregation.
+    Single-angle runs use their angle-average. If angle assignment is not
+    possible, all valid intensity replicates are averaged before falling back
+    to the legacy particle-size curve.
+    """
+    angle_distributions = [
+        (summary, measurement.distributions.get(f"angle_{summary.position or _angle_key(summary.angle_degrees)}"))
+        for summary in measurement.angle_summaries
+    ]
+    angle_distributions = [
+        (summary, distribution)
+        for summary, distribution in angle_distributions
+        if distribution is not None
+    ]
+    if angle_distributions:
+        summary, distribution = max(
+            angle_distributions,
+            key=lambda item: (item[0].position == "back", item[0].angle_degrees or -math.inf),
+        )
+        return distribution, f"angle-averaged intensity distribution ({summary.label})"
+
+    replicates = measurement.provenance.get("intensity_replicates", [])
+    if replicates:
+        averaged = _average_replicates(replicates)
+        if not averaged.empty:
+            return (
+                DistributionData(
+                    diameter_nm=averaged["d"].tolist(),
+                    intensity=averaged["i"].tolist(),
+                    source_columns={"diameter_nm": "Diameter (nm)", "intensity": "Intensity (%)"},
+                ),
+                f"mean intensity distribution ({len(replicates)} replicates)",
+            )
+
+    return measurement.distributions.get("particle_size"), "intensity distribution"
 
 
 def _assign_replicates_to_angles(measurement: Measurement) -> None:
@@ -218,7 +259,7 @@ def _assign_replicates_to_angles(measurement: Measurement) -> None:
     """
     summaries = [summary for summary in measurement.angle_summaries if summary.z_average and summary.z_average > 0]
     replicates = measurement.provenance.get("intensity_replicates", [])
-    if len(summaries) < 2 or not replicates:
+    if not summaries or not replicates:
         return
 
     buckets: dict[float, list[dict]] = {summary.angle_degrees: [] for summary in summaries}

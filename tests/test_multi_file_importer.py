@@ -11,7 +11,12 @@ from labassistant.importers.file_classifier import (
     classify_uploaded_file,
 )
 from labassistant.importers.lot_grouper import detect_lot_key, group_files_by_lot, preview_rows
-from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
+from labassistant.importers.measurement_importer import (
+    _refresh_distribution_metrics_from_intensity,
+    build_import_preview,
+    import_measurement_groups,
+)
+from labassistant.models import DerivedMetrics, DistributionData, Measurement, MeasurementMetadata
 from app import data_completeness_rows
 
 
@@ -236,7 +241,7 @@ def test_imports_grouped_measurement_from_summary_intensity_and_correlogram():
     assert measurement.derived_metrics.primary_peak_nm == 100.0
     assert measurement.derived_metrics.d50_nm == 100.0
     assert measurement.derived_metrics.correlogram_noise_score is not None
-    assert measurement.provenance["derived_metrics_source"] == "intensity distribution"
+    assert measurement.provenance["derived_metrics_source"] == "mean intensity distribution (2 replicates)"
     assert measurement.provenance["correlogram_quality_source"] == "correlogram"
     assert len(measurement.correlogram) == 4
     assert set(measurement.metadata.source_files) == {
@@ -251,3 +256,47 @@ def test_imports_grouped_measurement_from_summary_intensity_and_correlogram():
         "Correlogram file",
         "Status",
     ]
+
+
+def test_lot_metrics_average_single_angle_replicates_instead_of_using_replicate_one():
+    uploads = [
+        FakeUpload(
+            "Lot 1 summary.csv",
+            """Index,Sample Name,Scattering Collection (°),Z-Average (nm),PDI
+1,Lot 1,173,100,0.2
+""",
+        ),
+        FakeUpload(
+            "Lot 1 intensity distribution.csv",
+            """Diameter (nm),Intensity Rep 1 (%),Intensity Rep 2 (%)
+50,100,0
+100,0,100
+200,0,0
+""",
+        ),
+    ]
+
+    measurement = import_measurement_groups(build_import_preview(uploads).groups)[0].measurement
+
+    assert measurement is not None
+    assert measurement.derived_metrics.primary_peak_nm == 50.0
+    assert measurement.derived_metrics.d50_nm == 50.0
+    assert measurement.provenance["derived_metrics_source"] == "mean intensity distribution (2 replicates)"
+
+
+def test_lot_metrics_do_not_substitute_volume_when_intensity_is_missing():
+    measurement = Measurement(
+        metadata=MeasurementMetadata(sample_name="Lot 1"),
+        distributions={
+            "particle_size": DistributionData(
+                diameter_nm=[50.0, 100.0, 200.0],
+                volume=[5.0, 100.0, 5.0],
+            )
+        },
+        derived_metrics=DerivedMetrics(primary_peak_nm=125.0),
+    )
+
+    _refresh_distribution_metrics_from_intensity(measurement)
+
+    assert measurement.derived_metrics.primary_peak_nm == 125.0
+    assert "derived_metrics_source" not in measurement.provenance

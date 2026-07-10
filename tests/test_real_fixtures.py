@@ -81,18 +81,23 @@ def test_real_summary_metrics_match_the_orchestra_stats_block():
     assert summary.measurement_count == 18
 
 
-def test_real_intensity_distribution_drives_derived_metrics():
+def test_real_backscatter_angle_average_drives_lot_derived_metrics():
     _, results = _import_lot_1()
     derived = results[0].measurement.derived_metrics
 
-    # Single clean intensity peak around 420 nm for replicate 1.
-    assert derived.peak_count == 1
-    assert derived.primary_peak_nm == approx(420.2, abs=0.1)
-    assert derived.d50_nm == approx(420.2, abs=0.1)
+    # Lot-level sizing uses the averaged backscatter curve; the larger forward
+    # population remains separate evidence for the dual-angle assessment.
+    assert derived.peak_count == 2
+    assert derived.primary_peak_nm == approx(267.2, abs=0.1)
+    assert derived.secondary_peak_nm == approx(5468.0, abs=0.1)
+    assert derived.d50_nm == approx(267.2, abs=0.1)
     assert derived.peak_width_ratio is not None and derived.peak_width_ratio > 1.0
     assert derived.peak_symmetry is not None
     assert derived.aggregation_risk in {"Low", "Moderate", "High"}
     assert derived.quality_score is not None and 0.0 <= derived.quality_score <= 100.0
+    assert results[0].measurement.provenance["derived_metrics_source"] == (
+        "angle-averaged intensity distribution (Back 174.7°)"
+    )
 
 
 def test_real_dual_angle_summary_is_split_forward_and_back():

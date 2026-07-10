@@ -25,6 +25,8 @@ records unless they change an established contract or standard.
 
 - [`status/current-state.md`](status/current-state.md) is the primary living
   handoff and the fastest way to understand the repository now.
+- [`IDEAS.md`](IDEAS.md) is the inbox for promising ideas that are not yet
+  approved or sequenced roadmap work.
 - [`prompts/`](prompts/README.md) contains numbered implementation requests and
   their completion records.
 - [`architecture/`](architecture/README.md) indexes current architecture

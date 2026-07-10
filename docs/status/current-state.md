@@ -9,14 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Repository workflow and application capability tasks
-  001–005; inspect `git log -1 --oneline` for the resulting commit identifier.
-- Working Tree: Expected clean at this handoff; inspect `git status --short`
-  before editing.
-- Last Successful Test: `124 passed in 2.05s` from `scripts/test -q` on
+- Latest Completed Change: Canonical lot-level DLS derived-metric evidence
+  selection (task 006); inspect `git log -1 --oneline` for the latest committed
+  identifier because unrelated documentation edits remain uncommitted.
+- Working Tree: Contains pre-existing documentation edits plus uncommitted task
+  006 changes; inspect `git status --short` and preserve unrelated work.
+- Last Successful Test: `126 passed in 2.03s` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 by Codex for task 004.
+- Last Updated: 2026-07-10 by Codex for task 006.
 
 ## North Star
 
@@ -234,6 +235,9 @@ architecture rationale.
   and added a tested registry for six existing operations (task 004).
 - Promoted persisted experiment retrieval into the capability layer and routed
   the Streamlit saved-experiment loader through it (task 005).
+- Canonicalized lot-level DLS distribution metrics on averaged backscatter
+  evidence, with explicit single-angle, replicate-average, and legacy
+  intensity fallbacks plus source provenance (task 006).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -270,8 +274,6 @@ architecture rationale.
 
 ## Outstanding Issues
 
-- Define and test the canonical source for lot-level DLS `derived_metrics` so
-  it uses the richer per-angle evidence instead of intensity replicate 1 alone.
 - Add regression fixtures for additional vendor versions, locales, delimiters,
   workbook layouts, single-angle files, and volume/number distributions.
 - Validate OpenLab ingestion against more representative archives and add peak
@@ -282,7 +284,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `124 passed in 2.40s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `126 passed in 2.03s` from `scripts/test -q` on 2026-07-10.
 - Supported development version: Python 3.12; verification used Python 3.12.13.
 - Coverage includes models, DLS/multi-file ingestion, representative fixtures,
   metrics, aggregation, quality, history, filtration, chromatography/OpenLab,
@@ -293,24 +295,23 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Define and test the canonical source for lot-level DLS
-  `derived_metrics` so it uses richer per-angle evidence instead of intensity
-  replicate 1 alone.
-- Why this is next: The ambiguity is a known scientific correctness risk and
-  resolving it strengthens the mature DLS workflow before further capability
-  extraction.
-- Expected files: DLS importer/measurement assembly, metrics or aggregation
-  helpers, focused importer and application tests, architecture notes if the
-  contract changes, and this status page.
-- Expected tests: Multi-angle evidence selection, single-angle fallback,
-  missing distributions, representative fixture compatibility, and the full
-  suite.
-- Estimated scope: Medium; first document the evidence rule, then centralize it
-  without changing unrelated parser behavior.
-- Risks: Changing current UI values, confusing replicate and angle semantics,
-  or selecting volume/number evidence where intensity evidence is required.
-- Success criteria: One documented and tested rule produces lot-level derived
-  metrics from the best available angle evidence with explicit fallback.
+- Objective: Add representative DLS regression fixtures for another vendor
+  version and the highest-risk format variations: locale/delimiter differences,
+  single-angle exports, and volume/number-only distributions.
+- Why this is next: The canonical metric rule is now explicit, while parser
+  compatibility remains the largest risk to the mature DLS workflow.
+- Expected files: Trimmed, non-sensitive fixtures; DLS parser/importer tests;
+  focused parser changes only where a fixture demonstrates a real gap; prompt
+  007; and this status page.
+- Expected tests: Classification and parsing per fixture, single-angle metric
+  fallback, intensity-only enforcement for derived metrics, representative
+  fixture compatibility, and the full suite.
+- Estimated scope: Medium; add fixtures incrementally and avoid speculative
+  parser generalization.
+- Risks: Encoding sensitive source data in fixtures, overfitting to synthetic
+  formats, or silently treating volume/number curves as intensity.
+- Success criteria: Each new format has a minimal representative fixture and a
+  regression test that documents whether it is supported or rejected clearly.
 
 ## AI Context Window
 

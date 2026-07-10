@@ -204,6 +204,14 @@ Current `Measurement` fields map naturally to the platform:
 - `interpretation`: experiment brief or AI-ready summary.
 - `provenance`: source file, sheet, table, column, and parser confidence details.
 
+For DLS, lot-level distribution-derived metrics have one canonical intensity
+evidence rule: prefer the averaged backscatter curve, otherwise use the sole
+available angle average, then the average of all valid intensity replicates,
+and finally the legacy intensity curve. Forward-angle curves remain separate
+aggregation-sensitive evidence. Volume and number distributions are not valid
+substitutes for this intensity contract, and provenance records the selected
+source.
+
 The existing `Measurement` model should fit under the new hierarchy as the raw
 analytical evidence layer. Its derived metrics and flags should be converted
 into `Observation` objects for reasoning. For example:
