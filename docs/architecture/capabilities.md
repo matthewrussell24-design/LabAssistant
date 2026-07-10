@@ -145,7 +145,7 @@ scientific workflow.
 supported measurements; `FileNotFoundError` for a missing selected path;
 existing parser exceptions for malformed files.
 
-**Caller Types:** Human UI, CLI, Future API. The PySide6 desktop prototype is
+**Caller Types:** Human UI, CLI, Future API. The native AppKit desktop shell is
 the first caller. Agent use is intentionally excluded.
 
 ## Import Chromatography Experiment

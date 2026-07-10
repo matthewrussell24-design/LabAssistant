@@ -63,10 +63,11 @@ human shells:
   metrics, and observation workflow.
 
 `app.py` remains the compatible Streamlit shell. `labassistant.desktop` owns
-Qt startup and application invocation; reusable desktop presentation lives in
-`labassistant.ui` as separate theme, presenter, component, and window modules.
-The PySide6 shell owns widgets, navigation, session-only view history, file
-selection, error display, and formatting. It imports no Streamlit code and
+native startup and application invocation; reusable desktop presentation lives
+in `labassistant.ui` as a pure presenter, self-contained workspace document,
+and AppKit/WebKit window controller. AppKit owns the real window and file panel;
+local WebKit owns cards, navigation, session-only view history, transitions,
+and formatting without a web server. The shell imports no Streamlit code and
 contains no scientific calculations. Both shells depend inward on application
 contracts.
 

@@ -14,8 +14,8 @@
   `git log -1 --oneline` for the resulting commit identifier.
 - Working Tree: Expected to contain only task 009 changes before commit;
   inspect `git status --short` before editing.
-- Last Successful Test: `136 passed in 3.04s` from `scripts/test -q` on
-  2026-07-10; Streamlit and native PySide6 startup smoke tests also passed.
+- Last Successful Test: `135 passed in 2.70s` from `scripts/test -q` on
+  2026-07-10; Streamlit and native AppKit/WebKit smoke tests also passed.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
 - Last Updated: 2026-07-10 by Codex for task 009.
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 136 passing.
+- Tests: 🟢 Healthy — 135 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -117,8 +117,9 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
 ```
 
 - `app.py` owns UI layout, widgets, session state, and visualization.
-- `labassistant.desktop` owns Qt startup and application invocation;
-  `labassistant.ui` owns modular theme, presenter, component, and window code.
+- `labassistant.desktop` owns native startup and application invocation;
+  `labassistant.ui` owns the pure presenter, local workspace document, and
+  AppKit/WebKit controller.
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
   persisted experiment retrieval, local DLS dataset analysis, and a
@@ -206,8 +207,8 @@ architecture rationale.
 
 - `app.py` — current Streamlit application shell.
 - `labassistant/desktop.py` — native desktop startup/controller entry point.
-- `labassistant/ui/` — reusable desktop theme, presentation helpers,
-  components, and research-workspace window.
+- `labassistant/ui/` — reusable presentation helpers, self-contained workspace
+  document, and native AppKit/WebKit controller.
 - `labassistant/` — reusable application and scientific core.
 - `labassistant/application.py` — app-level contracts, capability registry, and
   experiment assembly.
@@ -249,7 +250,7 @@ architecture rationale.
 - Added synthetic DLS format regressions for decimal-comma delimiters,
   single-angle summaries, and explicit rejection of volume/number-only files
   as intensity evidence (task 007).
-- Added a PySide6 desktop vertical slice and typed local DLS analysis
+- Added a native desktop vertical slice and typed local DLS analysis
   capability, proving the core can serve a native shell without importing
   Streamlit (task 008).
 - Replaced the prototype text view with a polished, modular research workspace
@@ -285,14 +286,13 @@ architecture rationale.
   reproducible.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
-- PySide6 proves native shell independence but is not yet packaged, notarized,
-  or validated across target macOS versions.
+- AppKit/WebKit proves native shell independence but is not yet packaged,
+  notarized, or validated across target macOS versions.
 - Desktop history is session-only. Persisted timeline browsing/restoration is
   intentionally disabled until an application query contract exists.
-- PySide6 6.11.1 and 6.10.1 failed to register their installed Cocoa plugin
-  reliably from the target macOS 26 `zsh` login shell; the verified prototype
-  pins 6.8.3, checks that version in the launcher, and initializes Qt plugin
-  paths explicitly.
+- PySide6 6.11.1, 6.10.1, and 6.8.3 all failed to initialize their installed
+  Cocoa plugin reliably across fresh target macOS 26 `zsh` login shells. Qt is
+  removed; the shell now pins PyObjC 12.2.1 and uses AppKit directly.
 - Cross-technique reasoning and provenance contracts are still early and may
   change as more instruments are integrated.
 
@@ -309,10 +309,10 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `136 passed in 3.04s` from `scripts/test -q` on 2026-07-10.
-- Streamlit headless startup succeeded on port 8765; the PySide6 desktop window
-  also launched successfully from `scripts/run-desktop`, opened its file
-  picker, and rendered the representative Lot 1 DLS result end to end.
+- Latest result: `135 passed in 2.70s` from `scripts/test -q` on 2026-07-10.
+- The native AppKit window launches from a fresh `zsh` login shell, opens its
+  real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
+- Three consecutive fresh login-shell launches succeeded after Qt removal.
 - Supported development version: Python 3.12; verification used Python 3.12.13.
 - Coverage includes models, DLS/multi-file ingestion, representative fixtures,
   metrics, aggregation, quality, history, filtration, chromatography/OpenLab,

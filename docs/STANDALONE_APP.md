@@ -44,23 +44,23 @@ shell, but that choice should not leak into the scientific core.
 
 ## Desktop Prototype
 
-The first desktop vertical slice uses PySide6 6.8.3 as a deliberately small native
-macOS shell. `scripts/run-desktop` opens a Qt window, lets a scientist
+The desktop vertical slice uses PyObjC 12.2.1 as a deliberately small native
+macOS shell. `scripts/run-desktop` opens an AppKit window, lets a scientist
 select existing supported DLS files, and displays a concise analysis summary.
 The desktop module calls `analyze_dls_dataset` from `labassistant.application`;
 it does not import `app.py` or duplicate parsing, metrics, observation, or
 experiment-assembly logic.
 
-PySide6 adds a substantial dependency, but it works reliably with the project's
-Homebrew Python 3.12 environment and provides a credible packaging path. The
-framework remains isolated to the shell so another toolkit can replace it
-without changing scientific or application contracts.
+AppKit provides the native application lifecycle and file panel. A local
+WKWebView renders the modern research workspace from a self-contained document;
+there is no HTTP server, remote content, or network application layer. PyObjC
+is isolated to the shell so scientific and application contracts remain
+toolkit-independent.
 
-PySide6 is pinned because both 6.11.1 and 6.10.1 failed to initialize the Cocoa
-platform plugin reliably from the target Mac's normal `zsh` login shell. The
-6.8.3 LTS line launches successfully in that exact environment. The launcher
-checks the installed version and initializes Qt's plugin search paths
-explicitly for GUI-launch and remote-shell environments.
+Qt was removed after PySide6 6.11.1, 6.10.1, and 6.8.3 all exhibited
+nondeterministic Cocoa platform-plugin initialization from fresh `zsh` login
+shells. The AppKit replacement removes that plugin boundary. The launcher
+checks the pinned PyObjC runtime before starting.
 
 ## Desktop Research Workspace
 
@@ -70,10 +70,10 @@ system typography, semantic status colors, soft shadows, and a restrained blue
 accent. Its hierarchy is Workspace actions -> Current Experiment -> structured
 Analysis, with a session timeline alongside the active work.
 
-Presentation is split across `labassistant.ui.theme`, `.presenters`,
-`.components`, and `.desktop_window`. Reusable components include `Card`,
-`StatusBadge`, `MetricTile`, `WorkspaceAction`, `HistoryItem`, and
-`AnalysisSection`. The launcher/controller remains in `labassistant.desktop`.
+Presentation is split across `labassistant.ui.presenters`, `.web_workspace`,
+and `.macos_window`. Reusable HTML/CSS/JavaScript patterns include Card,
+StatusBadge, MetricTile, WorkspaceAction, HistoryItem, and AnalysisSection. The
+launcher remains in `labassistant.desktop`.
 No presentation module calculates scientific values or imports `app.py`.
 
 The timeline intentionally covers the current desktop session only. Persisted

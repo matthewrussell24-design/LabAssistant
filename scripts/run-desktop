@@ -9,9 +9,9 @@ if [[ ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
-PYSIDE_VERSION="$($PYTHON -c 'import PySide6; print(PySide6.__version__)' 2>/dev/null || true)"
-if [[ "$PYSIDE_VERSION" != "6.8.3" ]]; then
-  echo "LabAssistant Desktop requires PySide6 6.8.3 (found: ${PYSIDE_VERSION:-not installed}). Run: .venv/bin/pip install -r requirements.txt" >&2
+PYOBJC_VERSION="$($PYTHON -c 'import objc; print(objc.__version__)' 2>/dev/null || true)"
+if [[ "$PYOBJC_VERSION" != "12.2.1" ]]; then
+  echo "LabAssistant Desktop requires PyObjC 12.2.1 (found: ${PYOBJC_VERSION:-not installed}). Run: .venv/bin/pip install -r requirements.txt" >&2
   exit 1
 fi
 

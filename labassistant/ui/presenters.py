@@ -49,6 +49,36 @@ def result_status(result: DLSAnalysisResult) -> tuple[str, str]:
     return "Ready", "success"
 
 
+def result_payload(result: DLSAnalysisResult) -> dict:
+    """Serialize the read model for the local native presentation document."""
+    display = build_analysis_display(result)
+    status_label, status_tone = result_status(result)
+    return {
+        "experiment": result.experiment.to_dict(),
+        "source_files": list(result.source_files),
+        "status": {"label": status_label, "tone": status_tone},
+        "measurements": [
+            {
+                "sample_name": measurement.sample_name,
+                "status": measurement.status,
+                "z_average": _format_metric(measurement.z_average_nm, " nm"),
+                "pdi": _format_metric(measurement.pdi),
+                "primary_peak": _format_metric(measurement.primary_peak_nm, " nm"),
+                "d50": _format_metric(measurement.d50_nm, " nm"),
+                "quality_score": _format_metric(measurement.quality_score),
+                "warnings": list(measurement.warnings),
+            }
+            for measurement in result.measurements
+        ],
+        "analysis": {
+            "summary": list(display.summary),
+            "evidence": list(display.evidence),
+            "possible_causes": list(display.possible_causes),
+            "next_steps": list(display.next_steps),
+        },
+    }
+
+
 def _measurement_evidence(measurement: DLSMeasurementSummary) -> str:
     metrics = [
         f"Z-average {_format_metric(measurement.z_average_nm, ' nm')}",

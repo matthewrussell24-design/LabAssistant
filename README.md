@@ -78,8 +78,8 @@ Use `scripts/run` for the existing Streamlit application.
 
 On macOS, use `scripts/run-desktop` for the native desktop prototype. Select
 the summary, intensity-distribution, and correlogram files that make up an
-existing supported DLS dataset. PySide6 is installed through
-`requirements.txt`.
+existing supported DLS dataset. The native AppKit/WebKit runtime is installed
+through the pinned PyObjC packages in `requirements.txt`.
 
 The desktop app opens into a research workspace with reusable experiment,
 metric, analysis, and session-history cards. Streamlit remains available for

@@ -7,7 +7,7 @@ Depends On: 008 - Desktop Prototype Vertical Slice
 
 ## Objective
 
-Transform the functional PySide6 prototype into a calm, modern research
+Transform the functional native prototype into a calm, modern research
 workspace that feels like a laboratory second brain rather than a file viewer.
 This is a presentation-layer redesign. Scientific calculations, analysis
 behavior, application contracts, and domain models remain unchanged.
@@ -33,9 +33,10 @@ but clearly disabled. The UI must not imply that they work.
 ## Architecture
 
 - Keep `labassistant.desktop` as the launcher/controller only.
-- Add reusable PySide6 presentation components such as `Card`, `StatusBadge`,
+- Add reusable presentation patterns such as `Card`, `StatusBadge`,
   `MetricTile`, `WorkspaceAction`, `HistoryItem`, and `AnalysisSection`.
-- Keep theme tokens and QSS separate from layout/controller code.
+- Keep theme tokens and HTML/CSS presentation separate from native window and
+  application-controller code.
 - Derive display copy through pure presentation helpers over
   `DLSAnalysisResult`; do not calculate or reinterpret scientific metrics.
 - Keep all import and analysis calls routed through `analyze_dls_dataset`.
@@ -71,8 +72,8 @@ window sizes.
 - Replaced the prototype text panel with a three-column research workspace:
   action-oriented Workspace, visually dominant Current Experiment, structured
   Analysis, and clickable session History.
-- Added separate theme tokens/QSS, pure presentation helpers, reusable PySide6
-  components, and a dedicated `DesktopWindow` controller/layout module.
+- Added a self-contained reusable workspace document, pure presentation
+  helpers, and a dedicated native AppKit/WebKit controller module.
 - Added purposeful empty and populated experiment states, metric tiles,
   measurement cards, semantic badges, soft shadows, hover states, loading
   feedback, and a short fade-in transition.
@@ -88,12 +89,12 @@ window sizes.
 ## Files Changed
 
 - `labassistant/desktop.py`
-- `labassistant/ui/theme.py`
 - `labassistant/ui/presenters.py`
-- `labassistant/ui/components.py`
-- `labassistant/ui/desktop_window.py`
+- `labassistant/ui/web_workspace.py`
+- `labassistant/ui/macos_window.py`
+- `requirements.txt`
+- `scripts/run-desktop`
 - `tests/test_desktop.py`
-- `tests/test_desktop_ui.py`
 - `docs/ARCHITECTURE.md`
 - `docs/STANDALONE_APP.md`
 - `docs/ROADMAP.md`
@@ -102,11 +103,15 @@ window sizes.
 
 ## Test Results
 
-- Focused desktop, UI-component, and application tests: 16 passed.
-- Full suite: 136 passed in 3.04s.
+- Focused desktop-presentation and application tests: 15 passed.
+- Full suite: 135 passed in 2.70s.
 - Streamlit headless startup: successful on port 8765.
 - Native macOS visual QA: populated dashboard, empty state, and session-history
   restore verified with the representative Lot 1 DLS dataset.
+- Native runtime reliability: three consecutive fresh `zsh` login-shell
+  launches succeeded; the real AppKit NSOpenPanel was opened and cancelled.
+- Qt packages were removed from the project environment and the AppKit shell
+  was launched again successfully, proving there is no residual Qt dependency.
 
 ## Remaining Work
 

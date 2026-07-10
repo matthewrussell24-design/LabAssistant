@@ -48,32 +48,10 @@ def analyze_paths_for_display(paths: Sequence[str]) -> str:
 
 
 def run_desktop(initial_paths: Sequence[str] = ()) -> None:
-    """Open the native Qt desktop prototype."""
-    import os
-    import sys
+    """Open the native AppKit desktop workspace."""
+    from labassistant.ui.macos_window import run_native_workspace
 
-    from PySide6.QtCore import QCoreApplication, QLibraryInfo
-
-    # GUI launchers and remote shells do not always inherit Qt's plugin path.
-    # Set it before QApplication is constructed so the macOS Cocoa plugin can
-    # be discovered reliably.
-    plugins_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)
-    os.environ.setdefault("QT_PLUGIN_PATH", plugins_path)
-    os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", os.path.join(plugins_path, "platforms"))
-    QCoreApplication.setLibraryPaths([plugins_path])
-
-    from PySide6.QtWidgets import QApplication
-
-    from labassistant.ui.desktop_window import DesktopWindow
-    from labassistant.ui.theme import APP_STYLESHEET
-
-    application = QApplication.instance() or QApplication(sys.argv)
-    application.setApplicationName("LabAssistant")
-    application.setOrganizationName("LabAssistant")
-    application.setStyleSheet(APP_STYLESHEET)
-    window = DesktopWindow(analyze_dls_dataset, initial_paths)
-    window.show()
-    application.exec()
+    run_native_workspace(analyze_dls_dataset, initial_paths)
 
 
 if __name__ == "__main__":

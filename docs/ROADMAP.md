@@ -52,7 +52,8 @@ removing or bypassing Streamlit.
 - Defer packaging, authentication, APIs, agents, new instruments, and visual
   polish.
 
-Status: delivered with PySide6 and `scripts/run-desktop` in task 008.
+Status: delivered with AppKit/WebKit through PyObjC and `scripts/run-desktop` in
+task 008; Qt was removed after repeated Cocoa plugin failures.
 
 ## Phase 0b: Desktop Research Workspace
 

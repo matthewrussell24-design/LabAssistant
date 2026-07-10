@@ -2,7 +2,8 @@ from pathlib import Path
 
 from labassistant.application import DLSAnalysisResult, DLSMeasurementSummary, ExperimentSnapshot
 from labassistant.desktop import analyze_paths_for_display, format_analysis_summary
-from labassistant.ui.presenters import build_analysis_display, result_status
+from labassistant.ui.presenters import build_analysis_display, result_payload, result_status
+from labassistant.ui.web_workspace import WORKSPACE_HTML
 
 
 def test_desktop_summary_formats_application_result_without_scientific_logic():
@@ -98,3 +99,17 @@ def test_analysis_presenter_organizes_existing_evidence_without_inventing_causes
     assert "Z-average 359 nm" in display.evidence[0]
     assert "does not assign causal explanations" in display.possible_causes[0]
     assert result_status(result) == ("Review", "warning")
+
+    payload = result_payload(result)
+    assert payload["measurements"][0]["primary_peak"] == "267 nm"
+    assert payload["status"] == {"label": "Review", "tone": "warning"}
+
+
+def test_native_workspace_document_has_reusable_dashboard_regions():
+    assert 'class="card workspace"' in WORKSPACE_HTML
+    assert 'class="card experiment"' in WORKSPACE_HTML
+    assert 'class="card analysis"' in WORKSPACE_HTML
+    assert 'class="card history"' in WORKSPACE_HTML
+    assert "const metric=" in WORKSPACE_HTML
+    assert "const section=" in WORKSPACE_HTML
+    assert "window.webkit.messageHandlers.labassistant" in WORKSPACE_HTML

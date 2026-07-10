@@ -13,14 +13,13 @@ compatible interface over the same scientific core.
 
 ## Framework Recommendation
 
-Use PySide6 6.8.3 for this prototype. It provides a native macOS Qt window and file
-dialog, works with the repository's verified Homebrew Python 3.12 environment,
-and has a credible path to future packaging. The tradeoff is a large dependency
-compared with Tkinter. Tkinter was initially preferred for minimalism, but the
-pre-implementation runtime check found that the project interpreter lacks
-`_tkinter`; relying on the unrelated system Python would make the documented
-launcher unreliable. PySide6 is therefore the smallest dependable choice for
-the repository as configured.
+Use PyObjC with AppKit and WebKit for this macOS prototype. AppKit provides the
+real native window and file panel; an embedded local WebKit view provides the
+polished card-based workspace without a server. The tradeoff is macOS-only UI
+code, which is appropriate for the current target but would require a separate
+shell on other platforms. Tkinter was unavailable in the project interpreter,
+and repeated PySide6 versions proved nondeterministic because their installed
+Cocoa platform plugin could fail between fresh login-shell launches.
 
 This is a prototype-shell decision, not a permanent desktop-framework lock-in:
 the application contracts must remain toolkit-independent.
@@ -29,7 +28,7 @@ the application contracts must remain toolkit-independent.
 
 - Add one application capability that accepts existing supported local DLS
   files, performs grouping/import/analysis, and returns a concise typed result.
-- Add a small PySide6 shell that selects one or more files and renders the
+- Add a small AppKit/WebKit shell that selects one or more files and renders the
   experiment identity, evidence count, observation count, and key per-lot DLS
   results.
 - Add a local launcher and launch documentation.
@@ -57,14 +56,13 @@ through `scripts/run`, and the full test suite passes.
 - Added `analyze_dls_dataset`, a typed application capability that owns local
   file validation, multi-file grouping, DLS measurement assembly, observation
   generation, experiment snapshotting, and concise per-lot result projection.
-- Added a minimal PySide6 shell with a native file dialog and compact text
+- Added a minimal native shell with an AppKit file dialog and compact WebKit
   summary; it imports only application contracts and contains no scientific
   calculations.
-- Reconciled the post-prototype launch hardening: the launcher accepts optional
-  paths for deterministic smoke testing, configures Qt's plugin directories,
-  pins PySide6 6.8.3 because 6.11.1 and 6.10.1 failed to register Cocoa
-  reliably from the target Mac's login shell, and rejects unrelated files
-  instead of creating empty measurements.
+- Reconciled launch hardening: the launcher accepts optional paths for
+  deterministic smoke testing, verifies the pinned PyObjC runtime, and rejects
+  unrelated files instead of creating empty measurements. The final AppKit
+  implementation removes Qt's unreliable platform-plugin layer entirely.
 - Added `scripts/run-desktop` while retaining `scripts/run` for Streamlit.
 - Added focused application-contract and display-format tests using the
   representative DLS workbook dataset.
@@ -74,7 +72,7 @@ through `scripts/run`, and the full test suite passes.
 - Focused application, desktop, multi-file, and real-fixture tests: 27 passed.
 - Full suite: 133 passed in 2.53s.
 - Streamlit headless startup: successful on port 8765.
-- Native PySide6 window launch: successful with the project `.venv`; the
+- Native AppKit window launch: successful with the project `.venv`; the
   representative three-file DLS dataset rendered one Lot 1 measurement with
   Z-average 359 nm, PDI 0.323, primary peak/D50 267 nm, high aggregation risk,
   quality score 43.4, and the dual-angle warning.
