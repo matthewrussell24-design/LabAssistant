@@ -303,9 +303,10 @@ Start here when changing product or architecture direction:
 5. `docs/prompts/*.md` — What should be implemented next?
 
 Product principles live in `docs/VISION.md`; standalone and agent-access
-boundaries live in `docs/STANDALONE_APP.md`. `docs/AGENT_HANDOFF.md` retains
-deeper historical context, and `LabAssistant_Vision_and_Roadmap.md` remains a
-legacy compatibility pointer.
+boundaries live in `docs/STANDALONE_APP.md`. `docs/AGENT_HANDOFF.md` orients a
+new agent to the current direction and next best move as a companion to the
+status page, and `LabAssistant_Vision_and_Roadmap.md` remains a legacy
+compatibility pointer.
 
 The status page is the operating system for contributor coordination:
 
