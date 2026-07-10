@@ -6,6 +6,7 @@ from labassistant.application import (
     AGENT_API_VERSION,
     APP_DIRECTION,
     HUMAN_APP_SURFACE,
+    ExperimentListing,
     analyze_dls_dataset,
     agent_access_policy,
     app_manifest,
@@ -13,11 +14,13 @@ from labassistant.application import (
     dls_experiment_from_samples,
     get_capability,
     list_capabilities,
+    list_experiments,
+    restore_dls_experiment,
     retrieve_experiment,
     save_experiment_to_memory,
 )
 from labassistant.models import Experiment, Measurement, MeasurementMetadata, Observation
-from labassistant.history import save_experiment
+from labassistant.history import ExperimentRecordNotFoundError, save_experiment
 from labassistant.view_models import ParsedSample
 
 
@@ -115,6 +118,102 @@ def test_retrieve_experiment_returns_read_only_metadata_and_fresh_measurements(t
         "label": "Run A",
         "saved_at": saved.saved_at,
     }
+
+
+def test_list_experiments_returns_empty_tuple_when_no_history(tmp_path):
+    assert list_experiments(history_path=tmp_path / "experiments.jsonl") == ()
+
+
+def test_list_experiments_orders_newest_first_with_metadata_only(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    older = save_experiment(
+        [Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))],
+        label="Run A",
+        history_path=history_path,
+    )
+    newer = save_experiment(
+        [
+            Measurement(metadata=MeasurementMetadata(sample_name="Lot 1")),
+            Measurement(metadata=MeasurementMetadata(sample_name="Lot 2")),
+        ],
+        label="Run B",
+        history_path=history_path,
+    )
+
+    listings = list_experiments(history_path=history_path)
+
+    assert isinstance(listings, tuple)
+    assert all(isinstance(listing, ExperimentListing) for listing in listings)
+    # Same-second saves are ordered by append position: the last saved wins.
+    assert [listing.record_id for listing in listings] == [newer.id, older.id]
+    assert listings[0].measurement_count == 2
+    assert listings[0].label == "Run B"
+    # Metadata only: no measurement payload is exposed through a listing.
+    assert not hasattr(listings[0], "measurements")
+    assert listings[0].to_dict() == {
+        "record_id": newer.id,
+        "saved_at": newer.saved_at,
+        "label": "Run B",
+        "measurement_count": 2,
+        "api_version": AGENT_API_VERSION,
+    }
+
+
+def test_list_experiments_skips_malformed_lines(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    saved = save_experiment(
+        [Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))],
+        label="Run A",
+        history_path=history_path,
+    )
+    with history_path.open("a", encoding="utf-8") as handle:
+        handle.write("{not valid json}\n")
+
+    listings = list_experiments(history_path=history_path)
+
+    assert [listing.record_id for listing in listings] == [saved.id]
+
+
+def test_restore_dls_experiment_rehydrates_a_saved_record(tmp_path):
+    fixture_dir = Path(__file__).parent / "fixtures"
+    history_path = tmp_path / "experiments.jsonl"
+    measurements = _import_fixture_measurements(fixture_dir)
+    record = save_experiment(measurements, label="Saved run", history_path=history_path)
+
+    result = restore_dls_experiment(record.id, history_path=history_path)
+
+    assert result.experiment.label == "Saved run"
+    assert result.experiment.technique == "DLS"
+    assert result.measurements[0].sample_name == "Lot 1"
+    assert result.measurements[0].primary_peak_nm is not None
+    assert "measurements" in result.to_dict()
+
+
+def test_restore_dls_experiment_reports_missing_record(tmp_path):
+    with raises(ExperimentRecordNotFoundError):
+        restore_dls_experiment("does-not-exist", history_path=tmp_path / "experiments.jsonl")
+
+
+def _import_fixture_measurements(fixture_dir):
+    from labassistant.importers.measurement_importer import (
+        build_import_preview,
+        import_measurement_groups,
+    )
+
+    paths = [
+        fixture_dir / "Orchestra_Zetasizer_Data_Lot_446-01.xlsx",
+        fixture_dir / "Size Distribution by Intensity Lot 1.xlsx",
+        fixture_dir / "Correlogram lot 1.xlsx",
+    ]
+    handles = [path.open("rb") for path in paths]
+    try:
+        preview = build_import_preview(handles)
+        groups = [group for group in preview.groups if group.summary_files or group.intensity_files]
+        imports = import_measurement_groups(groups)
+    finally:
+        for handle in handles:
+            handle.close()
+    return [result.measurement for result in imports if result.measurement is not None]
 
 
 def test_dls_experiment_creation_is_available_outside_streamlit():
@@ -216,6 +315,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "import_dls_experiment",
         "analyze_dls_dataset",
         "import_chromatography_experiment",
+        "list_experiments",
         "retrieve_experiment",
         "retrieve_experiment_summary",
         "save_scientific_memory",

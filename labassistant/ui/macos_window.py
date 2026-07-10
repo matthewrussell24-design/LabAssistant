@@ -25,8 +25,8 @@ from AppKit import (
 from Foundation import NSURL
 from WebKit import WKWebView, WKWebViewConfiguration
 
-from labassistant.application import DLSAnalysisResult
-from labassistant.ui.presenters import result_payload
+from labassistant.application import DLSAnalysisResult, list_experiments, restore_dls_experiment
+from labassistant.ui.presenters import persisted_history_payload, result_payload
 from labassistant.ui.web_workspace import WORKSPACE_HTML
 
 
@@ -48,12 +48,34 @@ class WorkspaceController(NSObject):
         action = body.get("action") if hasattr(body, "get") else body.objectForKey_("action")
         if action == "import_dls":
             self.selectDLSDataset()
+        elif action == "open_experiment":
+            record_id = body.get("record_id") if hasattr(body, "get") else body.objectForKey_("record_id")
+            self.restoreExperiment_(record_id)
 
     def webView_didFinishNavigation_(self, webview, navigation):
+        self.loadPersistedHistory()
         if self.pending_paths:
             paths = self.pending_paths
             self.pending_paths = ()
             self.analyzePaths_(paths)
+
+    def loadPersistedHistory(self):
+        try:
+            listings = list_experiments()
+        except Exception:
+            listings = ()
+        payload = persisted_history_payload(listings)
+        script = f"window.labassistantSetPersistedHistory({json.dumps(payload)})"
+        self.webview.evaluateJavaScript_completionHandler_(script, None)
+
+    def restoreExperiment_(self, record_id):
+        try:
+            payload = result_payload(restore_dls_experiment(str(record_id)))
+        except Exception as error:
+            script = f"window.labassistantShowError({json.dumps(str(error))})"
+        else:
+            script = f"window.labassistantAddResult({json.dumps(payload)})"
+        self.webview.evaluateJavaScript_completionHandler_(script, None)
 
     def selectDLSDataset(self):
         panel = NSOpenPanel.openPanel()

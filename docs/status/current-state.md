@@ -9,15 +9,18 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Polished native desktop research workspace over
-  unchanged DLS application contracts (task 009); inspect
-  `git log -1 --oneline` for the resulting commit identifier.
-- Working Tree: Expected to contain only task 009 changes before commit;
+- Latest Completed Change: Promoted persisted experiment listing into the
+  application layer (`list_experiments`) and wired the desktop History timeline
+  plus "Open Existing Experiment" to browse and restore persisted records
+  through the application boundary (task 010); inspect `git log -1 --oneline`
+  for the resulting commit identifier.
+- Working Tree: Expected to contain only task 010 changes before commit;
   inspect `git status --short` before editing.
-- Last Successful Test: `135 passed in 2.70s` from `scripts/test -q` on
-  2026-07-10; Streamlit and native AppKit/WebKit smoke tests also passed.
+- Last Successful Test: `142 passed in 2.00s` from `scripts/test -q` on
+  2026-07-10; clean-process AppKit controller import and an end-to-end
+  list/restore smoke also passed.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 by Codex for task 009.
+- Last Updated: 2026-07-10 for task 010.
 
 ## North Star
 
@@ -122,8 +125,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   AppKit/WebKit controller.
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
-  persisted experiment retrieval, local DLS dataset analysis, and a
-  transport-independent registry of eight stable capability names.
+  persisted experiment retrieval and listing, local DLS dataset analysis, and a
+  transport-independent registry of nine stable capability names.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -256,6 +259,11 @@ architecture rationale.
 - Replaced the prototype text view with a polished, modular research workspace
   using reusable cards, metric tiles, semantic status, structured analysis,
   purposeful empty states, and clickable session history (task 009).
+- Promoted persisted experiment listing into the application layer with a
+  versioned, metadata-only `list_experiments` query and a `restore_dls_experiment`
+  composition over `retrieve_experiment`; wired the desktop History timeline and
+  "Open Existing Experiment" to browse and restore persisted records without the
+  UI reading JSONL storage (task 010).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -271,8 +279,8 @@ architecture rationale.
 
 ## Active Work
 
-- Desktop redesign task 009 is complete pending commit.
-- No unrelated pre-existing changes were present when task 009 began.
+- Persisted-history task 010 is complete pending commit.
+- No unrelated pre-existing changes were present when task 010 began.
 
 ## Known Risks
 
@@ -288,8 +296,9 @@ architecture rationale.
   services.
 - AppKit/WebKit proves native shell independence but is not yet packaged,
   notarized, or validated across target macOS versions.
-- Desktop history is session-only. Persisted timeline browsing/restoration is
-  intentionally disabled until an application query contract exists.
+- Desktop restore assembles a DLS read model; persisted history browsing and
+  restoration now flow through `list_experiments`/`restore_dls_experiment`, but
+  generalizing restore for a second persisted technique is still pending.
 - PySide6 6.11.1, 6.10.1, and 6.8.3 all failed to initialize their installed
   Cocoa plugin reliably across fresh target macOS 26 `zsh` login shells. Qt is
   removed; the shell now pins PyObjC 12.2.1 and uses AppKit directly.
@@ -309,10 +318,13 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `135 passed in 2.70s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `142 passed in 2.00s` from `scripts/test -q` on 2026-07-10.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
+- Task 010 added application list/restore coverage and desktop persisted-history
+  document assertions; a clean-process AppKit controller import and an
+  end-to-end list/restore smoke both passed.
 - Supported development version: Python 3.12; verification used Python 3.12.13.
 - Coverage includes models, DLS/multi-file ingestion, representative fixtures,
   metrics, aggregation, quality, history, filtration, chromatography/OpenLab,
@@ -323,25 +335,25 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote persisted experiment listing into the application layer
-  and use it to populate the desktop History timeline and Open Existing
-  Experiment action.
-- Why this is next: The polished shell now exposes the missing boundary
-  honestly; persistent history is the most visible gap in an otherwise coherent
-  daily-use workspace.
-- Expected files: Application read contracts, history/application tests,
-  desktop timeline wiring, prompt 010, capability and architecture docs, and
-  this status page.
-- Expected tests: Empty/corrupt/tolerant listing behavior, immutable history
-  summaries, record restoration, timeline ordering/grouping, click-to-restore,
-  and the full suite.
-- Estimated scope: Medium; reuse existing JSONL persistence without redesigning
-  storage or adding desktop-specific history parsing.
-- Risks: Exposing mutable measurements through list results, confusing saved
-  records with session analyses, or letting the UI bypass application errors.
-- Success criteria: The desktop timeline lists persisted experiments through a
-  versioned application query and restores a selected record through the
-  existing retrieval capability.
+- Objective: Promote experiment comparison into the application layer by adding
+  a versioned `compare_experiments` capability over the existing history drift
+  logic, then surface it in a shell (Streamlit first, desktop optional).
+- Why this is next: Listing and restore now let a scientist reopen prior work;
+  the next daily-use gap is explaining how a current or restored experiment
+  differs from a prior saved run without the UI owning comparison math.
+- Expected files: Application read contract wrapping
+  `labassistant.history.compare_experiments`/`compare_to_history`, application
+  and history tests, at least one shell caller, prompt 011, capability and
+  architecture docs, and this status page.
+- Expected tests: Stable versioned comparison output, sample-name matching,
+  drift labels, empty/absent-history behavior, and the full suite.
+- Estimated scope: Medium; reuse existing drift thresholds and JSONL persistence
+  without redesigning storage.
+- Risks: Duplicating drift logic in a shell, exposing mutable measurements
+  through comparison results, or implying causality the contract cannot assign.
+- Success criteria: A shell compares a current or restored experiment against
+  saved history through a versioned application capability, and no interface
+  reimplements the comparison math.
 
 ## AI Context Window
 
@@ -381,7 +393,7 @@ task instructions or repository agent rules.
 - Standards: [`../standards/README.md`](../standards/README.md)
 - Decision Records: [`../decisions/README.md`](../decisions/README.md)
 - Vision: [`../VISION.md`](../VISION.md)
-- Historical Handoff: [`../AGENT_HANDOFF.md`](../AGENT_HANDOFF.md)
+- Agent Handoff: [`../AGENT_HANDOFF.md`](../AGENT_HANDOFF.md)
 
 ## Update Rules
 

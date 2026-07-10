@@ -1,8 +1,18 @@
 from pathlib import Path
 
-from labassistant.application import DLSAnalysisResult, DLSMeasurementSummary, ExperimentSnapshot
+from labassistant.application import (
+    DLSAnalysisResult,
+    DLSMeasurementSummary,
+    ExperimentListing,
+    ExperimentSnapshot,
+)
 from labassistant.desktop import analyze_paths_for_display, format_analysis_summary
-from labassistant.ui.presenters import build_analysis_display, result_payload, result_status
+from labassistant.ui.presenters import (
+    build_analysis_display,
+    persisted_history_payload,
+    result_payload,
+    result_status,
+)
 from labassistant.ui.web_workspace import WORKSPACE_HTML
 
 
@@ -113,3 +123,35 @@ def test_native_workspace_document_has_reusable_dashboard_regions():
     assert "const metric=" in WORKSPACE_HTML
     assert "const section=" in WORKSPACE_HTML
     assert "window.webkit.messageHandlers.labassistant" in WORKSPACE_HTML
+
+
+def test_native_workspace_document_supports_persisted_history_restore():
+    # The Open Existing Experiment action is real now, not a disabled placeholder.
+    assert 'id="open-existing"' in WORKSPACE_HTML
+    assert "window.labassistantSetPersistedHistory" in WORKSPACE_HTML
+    assert "action:'open_experiment'" in WORKSPACE_HTML
+    assert "SAVED EXPERIMENTS" in WORKSPACE_HTML
+    assert "Persisted history planned" not in WORKSPACE_HTML
+
+
+def test_persisted_history_payload_exposes_metadata_only_with_readable_time():
+    listings = [
+        ExperimentListing(
+            record_id="rec-1",
+            saved_at="2026-07-10T13:05:42+00:00",
+            label="Saved run",
+            measurement_count=2,
+        )
+    ]
+
+    payload = persisted_history_payload(listings)
+
+    assert payload == [
+        {
+            "record_id": "rec-1",
+            "label": "Saved run",
+            "measurement_count": 2,
+            "saved_at": "2026-07-10T13:05:42+00:00",
+            "saved_display": "2026-07-10 13:05",
+        }
+    ]

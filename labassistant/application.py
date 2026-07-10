@@ -7,7 +7,12 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from labassistant.context_engine import KnowledgeStore
-from labassistant.history import DEFAULT_HISTORY_PATH, load_experiment_record, measurements_from_record
+from labassistant.history import (
+    DEFAULT_HISTORY_PATH,
+    load_experiment_record,
+    load_history,
+    measurements_from_record,
+)
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.models import Experiment, Measurement
 from labassistant.observations import observations_from_samples
@@ -135,6 +140,26 @@ class RetrievedExperiment:
 
 
 @dataclass(frozen=True)
+class ExperimentListing:
+    """Read-only persisted history entry for timeline browsing.
+
+    The listing is metadata only. It never carries mutable measurements, so a
+    timeline can render every saved experiment without a caller being able to
+    edit persisted evidence. Callers restore full editable measurements through
+    ``retrieve_experiment`` (or a technique restore helper) using ``record_id``.
+    """
+
+    record_id: str
+    saved_at: str
+    label: str
+    measurement_count: int
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -203,6 +228,37 @@ def retrieve_experiment(
         label=record.label,
         measurement_count=len(measurements),
         _measurements=measurements,
+    )
+
+
+def list_experiments(
+    *,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> tuple[ExperimentListing, ...]:
+    """List persisted experiments newest-first through the application boundary.
+
+    The listing is tolerant: malformed JSONL lines are skipped by the underlying
+    history reader so a single damaged record cannot hide the rest of the
+    timeline. Ordering matches ``latest_experiment`` — newest ``saved_at`` first,
+    with append order breaking same-second ties so the most recently saved record
+    sorts first. Only immutable metadata is returned; measurements stay in
+    persistence until a caller restores them by ``record_id``.
+    """
+
+    records = load_history(history_path)
+    ordered = sorted(
+        enumerate(records),
+        key=lambda item: (item[1].saved_at, item[0]),
+        reverse=True,
+    )
+    return tuple(
+        ExperimentListing(
+            record_id=record.id,
+            saved_at=record.saved_at,
+            label=record.label,
+            measurement_count=len(record.measurements),
+        )
+        for _, record in ordered
     )
 
 
@@ -277,7 +333,53 @@ def analyze_dls_dataset(
     samples = [sample_from_measurement(measurement) for measurement in measurements]
     source_files = [str(path) for path in source_paths]
     experiment = dls_experiment_from_samples(samples, label=label, source_files=source_files)
-    summaries = tuple(
+    return DLSAnalysisResult(
+        experiment=build_experiment_snapshot(experiment),
+        measurements=_dls_measurement_summaries(samples),
+        source_files=tuple(source_files),
+        import_errors=tuple(error for result in imports for error in result.errors),
+    )
+
+
+def restore_dls_experiment(
+    record_id: str,
+    *,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> DLSAnalysisResult:
+    """Restore a persisted DLS experiment as a read-only analysis result.
+
+    This reuses the persisted-retrieval capability (``retrieve_experiment``) and
+    the shared DLS summary assembly so desktop and future shells never read JSONL
+    storage directly or recompute scientific metrics. The returned result mirrors
+    ``analyze_dls_dataset`` so a restored record renders through the same read
+    model as a freshly imported dataset.
+    """
+
+    retrieved = retrieve_experiment(record_id, history_path=history_path)
+    measurements = retrieved.restore_measurements()
+    samples = [sample_from_measurement(measurement) for measurement in measurements]
+    source_files = list(
+        dict.fromkeys(
+            source
+            for sample in samples
+            for source in sample.measurement.metadata.source_files
+        )
+    )
+    experiment = dls_experiment_from_samples(
+        samples, label=retrieved.label, source_files=source_files
+    )
+    return DLSAnalysisResult(
+        experiment=build_experiment_snapshot(experiment),
+        measurements=_dls_measurement_summaries(samples),
+        source_files=tuple(source_files),
+        import_errors=(),
+    )
+
+
+def _dls_measurement_summaries(samples: list[Any]) -> tuple[DLSMeasurementSummary, ...]:
+    """Build immutable per-lot read summaries shared by import and restore."""
+
+    return tuple(
         DLSMeasurementSummary(
             sample_name=sample.name,
             status=sample_status(sample),
@@ -291,12 +393,6 @@ def analyze_dls_dataset(
             warnings=tuple(sample.warnings),
         )
         for sample in samples
-    )
-    return DLSAnalysisResult(
-        experiment=build_experiment_snapshot(experiment),
-        measurements=summaries,
-        source_files=tuple(source_files),
-        import_errors=tuple(error for result in imports for error in result.errors),
     )
 
 
@@ -423,6 +519,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="import_chromatography_experiment",
         purpose="Assemble a chromatography import preview into an experiment.",
         handler=chromatography_experiment_from_preview,
+    ),
+    CapabilityContract(
+        name="list_experiments",
+        purpose="List persisted experiments newest-first for timeline browsing.",
+        handler=list_experiments,
     ),
     CapabilityContract(
         name="retrieve_experiment",

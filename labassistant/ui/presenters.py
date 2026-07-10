@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
-from labassistant.application import DLSAnalysisResult, DLSMeasurementSummary
+from labassistant.application import DLSAnalysisResult, DLSMeasurementSummary, ExperimentListing
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,37 @@ def result_payload(result: DLSAnalysisResult) -> dict:
             "next_steps": list(display.next_steps),
         },
     }
+
+
+def persisted_history_payload(listings: Iterable[ExperimentListing]) -> list[dict]:
+    """Serialize persisted experiment listings for the timeline document.
+
+    This carries only immutable metadata plus a human-readable saved time. It
+    never exposes measurements; the document restores a record by ``record_id``
+    through the application boundary when the scientist opens it.
+    """
+    return [
+        {
+            "record_id": listing.record_id,
+            "label": listing.label,
+            "measurement_count": listing.measurement_count,
+            "saved_at": listing.saved_at,
+            "saved_display": _format_saved_at(listing.saved_at),
+        }
+        for listing in listings
+    ]
+
+
+def _format_saved_at(saved_at: str) -> str:
+    """Render an ISO timestamp as a compact local-looking date/time label."""
+    text = (saved_at or "").strip()
+    if not text:
+        return "Unknown time"
+    head = text.split("+", 1)[0].split("Z", 1)[0]
+    if "T" in head:
+        date_part, time_part = head.split("T", 1)
+        return f"{date_part} {time_part[:5]}".strip()
+    return head
 
 
 def _measurement_evidence(measurement: DLSMeasurementSummary) -> str:

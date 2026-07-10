@@ -46,7 +46,6 @@ Duplicated or bypassed workflows:
 
 Missing capability boundaries:
 
-- Retrieve an experiment or experiment history.
 - Compare experiments and find related prior work.
 - Retrieve related scientific context.
 - Generate normalized observations from supported evidence.
@@ -64,6 +63,7 @@ Missing capability boundaries:
 | `import_dls_experiment` | `dls_experiment_from_samples` | Available, transitional input |
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
+| `list_experiments` | `list_experiments` | Available; used by desktop History timeline |
 | `retrieve_experiment` | `retrieve_experiment` | Available; first used by Streamlit history loader |
 | `retrieve_experiment_summary` | `build_experiment_snapshot` | Available |
 | `save_scientific_memory` | `save_experiment_to_memory` | Available |
@@ -185,6 +185,28 @@ not-found errors separately.
 
 **Caller Types:** Human UI, Agent, CLI, Future API.
 
+## List Experiments
+
+**Name:** `list_experiments`
+
+**Purpose:** Enumerate persisted experiments for timeline browsing without
+exposing mutable measurements or requiring an interface shell to read JSONL
+storage directly.
+
+**Inputs:** An optional history path for local or test storage.
+
+**Outputs:** A tuple of frozen, metadata-only `ExperimentListing` records
+(record id, saved time, label, measurement count, api version) ordered
+newest-first. Same-second ties are broken by append order so the most recently
+saved record sorts first, matching `latest_experiment`.
+
+**Expected Errors:** None under normal operation. A missing history file yields
+an empty tuple, and malformed JSONL lines are skipped so one damaged record
+cannot hide the rest of the timeline.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. The native AppKit desktop
+History timeline is the first caller.
+
 ## Retrieve Persisted Experiment
 
 **Name:** `retrieve_experiment`
@@ -205,6 +227,12 @@ cannot safely interpret the JSONL or measurement payload.
 
 **Caller Types:** Human UI, Agent, CLI, Future API. The Streamlit saved DLS
 experiment loader is the first caller.
+
+**Restore composition:** `restore_dls_experiment(record_id)` is a supporting
+application function (not a separate catalog entry) that composes
+`retrieve_experiment` with the shared DLS summary assembly and returns a
+`DLSAnalysisResult`. It lets the desktop reopen a saved record through the same
+read model as a fresh import without reading storage or recomputing metrics.
 
 ## Save Scientific Memory
 
@@ -232,7 +260,6 @@ These are capability boundaries, not implemented public contracts:
 
 | Candidate name | Scientific intent | Current owner |
 | --- | --- | --- |
-| `list_experiments` | Browse experiment history | History/UI |
 | `compare_experiments` | Explain meaningful differences | History/UI |
 | `find_related_experiments` | Find similar prior scientific work | History/UI |
 | `retrieve_related_context` | Build a compact evidence-backed context packet | Context engine/UI |

@@ -68,8 +68,10 @@ changing scientific behavior.
   until application capabilities exist.
 - Preserve Streamlit and the shared DLS analysis contract.
 
-Status: delivered in task 009. Persisted desktop history and packaging remain
-separate future tasks.
+Status: delivered in task 009. Task 010 added a versioned `list_experiments`
+application query and wired the desktop History timeline plus "Open Existing
+Experiment" to browse and restore persisted records through the application
+boundary. Desktop packaging remains a separate future task.
 
 ## Phase 1: Rename The Product Concepts
 
