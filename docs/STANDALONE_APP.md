@@ -42,6 +42,20 @@ The app may continue to run through Streamlit while these workflows mature.
 Future packaging could become a desktop app, local web app, or other dedicated
 shell, but that choice should not leak into the scientific core.
 
+## Desktop Prototype
+
+The first desktop vertical slice uses PySide6 as a deliberately small native
+macOS shell. `scripts/run-desktop` opens a Qt window, lets a scientist
+select existing supported DLS files, and displays a concise analysis summary.
+The desktop module calls `analyze_dls_dataset` from `labassistant.application`;
+it does not import `app.py` or duplicate parsing, metrics, observation, or
+experiment-assembly logic.
+
+PySide6 adds a substantial dependency, but it works reliably with the project's
+Homebrew Python 3.12 environment and provides a credible packaging path. The
+framework remains isolated to the shell so another toolkit can replace it
+without changing scientific or application contracts.
+
 ## Agent-Access Layer
 
 Future agents should eventually be able to use LabAssistant, but the first
@@ -58,11 +72,12 @@ remote hosting, or broad LLM prompt orchestration. Those remain non-goals until
 the human app workflows, data model, provenance, and persistence boundaries are
 stable.
 
-The current foundation is `labassistant.application`, which exposes:
+The current foundation is `labassistant.application`, which includes:
 
 - `app_manifest()`
 - `agent_access_policy()`
 - `build_experiment_snapshot(experiment)`
+- `analyze_dls_dataset(paths)`
 
 These are deliberately small. They provide a directionally stable app boundary
 without committing to an HTTP server, plugin protocol, or agent runtime.
@@ -102,6 +117,9 @@ generate reports.
 - Keep tests around the contract.
 
 Status: started with `labassistant.application`.
+
+The native desktop DLS vertical slice is delivered; packaging, notarization,
+and visual refinement remain future work.
 
 ### Phase B: Move App Logic Behind Services
 

@@ -51,12 +51,21 @@ The backend package already does several useful jobs:
 This is a strong foundation, but naming and module boundaries still reflect the
 first DLS use case more than the long-term platform.
 
-`labassistant.application` now provides the first small app-level boundary:
+`labassistant.application` now provides the app-level boundary used by two
+human shells:
 
 - `app_manifest()` describes the standalone app direction.
 - `agent_access_policy()` documents current planned agent access and non-goals.
 - `build_experiment_snapshot(experiment)` returns a read-only summary suitable
   for UI navigation, reports, and future agent context selection.
+- `analyze_dls_dataset(paths)` accepts existing local DLS files and returns a
+  typed, read-only experiment/result summary after running the shared importer,
+  metrics, and observation workflow.
+
+`app.py` remains the compatible Streamlit shell. `labassistant.desktop` is a
+minimal PySide6 shell that owns only native widgets, file selection, error
+display, and formatting. It imports no Streamlit code and contains no
+scientific logic. Both shells depend inward on application contracts.
 
 ## Preferred Long-Term Shape
 

@@ -72,6 +72,15 @@ exports:
 The Zetasizer workflow should remain stable while the backend moves toward
 experiment-first ingestion, metrics, reasoning, memory, and reporting.
 
+## Run Locally
+
+Use `scripts/run` for the existing Streamlit application.
+
+On macOS, use `scripts/run-desktop` for the native desktop prototype. Select
+the summary, intensity-distribution, and correlogram files that make up an
+existing supported DLS dataset. PySide6 is installed through
+`requirements.txt`.
+
 ## Product Direction
 
 LabAssistant should eventually support multiple analytical techniques:

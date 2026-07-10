@@ -38,6 +38,22 @@ Goal: make the product boundary explicit before adding larger features.
 
 Status: started.
 
+## Phase 0a: Desktop Prototype Vertical Slice
+
+Goal: prove that the reusable core can support a native human interface without
+removing or bypassing Streamlit.
+
+- Add a toolkit-independent application contract for local DLS dataset
+  analysis.
+- Add a minimal native macOS window and file picker.
+- Display experiment and per-lot result summaries from typed application read
+  models.
+- Preserve the Streamlit shell and launcher.
+- Defer packaging, authentication, APIs, agents, new instruments, and visual
+  polish.
+
+Status: delivered with PySide6 and `scripts/run-desktop` in task 008.
+
 ## Phase 1: Rename The Product Concepts
 
 Goal: make the code and docs describe LabAssistant as a platform, while keeping
@@ -97,6 +113,8 @@ UI behavior.
 Near-term safe move:
 
 - Keep `app.py` as the Streamlit shell.
+- Keep `labassistant.desktop` as a second, minimal human shell proving the same
+  application core can serve a native window.
 - Add query helpers only when existing UI read workflows can move out cleanly,
   such as experiment summaries, history lookup, memory search, or report
   previews.

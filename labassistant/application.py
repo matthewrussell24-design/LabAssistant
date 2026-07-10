@@ -8,8 +8,10 @@ from uuid import uuid4
 
 from labassistant.context_engine import KnowledgeStore
 from labassistant.history import DEFAULT_HISTORY_PATH, load_experiment_record, measurements_from_record
+from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.models import Experiment, Measurement
 from labassistant.observations import observations_from_samples
+from labassistant.view_models import sample_from_measurement, sample_status
 
 
 APP_NAME = "LabAssistant"
@@ -61,6 +63,45 @@ class ExperimentSnapshot:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSMeasurementSummary:
+    """Concise read model for one imported DLS lot."""
+
+    sample_name: str
+    status: str
+    source_files: tuple[str, ...]
+    z_average_nm: float | None
+    pdi: float | None
+    primary_peak_nm: float | None
+    d50_nm: float | None
+    aggregation_risk: str | None
+    quality_score: float | None
+    warnings: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSAnalysisResult:
+    """Toolkit-independent result returned to local human interfaces."""
+
+    experiment: ExperimentSnapshot
+    measurements: tuple[DLSMeasurementSummary, ...]
+    source_files: tuple[str, ...]
+    import_errors: tuple[str, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "experiment": self.experiment.to_dict(),
+            "measurements": [measurement.to_dict() for measurement in self.measurements],
+            "source_files": list(self.source_files),
+            "import_errors": list(self.import_errors),
+            "api_version": self.api_version,
+        }
 
 
 @dataclass(frozen=True)
@@ -196,6 +237,66 @@ def dls_experiment_from_samples(
     )
 
 
+def analyze_dls_dataset(
+    paths: list[str | Path],
+    *,
+    label: str = "",
+) -> DLSAnalysisResult:
+    """Import and analyze an existing local DLS dataset.
+
+    This application operation owns file opening, multi-file grouping,
+    measurement assembly, observation generation, and read-model creation so
+    desktop and future shells do not reproduce the scientific workflow.
+    """
+    source_paths = [Path(path).expanduser() for path in paths]
+    if not source_paths:
+        raise ValueError("Select at least one DLS file.")
+    missing = [str(path) for path in source_paths if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"DLS file not found: {missing[0]}")
+
+    opened_files = []
+    try:
+        for path in source_paths:
+            opened_files.append(path.open("rb"))
+        preview = build_import_preview(opened_files)
+        imports = import_measurement_groups(preview.groups)
+    finally:
+        for opened_file in opened_files:
+            opened_file.close()
+
+    measurements = [result.measurement for result in imports if result.measurement is not None]
+    if not measurements:
+        errors = [error for result in imports for error in result.errors]
+        detail = errors[0] if errors else "No supported DLS measurements were found."
+        raise ValueError(detail)
+
+    samples = [sample_from_measurement(measurement) for measurement in measurements]
+    source_files = [str(path) for path in source_paths]
+    experiment = dls_experiment_from_samples(samples, label=label, source_files=source_files)
+    summaries = tuple(
+        DLSMeasurementSummary(
+            sample_name=sample.name,
+            status=sample_status(sample),
+            source_files=tuple(sample.measurement.metadata.source_files),
+            z_average_nm=sample.measurement.summary_metrics.z_average,
+            pdi=sample.measurement.summary_metrics.pdi,
+            primary_peak_nm=sample.measurement.derived_metrics.primary_peak_nm,
+            d50_nm=sample.measurement.derived_metrics.d50_nm,
+            aggregation_risk=sample.measurement.derived_metrics.aggregation_risk,
+            quality_score=sample.measurement.derived_metrics.quality_score,
+            warnings=tuple(sample.warnings),
+        )
+        for sample in samples
+    )
+    return DLSAnalysisResult(
+        experiment=build_experiment_snapshot(experiment),
+        measurements=summaries,
+        source_files=tuple(source_files),
+        import_errors=tuple(error for result in imports for error in result.errors),
+    )
+
+
 def chromatography_experiment_from_preview(
     preview: dict[str, Any],
     *,
@@ -308,6 +409,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="import_dls_experiment",
         purpose="Assemble parsed DLS evidence into an experiment.",
         handler=dls_experiment_from_samples,
+    ),
+    CapabilityContract(
+        name="analyze_dls_dataset",
+        purpose="Import and analyze an existing local DLS dataset.",
+        handler=analyze_dls_dataset,
+        caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(
         name="import_chromatography_experiment",

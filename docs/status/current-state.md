@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: DLS format regression coverage for locale,
-  single-angle, and non-intensity distribution variants (task 007); inspect
+- Latest Completed Change: Native desktop prototype vertical slice over shared
+  DLS application contracts (task 008); inspect
   `git log -1 --oneline` for the resulting commit identifier.
-- Working Tree: Expected to contain only task 007 changes before commit;
+- Working Tree: Expected to contain only task 008 changes before commit;
   inspect `git status --short` before editing.
-- Last Successful Test: `129 passed in 2.04s` from `scripts/test -q` on
-  2026-07-10.
+- Last Successful Test: `132 passed in 2.18s` from `scripts/test -q` on
+  2026-07-10; Streamlit and native PySide6 startup smoke tests also passed.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 by Codex for task 007.
+- Last Updated: 2026-07-10 by Codex for task 008.
 
 ## North Star
 
@@ -32,8 +32,8 @@ full traceability.
 - Tests: 🟢 Healthy — 129 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
-- Application Layer: 🟡 In Progress — initial contracts exist; Streamlit
-  workflow extraction continues.
+- Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
+  a second human shell; broader Streamlit workflow extraction continues.
 - API Layer: ⚪ Not Started — intentionally deferred until the application
   boundary is mature.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
@@ -54,7 +54,8 @@ use planned work to imply an active implementation commitment.
 - ⬜ API layer
 - ⬜ Agent SDK
 - ⬜ Authentication
-- ⬜ Desktop application
+- ✅ Desktop prototype
+- ⬜ Packaged desktop application
 - ⬜ Deployment
 
 Checked items are present and tested, not necessarily final. Unchecked items
@@ -106,8 +107,8 @@ trustworthy evidence, and human control.
 The current data and control flow is:
 
 ```text
-Streamlit UI (`app.py`)
-  -> application boundary and view models
+Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
+  -> application boundary and view models/read models
   -> instrument importers and experiment assembly
   -> Measurement / Experiment / Observation models
   -> metrics, quality, aggregation, trend, and investigator reasoning
@@ -115,10 +116,12 @@ Streamlit UI (`app.py`)
 ```
 
 - `app.py` owns UI layout, widgets, session state, and visualization.
+- `labassistant.desktop` owns the prototype's Tk widgets, native file picker,
+  error presentation, and concise text rendering only.
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
-  persisted experiment retrieval, and a transport-independent registry of
-  seven stable capability names.
+  persisted experiment retrieval, local DLS dataset analysis, and a
+  transport-independent registry of eight stable capability names.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -200,6 +203,7 @@ architecture rationale.
 ## Repository Structure
 
 - `app.py` — current Streamlit application shell.
+- `labassistant/desktop.py` — minimal native desktop prototype shell.
 - `labassistant/` — reusable application and scientific core.
 - `labassistant/application.py` — app-level contracts, capability registry, and
   experiment assembly.
@@ -241,6 +245,9 @@ architecture rationale.
 - Added synthetic DLS format regressions for decimal-comma delimiters,
   single-angle summaries, and explicit rejection of volume/number-only files
   as intensity evidence (task 007).
+- Added a PySide6 desktop vertical slice and typed local DLS analysis
+  capability, proving the core can serve a native shell without importing
+  Streamlit (task 008).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -256,9 +263,8 @@ architecture rationale.
 
 ## Active Work
 
-- No product or documentation implementation task is active at this handoff.
-- The working tree contains pre-existing, uncommitted application,
-  documentation, and test changes. Preserve or intentionally reconcile them.
+- Desktop prototype task 008 is complete pending commit.
+- No unrelated pre-existing changes were present when task 008 began.
 
 ## Known Risks
 
@@ -272,6 +278,8 @@ architecture rationale.
   reproducible.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
+- PySide6 proves native shell independence but is not yet packaged, notarized,
+  or validated across target macOS versions.
 - Cross-technique reasoning and provenance contracts are still early and may
   change as more instruments are integrated.
 
@@ -288,7 +296,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `129 passed in 2.04s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `132 passed in 2.18s` from `scripts/test -q` on 2026-07-10.
+- Streamlit headless startup succeeded on port 8765; the PySide6 desktop window
+  also launched successfully from `scripts/run-desktop`.
 - Supported development version: Python 3.12; verification used Python 3.12.13.
 - Coverage includes models, DLS/multi-file ingestion, representative fixtures,
   metrics, aggregation, quality, history, filtration, chromatography/OpenLab,
@@ -299,24 +309,23 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Expand OpenLab ingestion with one representative archive slice
-  covering a peak table and its provenance, without broadening into unsupported
-  quantitation or calibration semantics.
-- Why this is next: DLS format risks now have explicit synthetic coverage;
-  OpenLab representative validation is the next outstanding ingestion risk.
-- Expected files: A trimmed, non-sensitive `.olax` fixture or synthetic archive
-  mirroring an observed layout; OpenLab importer and experiment tests; prompt
-  008; importer documentation; and this status page.
-- Expected tests: Archive inspection, peak-table extraction, injection and
-  detector association, source-entry provenance, unsupported-section reporting,
-  and the full suite.
-- Estimated scope: Medium; preserve the current tolerant archive reader and add
-  only evidence supported by the fixture.
-- Risks: Treating synthetic layouts as universal, losing archive-entry
-  provenance, or implying validated quantitation where only peak evidence is
-  present.
-- Success criteria: A representative archive yields peak evidence tied to its
-  source entry and injection, with unsupported content reported honestly.
+- Objective: Validate the desktop prototype through a real macOS user run and
+  decide whether the next desktop step is packaging with PySide6 or continued
+  application-layer workflow extraction.
+- Why this is next: The vertical slice proves technical independence from
+  Streamlit; the next decision should be based on actual launch, file-picker,
+  readability, and Python/Qt compatibility evidence rather than speculative UI
+  expansion.
+- Expected files: A short validation record and, only if justified, a narrowly
+  scoped follow-up prompt. Do not begin packaging during validation.
+- Expected tests: Native launch on the target Mac, representative DLS selection,
+  result comparison with Streamlit, cancel/error behavior, and existing suites.
+- Estimated scope: Small validation task before another implementation slice.
+- Risks: Treating one local Qt installation as distributable evidence or
+  expanding visual scope before framework/packaging direction is decided.
+- Success criteria: The target user confirms the prototype launches and its
+  scientific summary agrees with Streamlit, producing an evidence-based next
+  desktop decision.
 
 ## AI Context Window
 

@@ -1,7 +1,12 @@
+from pathlib import Path
+
+from pytest import approx, raises
+
 from labassistant.application import (
     AGENT_API_VERSION,
     APP_DIRECTION,
     HUMAN_APP_SURFACE,
+    analyze_dls_dataset,
     agent_access_policy,
     app_manifest,
     build_experiment_snapshot,
@@ -140,6 +145,35 @@ def test_dls_experiment_creation_is_available_outside_streamlit():
     assert [observation.label for observation in experiment.observations] == ["High variability"]
 
 
+def test_analyze_dls_dataset_runs_file_import_and_summary_outside_ui_code():
+    fixture_dir = Path(__file__).parent / "fixtures"
+    result = analyze_dls_dataset(
+        [
+            fixture_dir / "Orchestra_Zetasizer_Data_Lot_446-01.xlsx",
+            fixture_dir / "Size Distribution by Intensity Lot 1.xlsx",
+            fixture_dir / "Correlogram lot 1.xlsx",
+        ],
+        label="Desktop proof",
+    )
+
+    assert result.experiment.label == "Desktop proof"
+    assert result.experiment.technique == "DLS"
+    assert result.experiment.measurement_count == 1
+    assert result.measurements[0].sample_name == "Lot 1"
+    assert result.measurements[0].primary_peak_nm == approx(267.2, abs=0.1)
+    assert result.measurements[0].aggregation_risk == "High"
+    assert result.import_errors == ()
+    assert "measurements" in result.to_dict()
+
+
+def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
+    with raises(ValueError, match="Select at least one"):
+        analyze_dls_dataset([])
+
+    with raises(FileNotFoundError, match="DLS file not found"):
+        analyze_dls_dataset([tmp_path / "missing.csv"])
+
+
 def test_save_experiment_to_memory_can_use_injected_store():
     experiment = Experiment(
         experiment_id="exp-1",
@@ -175,6 +209,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "describe_platform",
         "describe_agent_access",
         "import_dls_experiment",
+        "analyze_dls_dataset",
         "import_chromatography_experiment",
         "retrieve_experiment",
         "retrieve_experiment_summary",

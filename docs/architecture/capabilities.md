@@ -62,6 +62,7 @@ Missing capability boundaries:
 | `describe_platform` | `app_manifest` | Available |
 | `describe_agent_access` | `agent_access_policy` | Available |
 | `import_dls_experiment` | `dls_experiment_from_samples` | Available, transitional input |
+| `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `retrieve_experiment` | `retrieve_experiment` | Available; first used by Streamlit history loader |
 | `retrieve_experiment_summary` | `build_experiment_snapshot` | Available |
@@ -124,6 +125,28 @@ application-level errors.
 
 **Caller Types:** Human UI, CLI, Future API. Agent use should wait for reviewed
 file/provenance handling.
+
+## Analyze Local DLS Dataset
+
+**Name:** `analyze_dls_dataset`
+
+**Purpose:** Run the supported multi-file DLS workflow from existing local
+paths independently of any UI framework.
+
+**Inputs:** One or more local CSV, text, XLS, or XLSX paths and an optional
+experiment label.
+
+**Outputs:** A versioned `DLSAnalysisResult` containing an
+`ExperimentSnapshot`, concise immutable per-lot summaries, source paths, and
+non-fatal import errors. Raw traces and mutable measurements remain inside the
+scientific workflow.
+
+**Expected Errors:** `ValueError` for an empty selection or a dataset with no
+supported measurements; `FileNotFoundError` for a missing selected path;
+existing parser exceptions for malformed files.
+
+**Caller Types:** Human UI, CLI, Future API. The PySide6 desktop prototype is
+the first caller. Agent use is intentionally excluded.
 
 ## Import Chromatography Experiment
 
@@ -246,5 +269,6 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Define and test the canonical source for lot-level DLS `derived_metrics` so it
-uses the richer per-angle evidence instead of intensity replicate 1 alone.
+Promote additional UI-owned workflows only when a second shell or existing
+human workflow needs them. Keep desktop packaging and richer presentation
+separate from scientific capability contracts.
