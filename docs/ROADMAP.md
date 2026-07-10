@@ -1,7 +1,8 @@
 # LabAssistant Roadmap
 
-This roadmap moves LabAssistant from a working Zetasizer/DLS workflow toward an
-Experiment Intelligence Platform without breaking the current product.
+This roadmap moves LabAssistant from a working Zetasizer/DLS workflow toward a
+standalone Experiment Intelligence application without breaking the current
+product.
 
 ## Current State
 
@@ -14,9 +15,28 @@ The current app already has a useful DLS workflow:
 - Dual-angle aggregation screening.
 - Experiment history, trend views, drift comparison, and similar-run search.
 - A decision-first Streamlit dashboard.
+- A small `labassistant.application` facade that declares the standalone app
+  direction and exposes read-only experiment snapshots.
 
 This is the foundation. It should be protected while the architecture shifts
 from file and measurement processing toward experiment lifecycle intelligence.
+
+## Phase 0: Standalone App Foundation
+
+Goal: make the product boundary explicit before adding larger features.
+
+- Treat Streamlit as the current shell, not the product identity.
+- Keep human scientists as the first users.
+- Keep `labassistant/` as the reusable scientific and application core.
+- Add small app-level contracts before adding any agent runtime.
+- Use `docs/STANDALONE_APP.md` as the canonical direction for app shell,
+  application service, and agent-access decisions.
+- Keep `labassistant.application` limited to manifest/policy/snapshot helpers
+  until real app workflows need query or command modules.
+- Do not add an HTTP API, background service, autonomous agent loop, or
+  instrument-control path in this phase.
+
+Status: started.
 
 ## Phase 1: Rename The Product Concepts
 
@@ -68,6 +88,24 @@ Near-term safe move:
 - Avoid renaming existing fields that the UI and tests rely on.
 - Add adapter helpers that can assemble current `Measurement` objects into an
   experiment envelope.
+
+## Phase 2a: Introduce Application Services
+
+Goal: move reusable app workflows out of `app.py` without changing the current
+UI behavior.
+
+Near-term safe move:
+
+- Keep `app.py` as the Streamlit shell.
+- Add query helpers only when existing UI read workflows can move out cleanly,
+  such as experiment summaries, history lookup, memory search, or report
+  previews.
+- Add command helpers only when import, save, load, note, or export workflows
+  can share validation outside Streamlit.
+- Return plain dataclasses or dictionaries that can be consumed by Streamlit,
+  future packaged app shells, tests, and future agent clients.
+- Version public read contracts, starting with `ExperimentSnapshot`.
+- Keep write operations explicit and human-reviewable.
 
 ## Phase 3: Create An Ingestion Namespace
 
@@ -174,6 +212,25 @@ Near-term safe move:
 - Avoid migrating to SQLite until query needs justify it.
 - Define historical comparison interfaces before changing storage.
 
+## Phase 6a: Read-Only Agent Access
+
+Goal: make LabAssistant usable by future agents without overbuilding agent
+infrastructure.
+
+Prerequisites:
+
+- The human app should already use application query services for experiment
+  summaries, context retrieval, and report previews.
+- Experiment persistence and provenance should be stable enough to cite.
+- Responses should include schema or API version fields.
+
+Near-term safe move:
+
+- Expose read-only snapshots and context packets through Python functions first.
+- Avoid network servers until a real client needs one.
+- Avoid autonomous write actions; use reviewed command objects later.
+- Keep the authoritative data model as `Experiment` and `Observation`.
+
 ## Phase 7: Experiment Reports
 
 Goal: generate reports that describe experiments, not datasets.
@@ -232,22 +289,24 @@ The safest next refactor is a compatibility-first package split:
 1. Add lightweight `Workspace`, `Project`, `Experiment`, and `Observation`
    dataclasses to `labassistant/models.py`, keeping the existing `Measurement`
    API intact.
-2. Add an experiment assembly helper that wraps the current imported
+2. Keep `labassistant.application` as the app boundary and expand it only when
+   app query/command services have real callers.
+3. Add an experiment assembly helper that wraps the current imported
    `Measurement` list in a default workspace/project/experiment envelope.
-3. Add observation extraction helpers that convert current DLS warnings,
+4. Add observation extraction helpers that convert current DLS warnings,
    derived metrics, aggregation assessments, and reproducibility analyses into
    normalized observations.
-4. Add `labassistant/ingestion/zetasizer.py` that wraps the existing DLS importer
+5. Add `labassistant/ingestion/zetasizer.py` that wraps the existing DLS importer
    and returns measurements ready for experiment assembly.
-5. Add `labassistant/reasoning/experiment_brief.py` that wraps the current
+6. Add `labassistant/reasoning/experiment_brief.py` that wraps the current
    decision brief functions from `interpretation.py`.
-6. Add `labassistant/reasoning/reproducibility.py` and move only pure
+7. Add `labassistant/reasoning/reproducibility.py` and move only pure
    percent-RSD/outlier helpers from `trend_analysis.py` behind compatibility
    imports.
-7. Add `labassistant/particle_size_metrics.py` behind the existing
+8. Add `labassistant/particle_size_metrics.py` behind the existing
    `labassistant/metrics.py` compatibility module; later convert to a
    `metrics/particle_size.py` package layout when callers are ready.
-8. Update tests to assert the current DLS dashboard and importer behavior are
+9. Update tests to assert the current DLS dashboard and importer behavior are
    unchanged.
 
 This moves the codebase toward instrument-agnostic scientific reasoning while

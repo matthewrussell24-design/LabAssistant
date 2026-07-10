@@ -4,17 +4,20 @@ This file is kept for compatibility with earlier project handoffs. The project
 brain is now split into focused documents:
 
 1. `docs/VISION.md`
-2. `docs/ROADMAP.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/AGENT_HANDOFF.md`
+2. `docs/STANDALONE_APP.md`
+3. `docs/ROADMAP.md`
+4. `docs/ARCHITECTURE.md`
+5. `docs/AGENT_HANDOFF.md`
 
 ## Current Vision
 
-LabAssistant is an Experiment Intelligence Platform that transforms laboratory
-data into scientific insight across the lifecycle of a scientific experiment.
+LabAssistant is a standalone Experiment Intelligence application that
+transforms laboratory data into scientific insight across the lifecycle of a
+scientific experiment.
 
-The Zetasizer/DLS workflow is the first supported use case, not the final
-product. The core product goal is:
+The current Streamlit app is the first human-facing shell, not the product
+identity. The Zetasizer/DLS workflow is the first supported use case, not the
+final product. The core product goal is:
 
 ```text
 Define or upload an experiment -> LabAssistant gathers observations from every
@@ -24,6 +27,8 @@ trustworthy, why it matters, and what to do next.
 
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
+Human scientists are the first users; future agents should use stable app-level
+experiment and observation contracts after the human workflow is solid.
 
 Current scientific direction: LabAssistant should reason from experimentally
 relevant relationships first. For the active DLS work, the primary investigation
@@ -78,12 +83,14 @@ The safest next move is not a rewrite. Keep the working Zetasizer workflow stabl
 while introducing compatibility-first experiment-centered boundaries:
 
 1. Preserve the current `Experiment` / `Observation` / `Measurement` structure.
-2. Keep chromatography import, mass-balance reasoning, OpenLab OLAX work,
+2. Preserve `labassistant.application` as a small standalone-app manifest and
+   read-only snapshot boundary.
+3. Keep chromatography import, mass-balance reasoning, OpenLab OLAX work,
    KnowledgeStore/context retrieval, and Research Journal behavior stable.
-3. Keep pure relationship, reproducibility, and anomaly helpers in
+4. Keep pure relationship, reproducibility, and anomaly helpers in
    `trend_analysis.py` or similarly small reusable modules rather than burying
    scientific logic directly in Streamlit UI code.
-4. Continue adding tests that prove compatibility boundaries and scientific
+5. Continue adding tests that prove compatibility boundaries and scientific
    helper behavior.
 
 See `docs/ROADMAP.md` for the full phased plan.

@@ -5,16 +5,24 @@ next best move changes.
 
 ## Current Objective
 
-LabAssistant's strategic direction has broadened: it is an Experiment
-Intelligence Platform that transforms laboratory data into scientific insight
-across the lifecycle of a scientific experiment, not a DLS analyzer or primarily
-a Zetasizer/DLS dashboard. The current Zetasizer/DLS workflow is the first
-supported use case and must remain stable while the backend moves toward
-experiment-first ingestion, metrics, reasoning, reporting, and memory.
+LabAssistant's strategic direction has broadened: it is a standalone Experiment
+Intelligence application that transforms laboratory data into scientific
+insight across the lifecycle of a scientific experiment, not a DLS analyzer, a
+Zetasizer/DLS dashboard, or merely a Streamlit analysis tool. The current
+Streamlit surface is the first human-facing shell. The current Zetasizer/DLS
+workflow is the first supported use case and must remain stable while the core
+moves toward experiment-first ingestion, metrics, reasoning, reporting, and
+memory.
 
 Experiments are first-class objects. Measurements are building blocks. The
 reasoning engine should compare observations across instruments and over time.
 Reports should describe experiments, not datasets.
+
+Human scientists are the first users. Future agents are planned clients of the
+same application core, beginning with stable read-only contracts and reviewed
+commands later. Do not add speculative agent runtimes, remote APIs, autonomous
+lab actions, or instrument-control paths before the human app and application
+service layer are stable.
 
 Phases 3, 4, and 5 all have working implementations validated against the real
 Orchestra exports, and dual-angle protein aggregation detection is now the first
@@ -32,11 +40,16 @@ Recently completed across the phases:
 
 The shared integration point is the Measurement-backed `ParsedSample` view
 model, `build_metrics_table`, and `build_angle_table`.
+The app-boundary integration point is now `labassistant.application`, which
+exposes `app_manifest`, `agent_access_policy`, and
+`build_experiment_snapshot`.
 
 ## Current Project State
 
 - `app.py` contains the working Streamlit dashboard, multi-file import preview,
   and chart rendering.
+- `labassistant/application.py` contains the first app-level manifest, planned
+  agent-access policy, and read-only experiment snapshot helper.
 - `labassistant/importers/file_classifier.py` classifies uploads as summary,
   intensity distribution, correlogram, or unknown.
 - `labassistant/importers/lot_grouper.py` normalizes project lot names. For this
@@ -52,6 +65,8 @@ model, `build_metrics_table`, and `build_angle_table`.
 - `README.md` frames LabAssistant as a laboratory intelligence platform and
   summarizes current DLS capabilities.
 - `docs/VISION.md` is the canonical product vision.
+- `docs/STANDALONE_APP.md` is the canonical standalone app and future
+  agent-access direction.
 - `docs/ROADMAP.md` is the canonical incremental platform roadmap.
 - `docs/ARCHITECTURE.md` describes the intended instrument-agnostic module
   boundaries and migration guardrails.
@@ -61,20 +76,25 @@ model, `build_metrics_table`, and `build_angle_table`.
 ## Next Best Move
 
 The safest next move is a compatibility-first refactor that introduces
-experiment-centered boundaries without breaking the current Zetasizer workflow:
+experiment-centered application boundaries without breaking the current
+Zetasizer workflow:
 
-1. Add a first-class `Experiment` model/envelope around the existing
-   `Measurement` list and history record payloads.
-2. Add `labassistant/ingestion/zetasizer.py` as a facade over the existing DLS
+1. Keep `labassistant.application` small; expand only when app queries/commands
+   have real human-app callers.
+2. Add a first-class `Experiment` model/envelope around the existing
+   `Measurement` list and history record payloads where DLS still lacks one.
+3. Add application query helpers for repeated read workflows such as experiment
+   summary, history lookup, memory retrieval, and report preview.
+4. Add `labassistant/ingestion/zetasizer.py` as a facade over the existing DLS
    importer and multi-file import flow.
-3. Add `labassistant/reasoning/experiment_brief.py` as a facade over the current
+5. Add `labassistant/reasoning/experiment_brief.py` as a facade over the current
    decision brief logic in `interpretation.py`.
-4. Add `labassistant/reasoning/reproducibility.py` for pure percent-RSD/outlier
+6. Add `labassistant/reasoning/reproducibility.py` for pure percent-RSD/outlier
    helpers currently living in `trend_analysis.py`, keeping old imports working.
-5. Add `labassistant/particle_size_metrics.py` behind the existing
+7. Add `labassistant/particle_size_metrics.py` behind the existing
    `labassistant/metrics.py` compatibility module; later convert to
    `metrics/particle_size.py` when callers are ready.
-6. Add compatibility tests proving old and new import paths both work.
+8. Add compatibility tests proving old and new import paths both work.
 
 After that, two lanes remain open:
 
@@ -372,11 +392,15 @@ AN140527. Do not treat it as a minor metric.
 ## Working Rules for Agents
 
 - Read `docs/VISION.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`, this file,
-  and `README.md` before making architectural changes.
+  `docs/STANDALONE_APP.md`, and `README.md` before making architectural
+  changes.
 - Check `git status --short` before editing. Preserve user or previous-agent
   changes.
 - Keep changes scoped to the current milestone.
 - Prefer extracting pure logic with tests over redesigning the UI.
+- Treat Streamlit as the current app shell, not the long-term product boundary.
+- Do not add agent infrastructure beyond stable read-only contracts until the
+  application service layer is used by the human app.
 - Update this file when you finish a milestone or discover a better next move.
 - If you add a new module, add or update tests in the same turn whenever
   practical.

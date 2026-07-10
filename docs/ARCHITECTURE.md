@@ -6,17 +6,21 @@ current Streamlit app.
 
 ## Strategic Frame
 
-LabAssistant is an Experiment Intelligence Platform that transforms laboratory
-data into scientific insight across the lifecycle of a scientific experiment.
-The current Zetasizer/DLS workflow is the first supported use case, not the
-final product.
+LabAssistant is a standalone Experiment Intelligence application that
+transforms laboratory data into scientific insight across the lifecycle of a
+scientific experiment. The current Streamlit app is the first human-facing shell
+around the core. The current Zetasizer/DLS workflow is the first supported use
+case, not the final product.
 
 Architecture principle:
 
 ```text
+UI shells call application services.
+Application services call the scientific core.
 Instrument-specific code lives in ingestion/parsing modules.
 Scientific reasoning is general and reusable across instruments, conditions,
 time points, batches, and experiment histories.
+Future agent clients use stable read-only app contracts before write commands.
 ```
 
 The intelligence layer is the product. Instruments are plugins. Experiments are
@@ -24,7 +28,7 @@ first-class objects. Measurements are building blocks.
 
 ## Current State
 
-LabAssistant is currently a Streamlit app backed by a small `labassistant`
+LabAssistant currently has a Streamlit shell backed by a small `labassistant`
 package.
 
 The backend package already does several useful jobs:
@@ -47,10 +51,22 @@ The backend package already does several useful jobs:
 This is a strong foundation, but naming and module boundaries still reflect the
 first DLS use case more than the long-term platform.
 
+`labassistant.application` now provides the first small app-level boundary:
+
+- `app_manifest()` describes the standalone app direction.
+- `agent_access_policy()` documents current planned agent access and non-goals.
+- `build_experiment_snapshot(experiment)` returns a read-only summary suitable
+  for UI navigation, reports, and future agent context selection.
+
 ## Preferred Long-Term Shape
 
 ```text
 labassistant/
+  application/
+    commands.py
+    queries.py
+    services.py
+
   ingestion/
     zetasizer.py
     hplc.py
@@ -73,6 +89,10 @@ labassistant/
   reports/
     export.py
 
+  agent_access/
+    readonly_api.py
+    schemas.py
+
   models/
     workspace.py
     project.py
@@ -83,6 +103,33 @@ labassistant/
 
 Do not force this full split in one large rewrite. Extract one stable boundary
 at a time, with tests around behavior before and after the move.
+
+The current `labassistant/application.py` file can stay as a compatibility
+facade until there is enough application-service code to justify the
+`application/` package split.
+
+## Standalone App Boundary
+
+The app boundary should be explicit:
+
+```text
+Streamlit shell now, future app shell later
+  -> application queries and commands
+  -> Experiment / Observation / Measurement core
+  -> ingestion, reasoning, memory, reports
+```
+
+`app.py` may own layout, widgets, session state, and local UI affordances. It
+should not be the only place that knows how to assemble experiments, query
+history, retrieve memory, or produce report-ready summaries.
+
+Application queries should be read-only and easy to test. Application commands
+should be explicit, validated, and provenance-preserving.
+
+The future agent-access layer should sit on top of application queries first.
+It should return versioned snapshots, context packets, observations, and report
+summaries before it ever exposes write commands. Any future write path should
+reuse the same command validation used by the human app.
 
 ## Domain Model Direction
 
@@ -286,7 +333,7 @@ Future report exports may include:
 
 ## UI Direction
 
-The dashboard should stay decision-oriented.
+The human app should stay decision-oriented.
 
 Show first:
 
@@ -299,15 +346,37 @@ Show first:
 
 Hide secondary diagnostics inside expandable sections.
 
-`app.py` should eventually become a thin Streamlit entry point that calls the
-analysis core and renders returned view models.
+`app.py` should eventually become a thin Streamlit entry point that calls
+application services and renders returned view models.
+
+## Agent-Access Direction
+
+Agents are future clients of LabAssistant, not the primary product in the near
+term.
+
+Near-term contract:
+
+- Stable app manifest and access policy.
+- Read-only `ExperimentSnapshot` objects.
+- Compact context packets from the `ContextRetriever`.
+- Report-ready summaries generated from experiments and observations.
+
+Non-goals until the human app and service layer are stable:
+
+- autonomous lab operation
+- instrument control
+- remote API hosting
+- broad LLM orchestration
+- write actions that bypass human review
 
 ## Migration Guardrails
 
 - Preserve the working Zetasizer workflow.
+- Preserve the human app workflow while extracting app services.
 - Promote `Experiment` before introducing new instrument-specific surfaces.
 - Treat file import as the first step of experiment assembly, not the product
   center.
+- Treat Streamlit as the current shell, not the product architecture.
 - Keep old import paths working while introducing new package boundaries.
 - Add compatibility facades before renaming modules.
 - Add tests before changing parser heuristics.

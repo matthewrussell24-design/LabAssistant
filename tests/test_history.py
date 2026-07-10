@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from labassistant.history import (
+    ExperimentRecordNotFoundError,
+    MalformedExperimentRecordError,
     compare_experiments,
     compare_to_history,
     find_similar_samples,
     history_table,
     latest_experiment,
     load_history,
+    load_experiment_record,
     measurements_from_record,
     save_experiment,
     trend_table,
@@ -52,6 +55,40 @@ def test_save_and_load_experiment_history(tmp_path):
     assert restored[0].sample_name == "Lot 1"
     assert restored[0].summary_metrics.z_average == 125.0
     assert restored[0].provenance["loaded_from_history"]["record_id"] == saved.id
+
+
+def test_load_experiment_record_returns_requested_record(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    save_experiment([make_measurement("Older", 100.0, 0.2)], history_path=history_path)
+    requested = save_experiment(
+        [make_measurement("Requested", 125.0, 0.25)],
+        label="Requested run",
+        history_path=history_path,
+    )
+
+    loaded = load_experiment_record(requested.id, history_path=history_path)
+
+    assert loaded.id == requested.id
+    assert loaded.label == "Requested run"
+
+
+def test_load_experiment_record_distinguishes_missing_and_malformed(tmp_path):
+    missing_path = tmp_path / "missing.jsonl"
+    try:
+        load_experiment_record("missing", history_path=missing_path)
+    except ExperimentRecordNotFoundError:
+        pass
+    else:
+        raise AssertionError("Missing records must raise an explicit lookup error")
+
+    malformed_path = tmp_path / "malformed.jsonl"
+    malformed_path.write_text('{"id":"broken","measurements":"invalid"}\n', encoding="utf-8")
+    try:
+        load_experiment_record("broken", history_path=malformed_path)
+    except MalformedExperimentRecordError:
+        pass
+    else:
+        raise AssertionError("Malformed records must raise an explicit data error")
 
 
 def test_history_and_trend_tables_summarize_records(tmp_path):

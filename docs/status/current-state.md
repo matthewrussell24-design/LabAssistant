@@ -1,0 +1,368 @@
+# LabAssistant Current State
+
+**Project:** LabAssistant
+**Version:** 0.1.0-dev
+**Repository Root:** `LabAssistant/`
+**Primary Branch:** `main`
+**Architecture Version:** 2
+
+## Repository State
+
+- Current Branch: `main`
+- Latest Completed Change: Repository workflow and application capability tasks
+  001–005; inspect `git log -1 --oneline` for the resulting commit identifier.
+- Working Tree: Expected clean at this handoff; inspect `git status --short`
+  before editing.
+- Last Successful Test: `124 passed in 2.05s` from `scripts/test -q` on
+  2026-07-10.
+- Supported Python Version: Python 3.12; last verified with Python 3.12.13.
+- Last Updated: 2026-07-10 by Codex for task 004.
+
+## Project Health
+
+- Architecture: 🟢 Healthy — target boundaries and migration direction are
+  documented.
+- Tests: 🟢 Healthy — 124 passing.
+- Documentation: 🟢 Current — canonical status, navigation, prompts, and
+  decisions are aligned.
+- Application Layer: 🟡 In Progress — initial contracts exist; Streamlit
+  workflow extraction continues.
+- API Layer: ⚪ Not Started — intentionally deferred until the application
+  boundary is mature.
+- Agent SDK: ⚪ Planned — read-only application contracts come first.
+
+Health labels summarize the evidence in the detailed sections below. Update a
+label only when that evidence changes; do not use green to hide a known risk or
+use planned work to imply an active implementation commitment.
+
+## Platform Progress
+
+- ✅ Documentation workflow
+- ✅ Living status page
+- ✅ Experiment model
+- ✅ Observation model
+- ✅ Initial application boundary
+- ✅ Capability catalog and registry
+- ⬜ Mature application layer
+- ⬜ API layer
+- ⬜ Agent SDK
+- ⬜ Authentication
+- ⬜ Desktop application
+- ⬜ Deployment
+
+Checked items are present and tested, not necessarily final. Unchecked items
+are future platform capabilities and are not automatically the next task.
+
+## Current Milestone
+
+- Milestone: Application Layer Extraction
+- Status: In Progress
+- Goal: Separate reusable scientific workflows from the Streamlit UI while
+  preserving existing functionality and backwards compatibility.
+- Completion signal: Existing human workflows call stable application-layer
+  contracts, reusable logic no longer depends on Streamlit, and compatibility
+  tests protect current behavior.
+
+## Five-Minute Rule
+
+Every important project document should reveal its purpose within five minutes:
+
+- This document answers: Where are we?
+- `docs/ROADMAP.md` answers: Where are we going?
+- `docs/ARCHITECTURE.md` answers: Why is it built this way?
+- `AGENTS.md` answers: How should an AI work here?
+- `docs/prompts/*.md` answers: What should be implemented next?
+
+Prefer clear entry points, scoped detail, and links to deeper records over
+duplicating history in multiple documents.
+
+This page is the operating system for project coordination. The README routes
+contributors here; this page routes them to the relevant roadmap, architecture,
+prompt, decision, and standard records before implementation begins.
+
+## Project Vision
+
+LabAssistant is a human-first, standalone Experiment Intelligence application
+for turning laboratory data into trustworthy scientific findings and practical
+next steps. DLS/Zetasizer is the mature first workflow; chromatography and
+filtration are the first steps toward a broader platform.
+
+## Long-Term Vision
+
+LabAssistant should become a standalone, agent-native scientific reasoning
+platform with a human-first interface. Its instrument-independent core should
+serve application shells and a stable API while preserving provenance,
+trustworthy evidence, and human control.
+
+## Current Architecture
+
+The current data and control flow is:
+
+```text
+Streamlit UI (`app.py`)
+  -> application boundary and view models
+  -> instrument importers and experiment assembly
+  -> Measurement / Experiment / Observation models
+  -> metrics, quality, aggregation, trend, and investigator reasoning
+  -> local history and knowledge/context storage
+```
+
+- `app.py` owns UI layout, widgets, session state, and visualization.
+- `labassistant.application` exposes app and agent-access policy, read-only
+  experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
+  persisted experiment retrieval, and a transport-independent registry of
+  seven stable capability names.
+- Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
+  sources into domain evidence.
+- `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
+  `Experiment` is the instrument-agnostic reasoning unit, and `Observation` is
+  the normalized finding shared by reasoning layers.
+- Deterministic analysis lives outside the UI in metrics, quality, aggregation,
+  trend analysis, chromatography, observations, and the Scientific
+  Investigator.
+- Persistence is local. Experiment history uses JSONL; the context engine
+  manages reusable scientific knowledge and memory.
+
+The intended boundary is UI shells -> application services -> scientific core.
+Future agent access begins with versioned, read-only application contracts. An
+HTTP service, autonomous agent runtime, and instrument control are current
+non-goals.
+
+## Important Decisions
+
+- The repository is the source of truth. Substantial requests and completion
+  records live together in `docs/prompts/`.
+- This page is the primary handoff and part of the definition of done for
+  substantial work.
+- LabAssistant is a standalone experiment-intelligence product; Streamlit is a
+  replaceable current shell.
+- Human workflows come first. Future agents receive stable read-only contracts
+  before reviewed write commands.
+- Experiments are the top-level reasoning unit, measurements are evidence, and
+  normalized observations connect instrument adapters to shared reasoning.
+- Refactors are compatibility-first and incremental. Preserve the mature DLS
+  workflow while extracting stable boundaries.
+- Instrument parsing stays instrument-specific; scientific reasoning operates
+  on normalized, reusable evidence.
+
+## Recent Decisions
+
+2026-07-10:
+
+- Streamlit is a replaceable UI shell, not the product boundary.
+- The first explicit application boundary and read-only experiment snapshot
+  contract were introduced.
+- This status page became the primary project handoff and AI coordination
+  document.
+- Future APIs should target the application layer instead of exposing domain
+  models directly.
+- Human interfaces, future APIs, CLIs, and agents should share capability names
+  based on scientific intent rather than low-level functions.
+
+This is a concise captain's log, not a replacement for formal decision records.
+Keep only the most recent strategic choices here and preserve full rationale in
+`docs/decisions/`.
+
+## Architect's Notes
+
+- Favor incremental, compatibility-first refactors over sweeping rewrites.
+- Optimize human scientific workflows before autonomous-agent workflows.
+- Every reusable capability should eventually be callable through the
+  application layer.
+- Keep scientific reasoning independent of instrument type.
+- Keep instruments as adapters and experiments as the unit of scientific
+  meaning.
+
+These notes guide near-term judgment but do not replace architecture records
+when a decision establishes a durable contract.
+
+## Current Non-Goals
+
+Until the application layer is mature, do not:
+
+- Introduce FastAPI or another HTTP service.
+- Split the application into microservices.
+- Migrate away from Streamlit.
+- Replace JSONL persistence.
+- Redesign the UI.
+- Add an autonomous agent runtime or instrument-control path.
+
+Revisit a non-goal only through an explicitly scoped prompt with supporting
+architecture rationale.
+
+## Repository Structure
+
+- `app.py` — current Streamlit application shell.
+- `labassistant/` — reusable application and scientific core.
+- `labassistant/application.py` — app-level contracts, capability registry, and
+  experiment assembly.
+- `labassistant/models.py` — measurements, experiments, observations,
+  chromatography, and investigator result models.
+- `labassistant/importers/` — DLS, filtration, chromatography, and OpenLab
+  ingestion.
+- `labassistant/metrics.py`, `quality.py`, `aggregation.py`, and
+  `trend_analysis.py` — DLS and shared quantitative analysis.
+- `labassistant/chromatography.py`, `filtration.py`, and `observations.py` —
+  technique models and normalized finding generation.
+- `labassistant/investigator.py` — deterministic, instrument-independent
+  reasoning over observations.
+- `labassistant/history.py` and `context_engine.py` — local history and
+  scientific memory.
+- `labassistant/measurements.py`, `view_models.py`, and `interpretation.py` —
+  adapters and presentation-ready summaries used by the current UI.
+- `tests/` — unit, integration, importer, and representative-fixture coverage.
+- `docs/` — status, prompts, architecture, roadmap, standards, decisions,
+  vision, and technical proposals.
+- `graphify-out/` — generated knowledge graph and architecture navigation data.
+- `scripts/` — repository run and test entry points.
+
+## Recently Completed Work
+
+- Established the repository documentation workflow with numbered prompts,
+  indexes, standards, and decision records (task 001).
+- Established this living status page as the primary implementation-session
+  handoff (task 002).
+- Refined the status page into the canonical five-minute onboarding document
+  and aligned permanent agent guidance (task 003).
+- Defined the transport-independent capability layer, documented its backlog,
+  and added a tested registry for six existing operations (task 004).
+- Promoted persisted experiment retrieval into the capability layer and routed
+  the Streamlit saved-experiment loader through it (task 005).
+- Added the first explicit application boundary and versioned, read-only
+  `ExperimentSnapshot`.
+- Added DLS and chromatography experiment assembly.
+- Added instrument-independent `Experiment` and `Observation` models and the
+  Scientific Investigator reasoning layer.
+- Added OpenLab `.olax` ingestion, chromatogram trace decoding,
+  chromatography/mass-balance models, and normalized observations.
+- Added filtration follow-up measurements and persisted circulation variables
+  for cross-technique investigation.
+- Preserved the working DLS workflow: multi-file lot import, derived metrics,
+  dual-angle aggregation assessment, decision-first UI, history, comparison,
+  trends, and similar-run search.
+
+## Active Work
+
+- No product or documentation implementation task is active at this handoff.
+- The working tree contains pre-existing, uncommitted application,
+  documentation, and test changes. Preserve or intentionally reconcile them.
+
+## Known Risks
+
+- Package boundaries remain partly DLS-shaped, increasing coupling during
+  future extraction into application, ingestion, metrics, and reasoning areas.
+- Parser validation does not yet cover enough vendor versions, locales,
+  delimiters, workbook layouts, distribution types, or real OpenLab archives.
+- JSONL history has limited migration and query support; schema evolution needs
+  care until stronger persistence requirements justify a change.
+- `requirements.txt` is unpinned, so environment resolution is not fully
+  reproducible.
+- The large Streamlit shell can encourage UI logic to bypass application
+  services.
+- Cross-technique reasoning and provenance contracts are still early and may
+  change as more instruments are integrated.
+
+## Outstanding Issues
+
+- Define and test the canonical source for lot-level DLS `derived_metrics` so
+  it uses the richer per-angle evidence instead of intensity replicate 1 alone.
+- Add regression fixtures for additional vendor versions, locales, delimiters,
+  workbook layouts, single-angle files, and volume/number distributions.
+- Validate OpenLab ingestion against more representative archives and add peak
+  table, quantitation, system-suitability, calibration, audit-trail, and
+  provenance coverage incrementally.
+- Unify chromatography missing-mass hypotheses, DLS aggregation evidence, and
+  filtration outcomes in an experiment-level investigation test case.
+
+## Testing Status
+
+- Latest result: `124 passed in 2.40s` from `scripts/test -q` on 2026-07-10.
+- Supported development version: Python 3.12; verification used Python 3.12.13.
+- Coverage includes models, DLS/multi-file ingestion, representative fixtures,
+  metrics, aggregation, quality, history, filtration, chromatography/OpenLab,
+  context memory, application contracts, investigator reasoning, and view
+  models.
+- Parser changes require synthetic and representative real-file validation.
+- UI changes require a Streamlit smoke test in addition to unit tests.
+
+## Next Recommended Task
+
+- Objective: Define and test the canonical source for lot-level DLS
+  `derived_metrics` so it uses richer per-angle evidence instead of intensity
+  replicate 1 alone.
+- Why this is next: The ambiguity is a known scientific correctness risk and
+  resolving it strengthens the mature DLS workflow before further capability
+  extraction.
+- Expected files: DLS importer/measurement assembly, metrics or aggregation
+  helpers, focused importer and application tests, architecture notes if the
+  contract changes, and this status page.
+- Expected tests: Multi-angle evidence selection, single-angle fallback,
+  missing distributions, representative fixture compatibility, and the full
+  suite.
+- Estimated scope: Medium; first document the evidence rule, then centralize it
+  without changing unrelated parser behavior.
+- Risks: Changing current UI values, confusing replicate and angle semantics,
+  or selecting volume/number evidence where intensity evidence is required.
+- Success criteria: One documented and tested rule produces lot-level derived
+  metrics from the best available angle evidence with explicit fallback.
+
+## AI Context Window
+
+When beginning a new implementation session, the minimum required reading is:
+
+1. `docs/status/current-state.md`.
+2. The relevant implementation prompt in `docs/prompts/`.
+3. The relevant architecture or decision record linked by the prompt or this
+   page.
+
+Read additional documentation only when the task, affected contract, or links
+from those three sources require it. This minimum does not override explicit
+task instructions or repository agent rules.
+
+## AI Agent Instructions
+
+1. Read this document before substantial work.
+2. Inspect `git status --short` and preserve unrelated or pre-existing changes.
+3. Read the relevant architecture, decision, standard, and roadmap records.
+4. Read or create the relevant numbered prompt in `docs/prompts/`.
+5. Preserve backwards compatibility unless the task explicitly changes it.
+6. Implement and test the smallest coherent requested change.
+7. Update affected documentation and this page before declaring substantial
+   work complete.
+8. Run `graphify update .` after code or documentation changes.
+
+## Documentation Map
+
+- Current Status: [`current-state.md`](current-state.md)
+- Architecture: [`../architecture/README.md`](../architecture/README.md),
+  [`../architecture/capabilities.md`](../architecture/capabilities.md),
+  [`../ARCHITECTURE.md`](../ARCHITECTURE.md), and
+  [`../STANDALONE_APP.md`](../STANDALONE_APP.md)
+- Prompts: [`../prompts/README.md`](../prompts/README.md)
+- Roadmap: [`../roadmap/README.md`](../roadmap/README.md) and
+  [`../ROADMAP.md`](../ROADMAP.md)
+- Standards: [`../standards/README.md`](../standards/README.md)
+- Decision Records: [`../decisions/README.md`](../decisions/README.md)
+- Vision: [`../VISION.md`](../VISION.md)
+- Historical Handoff: [`../AGENT_HANDOFF.md`](../AGENT_HANDOFF.md)
+
+## Update Rules
+
+Update this document after:
+
+- Architectural refactors or contract changes.
+- New platform capabilities or completed implementation prompts.
+- Major documentation changes or repository restructuring.
+- Material changes to dependencies, runtime, test status, active work, known
+  risks, outstanding issues, or the next recommended task.
+
+Do not update this document after:
+
+- Typo or formatting-only fixes.
+- Isolated comments or cosmetic changes.
+- Isolated unit-test changes that do not alter project behavior or direction.
+- Trivial bug fixes with no architectural or handoff consequence.
+
+Substantial work is complete only when this page reflects the resulting state,
+its links are valid, `AGENTS.md` remains accurate, and architecture references
+remain consistent.

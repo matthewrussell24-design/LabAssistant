@@ -68,6 +68,14 @@ class ExperimentRecord:
         )
 
 
+class ExperimentRecordNotFoundError(LookupError):
+    """Raised when a requested history record does not exist."""
+
+
+class MalformedExperimentRecordError(ValueError):
+    """Raised when a requested history record cannot be reconstructed safely."""
+
+
 def measurements_from_record(record: ExperimentRecord) -> list[Measurement]:
     measurements = []
     for payload in record.measurements:
@@ -146,6 +154,59 @@ def load_history(history_path: Path = DEFAULT_HISTORY_PATH) -> list[ExperimentRe
             except json.JSONDecodeError:
                 continue
     return records
+
+
+def load_experiment_record(
+    record_id: str,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> ExperimentRecord:
+    """Load one valid history record by id with explicit lookup errors.
+
+    Unlike the tolerant history browser, this targeted read fails if a JSONL
+    line is malformed because silently stepping over damaged persistence would
+    make a successful lookup ambiguous.
+    """
+
+    requested_id = record_id.strip()
+    if not requested_id:
+        raise ExperimentRecordNotFoundError("Experiment record id is required")
+    if not history_path.exists():
+        raise ExperimentRecordNotFoundError(f"Experiment record not found: {requested_id}")
+
+    with history_path.open("r", encoding="utf-8") as history_file:
+        for line_number, line in enumerate(history_file, start=1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise MalformedExperimentRecordError(
+                    f"Malformed experiment history at line {line_number}"
+                ) from error
+            if not isinstance(payload, dict):
+                raise MalformedExperimentRecordError(
+                    f"Malformed experiment history at line {line_number}: expected an object"
+                )
+            if str(payload.get("id", "")) != requested_id:
+                continue
+            measurements = payload.get("measurements")
+            if not isinstance(measurements, list) or not all(
+                isinstance(measurement, dict) for measurement in measurements
+            ):
+                raise MalformedExperimentRecordError(
+                    f"Malformed experiment record {requested_id}: measurements must be a list of objects"
+                )
+            record = ExperimentRecord.from_dict(payload)
+            try:
+                measurements_from_record(record)
+            except (AttributeError, TypeError, ValueError) as error:
+                raise MalformedExperimentRecordError(
+                    f"Malformed experiment record {requested_id}: invalid measurement payload"
+                ) from error
+            return record
+
+    raise ExperimentRecordNotFoundError(f"Experiment record not found: {requested_id}")
 
 
 def history_table(records: list[ExperimentRecord]) -> pd.DataFrame:

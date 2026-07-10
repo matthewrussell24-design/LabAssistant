@@ -4,7 +4,8 @@ import zipfile
 
 import pandas as pd
 
-from app import chromatography_experiment_from_preview, dls_experiment_from_samples, load_chromatography_preview
+from app import load_chromatography_preview
+from labassistant.application import chromatography_experiment_from_preview, dls_experiment_from_samples
 from labassistant.models import (
     ChromatographyMeasurement,
     MassBalanceAssessment,

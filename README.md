@@ -1,11 +1,24 @@
 # LabAssistant
 
-LabAssistant is an Experiment Intelligence Platform that transforms laboratory
-data into scientific insight across the lifecycle of a scientific experiment.
+LabAssistant is a standalone Experiment Intelligence application that
+transforms laboratory data into scientific insight across the lifecycle of a
+scientific experiment.
+
+The current working surface is a Streamlit app, but LabAssistant should not be
+treated as merely a Streamlit analysis tool. Streamlit is the first human-facing
+shell around a reusable application core. The product direction is:
+
+- Human users first: scientists should be able to import, review, compare, and
+  report experiments in a dedicated LabAssistant application.
+- Application core second: ingestion, domain models, reasoning, memory, and
+  reporting should live outside UI code.
+- Agent-ready later: future agents should be able to use stable experiment and
+  observation APIs, but agent infrastructure should not be overbuilt before the
+  human workflow and domain boundaries are solid.
 
 The current working product supports a Zetasizer/DLS workflow, but that workflow
-is the first use case rather than the final product. The long-term platform goal
-is:
+is the first use case rather than the final product. The long-term application
+goal is:
 
 ```text
 Define or upload an experiment -> LabAssistant gathers observations from every
@@ -22,6 +35,23 @@ Every experiment should answer four questions:
 
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
+
+## Standalone Application Direction
+
+LabAssistant should evolve into a standalone app with a clear boundary between
+the product shell and the scientific core:
+
+- `app.py` is the current Streamlit shell for human users.
+- `labassistant/` is the reusable application and scientific core.
+- `labassistant.application` exposes the first tiny app-level manifest and
+  read-only experiment snapshot contract.
+- Future UI shells, report exporters, local services, or agent clients should
+  consume the same core rather than scrape Streamlit state.
+
+The planned agent-access layer is intentionally modest right now. It should
+start with stable, read-only access to experiments, observations, summaries,
+provenance, and reports. It should not yet include autonomous lab operation,
+instrument control, remote API hosting, or speculative LLM orchestration.
 
 ## Current Supported Use Case
 
@@ -243,16 +273,40 @@ over time, not only compare one uploaded dataset to another.
 
 ## Documentation Map
 
+The repository development workflow and complete documentation index live in
+[`docs/README.md`](docs/README.md).
+
+For the fastest project handoff, read
+[`docs/status/current-state.md`](docs/status/current-state.md). LabAssistant uses
+a five-minute rule: each important document should make its purpose clear within
+five minutes.
+
 Start here when changing product or architecture direction:
 
-1. `docs/VISION.md` - product vision and platform principles.
-2. `docs/ROADMAP.md` - incremental roadmap from DLS workflow to lab
-   intelligence platform.
-3. `docs/ARCHITECTURE.md` - target module boundaries and current migration
-   guidance.
-4. `docs/AGENT_HANDOFF.md` - current implementation state and next best moves.
-5. `LabAssistant_Vision_and_Roadmap.md` - legacy compatibility pointer to the
-   newer split docs.
+1. `docs/status/current-state.md` — Where are we?
+2. `docs/ROADMAP.md` — Where are we going?
+3. `docs/ARCHITECTURE.md` — Why is it built this way?
+4. `AGENTS.md` — How should an AI work here?
+5. `docs/prompts/*.md` — What should be implemented next?
+
+Product principles live in `docs/VISION.md`; standalone and agent-access
+boundaries live in `docs/STANDALONE_APP.md`. `docs/AGENT_HANDOFF.md` retains
+deeper historical context, and `LabAssistant_Vision_and_Roadmap.md` remains a
+legacy compatibility pointer.
+
+The status page is the operating system for contributor coordination:
+
+```text
+README
+  -> current-state.md
+       -> Roadmap
+       -> Architecture and decisions
+       -> Implementation prompts
+            -> Human contributors and Codex
+```
+
+Other documents provide durable detail; `current-state.md` tells contributors
+which detail matters now and identifies the safest next action.
 
 ## Local Setup
 
@@ -298,6 +352,7 @@ LabAssistant/
   README.md
   LabAssistant_Vision_and_Roadmap.md
   labassistant/
+    application.py
     aggregation.py
     history.py
     interpretation.py
@@ -317,6 +372,7 @@ LabAssistant/
     AGENT_HANDOFF.md
     ARCHITECTURE.md
     ROADMAP.md
+    STANDALONE_APP.md
     VISION.md
 ```
 
@@ -324,6 +380,10 @@ Preferred long-term direction:
 
 ```text
 labassistant/
+  application/
+    commands.py
+    queries.py
+    services.py
   ingestion/
     zetasizer.py
     hplc.py
@@ -342,6 +402,9 @@ labassistant/
     hypothesis_engine.py
   reports/
     export.py
+  agent_access/
+    readonly_api.py
+    schemas.py
   models/
     experiment.py
     measurement.py

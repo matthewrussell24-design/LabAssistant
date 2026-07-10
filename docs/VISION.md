@@ -1,10 +1,13 @@
 # LabAssistant Vision
 
-LabAssistant is an Experiment Intelligence Platform that transforms laboratory
-data into scientific insight across the lifecycle of a scientific experiment.
+LabAssistant is a standalone Experiment Intelligence application that
+transforms laboratory data into scientific insight across the lifecycle of a
+scientific experiment.
 
-It should not be framed primarily as a Zetasizer/DLS dashboard. The current
-Zetasizer/DLS workflow is the first supported use case, not the final product.
+It should not be framed primarily as a Zetasizer/DLS dashboard or a Streamlit
+analysis tool. The current Streamlit app is the first human-facing shell, and
+the current Zetasizer/DLS workflow is the first supported use case, not the
+final product.
 
 The core product goal is:
 
@@ -18,6 +21,9 @@ trustworthy, why it matters, and what to do next.
 
 The intelligence layer is the product. Instruments are plugins.
 Experiments are first-class objects. Measurements are building blocks.
+Human scientists are the first users. Future agents are planned clients of the
+same stable experiment intelligence core, not a separate product bolted onto
+the side.
 
 Scientists should not have to manually inspect exported tables, decide which
 charts matter, translate noisy metrics into experimental meaning, and then
@@ -27,6 +33,17 @@ with clear evidence and conservative language.
 The platform should reason about the scientific experiment, not merely process
 individual files or datasets. A file is an artifact. A measurement is an
 observation. An experiment is the unit of scientific meaning.
+
+The standalone app should keep a clean product boundary:
+
+```text
+UI shell -> application services -> scientific core -> memory/reporting
+```
+
+Agent access should use the same application services later, beginning with
+read-only experiment summaries, observations, context packets, and reports.
+Autonomous lab operation, instrument control, and speculative agent runtimes are
+not part of the near-term product vision.
 
 Every experiment should answer:
 
@@ -107,6 +124,11 @@ lifecycle.
 
 ## Architecture Principle
 
+UI-specific code belongs in the current app shell.
+
+Application workflows belong in UI-independent services and query/command
+facades.
+
 Instrument-specific code belongs in ingestion/parsing modules.
 
 Scientific reasoning belongs in general modules that can operate on normalized
@@ -175,3 +197,7 @@ LabAssistant should speak like a careful scientific analyst:
 
 The dashboard should remain decision-oriented: scientists should be able to tell
 which samples need attention and why in under 30 seconds.
+
+As the product becomes a standalone application, this decision-oriented behavior
+should apply to every shell: Streamlit today, a packaged local app later, and
+read-only agent clients after the application service layer is stable.

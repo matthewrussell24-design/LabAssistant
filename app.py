@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import html
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -14,6 +12,12 @@ from labassistant.aggregation import (
     INDEX_ELEVATED,
     INDEX_WATCH,
     assess_dual_angle_aggregation,
+)
+from labassistant.application import (
+    chromatography_experiment_from_preview,
+    dls_experiment_from_samples,
+    retrieve_experiment,
+    save_experiment_to_memory,
 )
 from labassistant.interpretation import (
     build_ai_summary,
@@ -102,10 +106,6 @@ from labassistant.view_models import (
 
 
 CHROMATOGRAPHY_FIXTURE_PATH = Path("sample_data/chromatography/mass_balance_demo.csv")
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def render_metric_row(label: str, value: str) -> str:
@@ -294,107 +294,6 @@ def render_experiment_brief(samples: list[ParsedSample]) -> None:
                 }
             )
             st.dataframe(display, use_container_width=True, hide_index=True)
-
-
-def dls_experiment_from_samples(
-    samples: list[ParsedSample],
-    *,
-    label: str = "",
-    source_files: list[str] | None = None,
-) -> Experiment:
-    observations = observations_from_samples(samples)
-    experiment_label = label.strip() or "DLS experiment"
-    metadata = {
-        "sample_count": len(samples),
-        "source_files": list(source_files or []),
-    }
-    return Experiment(
-        experiment_id=uuid4().hex,
-        label=experiment_label,
-        instrument="DLS",
-        technique="DLS",
-        source_path=None,
-        created_at=_utc_now(),
-        measurements=[sample.measurement for sample in samples],
-        observations=observations,
-        metadata=metadata,
-    )
-
-
-def chromatography_experiment_from_preview(
-    preview: dict,
-    *,
-    label: str = "",
-    source_name: str | None = None,
-) -> Experiment:
-    if "openlab_experiment" in preview:
-        experiment = preview["openlab_experiment"]
-        if label.strip():
-            experiment.label = label.strip()
-        if source_name:
-            experiment.source_path = source_name
-            experiment.metadata["source_name"] = source_name
-        return experiment
-
-    observations = list(preview.get("observations") or [])
-    hypotheses = list(preview.get("hypotheses") or [])
-    assessment = preview.get("assessment")
-    experiment_label = label.strip() or "Chromatography experiment"
-    unsupported_sections = []
-    if not any(observation.label == "Peak table available" for observation in observations):
-        unsupported_sections.append("Chromatography CSV import does not include raw detector signal traces.")
-    return Experiment(
-        experiment_id=uuid4().hex,
-        label=experiment_label,
-        instrument="Chromatography",
-        technique="HPLC",
-        source_path=source_name,
-        created_at=_utc_now(),
-        measurements=list(preview.get("measurements") or []),
-        observations=observations,
-        unsupported_sections=unsupported_sections,
-        metadata={
-            "source_name": source_name,
-            "hypotheses": hypotheses,
-            "assessment": assessment.to_dict() if hasattr(assessment, "to_dict") else {},
-        },
-    )
-
-
-def save_experiment_to_memory(
-    experiment: Experiment,
-    *,
-    human_note: str = "",
-    project_id: str | None = None,
-    tags: list[str] | None = None,
-) -> None:
-    store = KnowledgeStore()
-    store.add_experiment(experiment, project_id=project_id, tags=tags or [])
-    for hypothesis in experiment.metadata.get("hypotheses", []):
-        store.add_hypothesis(
-            str(hypothesis),
-            experiment_id=experiment.experiment_id,
-            project_id=project_id,
-            instrument_id=experiment.instrument,
-            tags=[experiment.technique or "", "hypothesis"],
-        )
-    for recommendation in experiment.metadata.get("recommendations", []):
-        store.add_recommendation(
-            str(recommendation),
-            experiment_id=experiment.experiment_id,
-            project_id=project_id,
-            instrument_id=experiment.instrument,
-            tags=[experiment.technique or "", "recommendation"],
-        )
-    if human_note.strip():
-        store.add_note(
-            human_note.strip(),
-            title=f"Note: {experiment.label}",
-            experiment_id=experiment.experiment_id,
-            project_id=project_id,
-            instrument_id=experiment.instrument,
-            tags=[experiment.technique or "", "human_note"],
-        )
 
 
 def _packet_items_table(items) -> pd.DataFrame:
@@ -1556,59 +1455,14 @@ def render_saved_experiment_loader() -> None:
     selected_label = st.selectbox("Saved experiment", labels, key="saved_experiment_to_load")
     selected_record = compatible_records[labels.index(selected_label)]
     if st.button("Load saved experiment into workspace", use_container_width=True):
-        measurements = measurements_from_saved_record(selected_record)
+        retrieved = retrieve_experiment(selected_record.id)
+        measurements = retrieved.restore_measurements()
         st.session_state["imported_upload_signature"] = ("history", selected_record.id)
         st.session_state["imported_samples"] = [sample_from_measurement(measurement) for measurement in measurements]
         st.session_state["import_errors"] = []
-        st.session_state["loaded_history_record"] = selected_record.to_dict()
-        st.session_state["history_label"] = f"{selected_record.label} (updated)"
+        st.session_state["loaded_history_record"] = retrieved.to_dict()
+        st.session_state["history_label"] = f"{retrieved.label} (updated)"
         st.rerun()
-
-
-def measurements_from_saved_record(record) -> list[Measurement]:
-    measurements = []
-    for payload in record.measurements:
-        measurement = measurement_from_saved_dict(payload)
-        measurement.provenance["loaded_from_history"] = {
-            "record_id": record.id,
-            "label": record.label,
-            "saved_at": record.saved_at,
-        }
-        measurements.append(measurement)
-    return measurements
-
-
-def measurement_from_saved_dict(payload: dict) -> Measurement:
-    return Measurement(
-        metadata=_model_from_dict(MeasurementMetadata, payload.get("metadata") or {}),
-        summary_metrics=_model_from_dict(SummaryMetrics, payload.get("summary_metrics") or {}),
-        distributions={
-            key: _model_from_dict(DistributionData, value)
-            for key, value in (payload.get("distributions") or {}).items()
-            if isinstance(value, dict)
-        },
-        correlogram=list(payload.get("correlogram") or []),
-        derived_metrics=_model_from_dict(DerivedMetrics, payload.get("derived_metrics") or {}),
-        angle_summaries=[
-            _model_from_dict(AngleSummary, value)
-            for value in payload.get("angle_summaries") or []
-            if isinstance(value, dict)
-        ],
-        flags=[
-            _model_from_dict(MeasurementFlag, value)
-            for value in payload.get("flags") or []
-            if isinstance(value, dict)
-        ],
-        interpretation=dict(payload.get("interpretation") or {}),
-        provenance=dict(payload.get("provenance") or {}),
-    )
-
-
-def _model_from_dict(model_type, payload: dict):
-    fields = set(model_type.__dataclass_fields__)
-    return model_type(**{key: value for key, value in payload.items() if key in fields})
-
-
 def upload_batch_signature(uploaded_files) -> tuple[tuple[str, int | None], ...]:
     return tuple((uploaded_file.name, getattr(uploaded_file, "size", None)) for uploaded_file in uploaded_files)
 
@@ -2437,7 +2291,7 @@ def main() -> None:
     add_page_style()
 
     st.title("LabAssistant")
-    st.caption("Experiment intelligence platform: DLS review plus chromatography/mass-balance proof of concept")
+    st.caption("Standalone experiment intelligence app: DLS review plus chromatography/mass-balance proof of concept")
 
     with st.sidebar:
         st.header("Data")
@@ -2530,13 +2384,13 @@ def main() -> None:
         st.header("History")
         loaded_record = st.session_state.get("loaded_history_record")
         if loaded_record:
-            st.caption(f"Loaded saved version: {loaded_record.get('label')} ({str(loaded_record.get('id', ''))[:8]}). Saving appends a new version.")
+            st.caption(f"Loaded saved version: {loaded_record.get('label')} ({str(loaded_record.get('record_id', ''))[:8]}). Saving appends a new version.")
         history_label = st.text_input("Experiment label", value=st.session_state.get("history_label", ""), key="history_label")
         if st.button("Save current experiment", use_container_width=True):
             for sample in samples:
                 if loaded_record:
                     sample.measurement.provenance["history_lineage"] = {
-                        "loaded_from_record_id": loaded_record.get("id"),
+                        "loaded_from_record_id": loaded_record.get("record_id"),
                         "loaded_from_label": loaded_record.get("label"),
                         "save_semantics": "append_new_version",
                     }
