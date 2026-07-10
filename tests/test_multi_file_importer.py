@@ -241,7 +241,7 @@ def test_imports_grouped_measurement_from_summary_intensity_and_correlogram():
     assert measurement.derived_metrics.primary_peak_nm == 100.0
     assert measurement.derived_metrics.d50_nm == 100.0
     assert measurement.derived_metrics.correlogram_noise_score is not None
-    assert measurement.provenance["derived_metrics_source"] == "mean intensity distribution (2 replicates)"
+    assert measurement.provenance["derived_metrics_source"] == "angle-averaged intensity distribution (Back 173°)"
     assert measurement.provenance["correlogram_quality_source"] == "correlogram"
     assert len(measurement.correlogram) == 4
     assert set(measurement.metadata.source_files) == {
@@ -281,7 +281,7 @@ def test_lot_metrics_average_single_angle_replicates_instead_of_using_replicate_
     assert measurement is not None
     assert measurement.derived_metrics.primary_peak_nm == 50.0
     assert measurement.derived_metrics.d50_nm == 50.0
-    assert measurement.provenance["derived_metrics_source"] == "mean intensity distribution (2 replicates)"
+    assert measurement.provenance["derived_metrics_source"] == "angle-averaged intensity distribution (Back 173°)"
 
 
 def test_lot_metrics_do_not_substitute_volume_when_intensity_is_missing():

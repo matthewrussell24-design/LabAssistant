@@ -212,6 +212,12 @@ aggregation-sensitive evidence. Volume and number distributions are not valid
 substitutes for this intensity contract, and provenance records the selected
 source.
 
+Delimited DLS ingestion accepts comma, semicolon, tab, and pipe separators and
+period or comma decimal marks. Single-angle summaries remain explicit
+per-angle evidence. Volume-only and number-only curves may be parsed as source
+data, but they are rejected as intensity-file roles and do not produce
+intensity-derived peaks, percentiles, shape metrics, or aggregation risk.
+
 The existing `Measurement` model should fit under the new hierarchy as the raw
 analytical evidence layer. Its derived metrics and flags should be converted
 into `Observation` objects for reasoning. For example:

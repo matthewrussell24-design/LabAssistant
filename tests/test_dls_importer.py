@@ -140,7 +140,16 @@ def test_summarize_by_angle_groups_interleaved_measurements():
     assert by_angle[174.7]["max_z_average"] == 280.0
 
 
-def test_summarize_by_angle_needs_two_angles():
+def test_summarize_by_angle_preserves_single_angle():
     data = pd.DataFrame({"Scattering Collection (°)": [173.0, 173.0], "Z-Average (nm)": [260.0, 265.0], "PDI": [0.3, 0.3]})
 
-    assert summarize_by_angle(data, "Scattering Collection (°)", "Z-Average (nm)", "PDI") == []
+    assert summarize_by_angle(data, "Scattering Collection (°)", "Z-Average (nm)", "PDI") == [
+        {
+            "angle_degrees": 173.0,
+            "position": "back",
+            "count": 2,
+            "z_average": 262.5,
+            "pdi": 0.3,
+            "max_z_average": 265.0,
+        }
+    ]

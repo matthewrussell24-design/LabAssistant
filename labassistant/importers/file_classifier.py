@@ -38,6 +38,15 @@ def classify_uploaded_file(uploaded_file) -> ClassifiedFile:
 
     content_hint = _classify_from_parsed_result(parsed_result) or _classify_from_text(source_text)
     file_type = name_hint or content_hint or UNKNOWN
+    unsupported_distribution = (
+        parsed_result is not None
+        and parsed_result.metrics.get("Diameter Column")
+        and not parsed_result.metrics.get("Intensity Column")
+        and (parsed_result.metrics.get("Volume Column") or parsed_result.metrics.get("Number Column"))
+    )
+    if unsupported_distribution:
+        file_type = UNKNOWN
+        parse_error = "An intensity distribution is required for DLS derived metrics."
 
     return ClassifiedFile(
         file=uploaded_file,
@@ -56,8 +65,6 @@ def _classify_from_name(file_name: str) -> str | None:
     if re.search(r"\b(summary|statistics|stats)\b", label):
         return SUMMARY_EXPORT
     if "intensity" in label and ("distribution" in label or "size" in label):
-        return INTENSITY_DISTRIBUTION
-    if "size distribution" in label:
         return INTENSITY_DISTRIBUTION
     return None
 

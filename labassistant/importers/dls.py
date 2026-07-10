@@ -83,14 +83,7 @@ def convert_numeric_text(data: pd.DataFrame) -> pd.DataFrame:
         if pd.api.types.is_numeric_dtype(converted[column]):
             continue
 
-        cleaned = (
-            converted[column]
-            .astype(str)
-            .str.replace(",", "", regex=False)
-            .str.replace("%", "", regex=False)
-            .str.strip()
-        )
-        numeric_values = pd.to_numeric(cleaned, errors="coerce")
+        numeric_values = converted[column].map(parse_numeric_text)
         numeric_ratio = numeric_values.notna().mean() if len(numeric_values) else 0
 
         if numeric_ratio >= 0.6:
@@ -99,12 +92,36 @@ def convert_numeric_text(data: pd.DataFrame) -> pd.DataFrame:
     return converted
 
 
-def is_probably_number(value: str) -> bool:
+def parse_numeric_text(value) -> float | None:
+    """Parse common invariant and decimal-comma numeric export formats."""
+    if value is None or pd.isna(value):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    text = str(value).strip().replace("\u00a0", "").replace(" ", "").replace("%", "")
+    if not text:
+        return None
+
+    if "," in text and "." in text:
+        decimal_mark = "," if text.rfind(",") > text.rfind(".") else "."
+        grouping_mark = "." if decimal_mark == "," else ","
+        text = text.replace(grouping_mark, "").replace(decimal_mark, ".")
+    elif "," in text:
+        comma_groups = text.lstrip("+-").split(",")
+        if len(comma_groups) > 2 and all(len(group) == 3 for group in comma_groups[1:]):
+            text = text.replace(",", "")
+        else:
+            text = text.replace(",", ".")
+
     try:
-        float(str(value).replace(",", "").replace("%", ""))
-        return True
+        return float(text)
     except ValueError:
-        return False
+        return None
+
+
+def is_probably_number(value: str) -> bool:
+    return parse_numeric_text(value) is not None
 
 
 def sniff_delimiter(text: str) -> str:
@@ -575,6 +592,15 @@ def extract_scalar_metric(data: pd.DataFrame, csv_text: str, metric_patterns: li
                 if not values.empty:
                     return float(values.iloc[0])
 
+    for row in read_delimited_rows(csv_text):
+        for index, cell in enumerate(row):
+            if not any(re.search(pattern, cell, re.IGNORECASE) for pattern in metric_patterns):
+                continue
+            for candidate in row[index + 1 :]:
+                value = parse_numeric_text(candidate)
+                if value is not None:
+                    return value
+
     for line in csv_text.splitlines():
         for pattern in metric_patterns:
             if re.search(pattern, line, re.IGNORECASE):
@@ -603,7 +629,7 @@ def summarize_by_angle(
 
     angles = pd.to_numeric(data[scattering_column], errors="coerce")
     distinct_angles = sorted(angles.dropna().unique().tolist())
-    if len(distinct_angles) < 2:
+    if not distinct_angles:
         return []
 
     summaries = []
@@ -652,13 +678,14 @@ def parse_dls_upload(uploaded_file) -> ParsedDLSResult:
     volume_column = infer_distribution_column(data, "Volume")
     number_column = infer_distribution_column(data, "Number")
     preferred_distribution = intensity_column or volume_column or number_column
+    metric_distribution = intensity_column
     z_average_column = infer_z_average_column(data)
     pdi_column = infer_pdi_column(data)
     scattering_angle_column = infer_scattering_angle_column(data)
     has_summary_stats = is_summary_stats_table(data)
     has_distribution_curve = bool(diameter_column and preferred_distribution)
     has_repeated_measurements = (bool(z_average_column or pdi_column) or has_summary_stats) and not has_distribution_curve
-    peaks = find_local_peaks(data, diameter_column, preferred_distribution)
+    peaks = find_local_peaks(data, diameter_column, metric_distribution)
 
     if has_summary_stats:
         z_average = extract_summary_metric(data, [r"\bz[-\s]?average\b", r"\bz[-\s]?avg\b"])
@@ -671,13 +698,13 @@ def parse_dls_upload(uploaded_file) -> ParsedDLSResult:
         pdi = extract_scalar_metric(data, source_text, [r"\bpdi\b", r"poly.*dispers"])
 
     count_rate = extract_scalar_metric(data, source_text, [r"count\s*rate", r"kcps"])
-    tail_index = calculate_tail_index(data, diameter_column, preferred_distribution)
-    width_ratio = calculate_width_ratio(data, diameter_column, preferred_distribution)
-    peak_count = count_peaks(data, diameter_column, preferred_distribution)
-    peak_width_ratio = calculate_peak_width(data, diameter_column, preferred_distribution)
-    peak_symmetry = calculate_peak_symmetry(data, diameter_column, preferred_distribution)
-    skewness = calculate_log_skewness(data, diameter_column, preferred_distribution)
-    percentiles = calculate_distribution_percentiles(data, diameter_column, preferred_distribution)
+    tail_index = calculate_tail_index(data, diameter_column, metric_distribution)
+    width_ratio = calculate_width_ratio(data, diameter_column, metric_distribution)
+    peak_count = count_peaks(data, diameter_column, metric_distribution)
+    peak_width_ratio = calculate_peak_width(data, diameter_column, metric_distribution)
+    peak_symmetry = calculate_peak_symmetry(data, diameter_column, metric_distribution)
+    skewness = calculate_log_skewness(data, diameter_column, metric_distribution)
+    percentiles = calculate_distribution_percentiles(data, diameter_column, metric_distribution)
     measurement_count = count_column_values(data, z_average_column or pdi_column)
     max_pdi = extract_summary_stat(data, [r"\bpdi\b", r"poly.*dispers"], ["maximum"]) if has_summary_stats else max_column_value(data, pdi_column)
     max_z_average = extract_summary_stat(data, [r"\bz[-\s]?average\b", r"\bz[-\s]?avg\b"], ["maximum"]) if has_summary_stats else max_column_value(data, z_average_column)
@@ -716,7 +743,7 @@ def parse_dls_upload(uploaded_file) -> ParsedDLSResult:
         tail_index=tail_index,
         width_ratio=width_ratio,
         has_repeated_measurements=has_repeated_measurements,
-        has_distribution_columns=bool(diameter_column and preferred_distribution),
+        has_distribution_columns=bool(diameter_column and intensity_column),
     )
 
     metrics = {
