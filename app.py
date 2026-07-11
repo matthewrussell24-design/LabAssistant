@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import html
-import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -14,8 +13,9 @@ from labassistant.aggregation import (
     assess_dual_angle_aggregation,
 )
 from labassistant.application import (
+    ChromatographyAnalysisResult,
     add_scientific_note,
-    chromatography_experiment_from_preview,
+    analyze_chromatography_source,
     compare_experiments,
     dls_experiment_from_samples,
     find_related_experiments,
@@ -35,20 +35,11 @@ from labassistant.interpretation import (
     review_evidence,
 )
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
-from labassistant.importers.chromatography import (
-    assess_chromatography_mass_balance,
-    chromatography_observations,
-    parse_chromatography_csv,
-    peak_area_trend_table,
-    total_area_trend_table,
-)
 from labassistant.importers.filtration import FiltrationImportResult, parse_filtration_csv
-from labassistant.importers.openlab_olax import build_experiment_from_olax
 from labassistant.history import save_experiment
 from labassistant.metrics import (
     find_local_peaks,
 )
-from labassistant.chromatography import mass_balance_hypotheses
 from labassistant.filtration import (
     FILTRATION_DIFFICULTY_RUBRIC,
     FiltrationMeasurement,
@@ -59,7 +50,6 @@ from labassistant.filtration import (
     validate_difficulty_score,
 )
 from labassistant.models import Experiment
-from labassistant.observations import observation_table
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
     ForwardScatterPoint,
@@ -466,55 +456,15 @@ def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame
         render_aggregation_review(samples)
 
 
-def load_chromatography_preview(source) -> dict:
-    source_name = getattr(source, "name", None) or str(source)
-    if source_name.lower().endswith(".olax"):
-        return load_openlab_olax_preview(source, source_name=source_name)
-
-    measurements = parse_chromatography_csv(source)
-    assessment = assess_chromatography_mass_balance(measurements)
-    observations = chromatography_observations(measurements, assessment)
-    hypotheses = mass_balance_hypotheses(observations)
-    return {
-        "measurements": measurements,
-        "assessment": assessment,
-        "observations": observations,
-        "hypotheses": hypotheses,
-        "source_name": source_name,
-        "peak_area_trend": peak_area_trend_table(measurements),
-        "total_area_trend": total_area_trend_table(measurements),
-    }
-
-
-def load_openlab_olax_preview(source, *, source_name: str) -> dict:
-    if isinstance(source, (str, Path)):
-        experiment = build_experiment_from_olax(source, label=Path(source_name).name)
-    else:
-        source.seek(0)
-        data = source.read()
-        with tempfile.NamedTemporaryFile(suffix=".olax") as temporary:
-            temporary.write(data)
-            temporary.flush()
-            experiment = build_experiment_from_olax(temporary.name, label=Path(source_name).name)
-    experiment.source_path = source_name
-    experiment.metadata["source_name"] = source_name
-    return {
-        "openlab_experiment": experiment,
-        "measurements": experiment.measurements,
-        "observations": experiment.observations,
-        "hypotheses": [],
-        "source_name": source_name,
-    }
-
-
-def render_chromatography_preview(preview: dict) -> None:
-    if "openlab_experiment" in preview:
-        render_openlab_preview(preview["openlab_experiment"])
+def render_chromatography_preview(result: ChromatographyAnalysisResult) -> None:
+    if result.source_kind == "openlab_olax":
+        render_openlab_preview(result)
         return
 
-    assessment = preview["assessment"]
-    observations = preview["observations"]
-    hypotheses = preview["hypotheses"]
+    assessment = result.assessment
+    if assessment is None:
+        st.error("Chromatography assessment is unavailable.")
+        return
 
     st.subheader("Chromatography / Mass Balance Preview")
     st.caption("Proof of concept: simple CSV to chromatography measurements, observations, and mass-balance hypotheses.")
@@ -529,14 +479,31 @@ def render_chromatography_preview(preview: dict) -> None:
     trend_cols = st.columns([1.3, 1])
     with trend_cols[0]:
         st.markdown("**Peak area trend**")
-        peak_trend = preview["peak_area_trend"].copy()
+        peak_trend = pd.DataFrame(
+            {
+                "Timepoint": point.timepoint,
+                "Parent Area %": point.parent_area_percent,
+                "Known Impurity Area %": point.known_impurity_area_percent,
+                "Unknown Area %": point.unknown_area_percent,
+                "Total Area": point.total_area,
+                "Parent RT (min)": point.parent_retention_time_min,
+            }
+            for point in result.trends
+        )
         for column in peak_trend.columns:
             if column != "Timepoint":
                 peak_trend[column] = pd.to_numeric(peak_trend[column], errors="coerce").round(2)
         st.dataframe(peak_trend, use_container_width=True, hide_index=True)
     with trend_cols[1]:
         st.markdown("**Total area trend**")
-        total_trend = preview["total_area_trend"].copy()
+        total_trend = pd.DataFrame(
+            {
+                "Timepoint": point.timepoint,
+                "Total Area": point.total_area,
+                "Change vs Start %": point.change_vs_start_percent,
+            }
+            for point in result.trends
+        )
         for column in ["Total Area", "Change vs Start %"]:
             total_trend[column] = pd.to_numeric(total_trend[column], errors="coerce").round(2)
         st.dataframe(total_trend, use_container_width=True, hide_index=True)
@@ -544,7 +511,7 @@ def render_chromatography_preview(preview: dict) -> None:
     obs_cols = st.columns([1.4, 1])
     with obs_cols[0]:
         st.markdown("**Generated observations**")
-        table = observation_table(observations)
+        table = pd.DataFrame(observation.to_dict() for observation in result.observations)
         if table.empty:
             st.info("No chromatography observations generated.")
         else:
@@ -562,38 +529,36 @@ def render_chromatography_preview(preview: dict) -> None:
             st.dataframe(display, use_container_width=True, hide_index=True)
     with obs_cols[1]:
         st.markdown("**Possible hypotheses**")
-        if hypotheses:
-            for hypothesis in hypotheses:
+        if result.hypotheses:
+            for hypothesis in result.hypotheses:
                 st.markdown(f"- {hypothesis}")
         else:
             st.info("No mass-balance hypotheses generated.")
 
 
-def render_openlab_preview(experiment: Experiment) -> None:
-    observations = list(experiment.observations)
-    metadata = experiment.metadata
+def render_openlab_preview(result: ChromatographyAnalysisResult) -> None:
 
     st.subheader("OpenLab (.olax) Preview")
     st.caption("Agilent OpenLab archive import: sequence, injections, detector packages, methods, and structured observations.")
 
     metric_cols = st.columns(5)
-    metric_cols[0].metric("Injections", len(experiment.measurements))
-    metric_cols[1].metric("Detector files", len(metadata.get("detector_files", [])))
-    metric_cols[2].metric("Peak tables", len(metadata.get("peak_table_files", [])))
-    metric_cols[3].metric("Methods", len(metadata.get("acquisition_method_files", [])))
-    metric_cols[4].metric("Audit files", len(metadata.get("audit_files", [])))
+    metric_cols[0].metric("Injections", len(result.measurements))
+    metric_cols[1].metric("Detector files", result.source_summary.detector_file_count)
+    metric_cols[2].metric("Peak tables", result.source_summary.peak_table_file_count)
+    metric_cols[3].metric("Methods", result.source_summary.acquisition_method_file_count)
+    metric_cols[4].metric("Audit files", result.source_summary.audit_file_count)
 
     rows = []
-    for measurement in experiment.measurements:
+    for measurement in result.measurements:
         rows.append(
             {
                 "Injection": measurement.injection_id,
                 "Sample": measurement.sample_name,
                 "Method": measurement.method_name,
-                "Signal files": len(measurement.metadata.get("openlab_signal_files", [])),
-                "Peaks parsed": len(measurement.peaks),
-                "Raw data file": measurement.metadata.get("raw_data_file"),
-                "Acquired": measurement.metadata.get("measurement_datetime"),
+                "Signal files": measurement.signal_file_count,
+                "Peaks parsed": measurement.peak_count,
+                "Raw data file": measurement.raw_data_file,
+                "Acquired": measurement.acquired_at,
             }
         )
     st.markdown("**Injections**")
@@ -602,7 +567,7 @@ def render_openlab_preview(experiment: Experiment) -> None:
     obs_cols = st.columns([1.35, 1])
     with obs_cols[0]:
         st.markdown("**Generated observations**")
-        table = observation_table(observations)
+        table = pd.DataFrame(observation.to_dict() for observation in result.observations)
         if table.empty:
             st.info("No OpenLab observations generated.")
         else:
@@ -621,13 +586,13 @@ def render_openlab_preview(experiment: Experiment) -> None:
             st.dataframe(display, use_container_width=True, hide_index=True)
     with obs_cols[1]:
         st.markdown("**Import limitations**")
-        if experiment.unsupported_sections:
+        if result.unsupported_sections:
             st.caption("The OLAX archive was imported successfully, but some internal data sections are not yet decoded.")
-            for section in experiment.unsupported_sections:
+            for section in result.unsupported_sections:
                 st.warning(section)
         else:
             st.caption("The OLAX archive was imported successfully and no import limitations were reported.")
-        if not metadata.get("peak_table_files"):
+        if result.source_summary.peak_table_file_count == 0:
             st.caption("No peak/result table was detected, so quantitative peak interpretation is limited.")
 
 
@@ -2333,12 +2298,12 @@ def main() -> None:
     chromatography_error = None
     if chromatography_file is not None:
         try:
-            chromatography_preview = load_chromatography_preview(chromatography_file)
+            chromatography_preview = analyze_chromatography_source(chromatography_file)
         except Exception as exc:  # pragma: no cover - surfaced in Streamlit
             chromatography_error = str(exc)
     elif load_fixture:
         try:
-            chromatography_preview = load_chromatography_preview(CHROMATOGRAPHY_FIXTURE_PATH)
+            chromatography_preview = analyze_chromatography_source(CHROMATOGRAPHY_FIXTURE_PATH)
         except Exception as exc:  # pragma: no cover - surfaced in Streamlit
             chromatography_error = str(exc)
 
@@ -2353,11 +2318,7 @@ def main() -> None:
         if chromatography_preview is not None:
             render_chromatography_preview(chromatography_preview)
             render_memory_panel(
-                chromatography_experiment=chromatography_experiment_from_preview(
-                    chromatography_preview,
-                    label="Chromatography preview",
-                    source_name=chromatography_preview.get("source_name"),
-                )
+                chromatography_experiment=chromatography_preview.restore_experiment()
             )
         else:
             render_memory_panel()
@@ -2437,11 +2398,7 @@ def main() -> None:
         source_files=source_file_names,
     )
     chromatography_memory_experiment = (
-        chromatography_experiment_from_preview(
-            chromatography_preview,
-            label="Chromatography preview",
-            source_name=chromatography_preview.get("source_name"),
-        )
+        chromatography_preview.restore_experiment()
         if chromatography_preview is not None
         else None
     )

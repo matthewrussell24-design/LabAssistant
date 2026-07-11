@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted standalone scientific-note creation into a
-  validated human/CLI-only application command with immutable receipt metadata
-  and routed Streamlit through it (task 019).
-- Working Tree: Task 019 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted chromatography CSV and OpenLab `.olax`
+  import-analysis into one typed application workflow and routed Streamlit
+  through it (task 020).
+- Working Tree: Task 020 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `162 passed in 2.21s` from `scripts/test -q` on
+- Last Successful Test: `164 passed in 2.44s` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 019.
+- Last Updated: 2026-07-10 for task 020.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 162 passing.
+- Tests: 🟢 Healthy — 164 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -123,10 +123,11 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
   persisted experiment retrieval, listing, summary/trend history views,
-  technique-aware DLS and chromatography restoration, local DLS dataset
-  analysis, immutable investigation results, scientific-context and Research
-  Journal reads, and a transport-independent registry of sixteen stable
-  capability names, including an explicit human/CLI-only note command.
+  technique-aware DLS and chromatography restoration, local DLS and
+  chromatography/OpenLab analysis, immutable investigation results,
+  scientific-context and Research Journal reads, and a transport-independent
+  registry of seventeen stable capability names, including an explicit
+  human/CLI-only note command.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -281,6 +282,8 @@ architecture rationale.
   application contract and routed Streamlit through it (task 018).
 - Promoted standalone scientific-note creation into a validated application
   command with immutable receipt metadata (task 019).
+- Promoted chromatography CSV and OpenLab import-analysis into a typed
+  application workflow and routed Streamlit through it (task 020).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -296,8 +299,8 @@ architecture rationale.
 
 ## Active Work
 
-- Scientific-note command task 019 is complete.
-- The working tree was clean when task 019 began.
+- Chromatography-analysis task 020 is complete.
+- The working tree was clean when task 020 began.
 
 ## Known Risks
 
@@ -332,8 +335,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `162 passed in 2.21s` from `scripts/test -q` on 2026-07-10.
-- The Streamlit shell completed a headless startup smoke after task 019.
+- Latest result: `164 passed in 2.44s` from `scripts/test -q` on 2026-07-10.
+- The Streamlit shell completed a headless startup smoke after task 020.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -350,16 +353,15 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote chromatography and OpenLab import-analysis orchestration
-  into a typed application workflow.
-- Why this is next: Streamlit still chooses parsers, builds mass-balance tables,
-  generates observations/hypotheses, and assembles chromatography experiments.
-- Expected scope: Medium to large; preserve CSV and `.olax` behavior while
-  defining a toolkit-independent result for a second local analysis workflow.
-- Risks: Conflating vendor-specific ingestion with shared reasoning or exposing
-  mutable pandas tables in the application contract.
-- Success criteria: Streamlit receives chromatography/OpenLab analysis through
-  a typed application result without directly orchestrating importers or hypotheses.
+- Objective: Promote filtration CSV import and follow-up summaries into a typed
+  application workflow.
+- Why this is next: Streamlit still invokes the filtration importer and builds
+  its presentation rows directly, leaving another reusable ingestion path in the shell.
+- Expected scope: Medium; preserve validation, units, warnings, normalized pressure,
+  traces, and sample matching without exposing mutable importer results.
+- Risks: Mixing DLS follow-up attachment with standalone filtration ingestion.
+- Success criteria: Streamlit receives immutable filtration import summaries
+  through the application layer and only attaches reviewed selections to DLS evidence.
 
 ## AI Context Window
 

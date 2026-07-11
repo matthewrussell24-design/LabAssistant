@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 from typing import Any, Callable
 from uuid import uuid4
 
@@ -28,7 +30,11 @@ from labassistant.history import (
 from labassistant.importers.chromatography import (
     assess_chromatography_mass_balance,
     chromatography_observations,
+    parse_chromatography_csv,
+    peak_area_trend_table,
+    total_area_trend_table,
 )
+from labassistant.importers.openlab_olax import build_experiment_from_olax
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.investigator import investigate as investigate_domain_experiment
 from labassistant.models import Experiment, Measurement
@@ -134,12 +140,16 @@ class ChromatographyMeasurementSummary:
     technique: str
     timepoint: str | None
     injection_id: str | None
+    method_name: str | None
     replicate_id: str | None
     source_files: tuple[str, ...]
     peak_count: int
     chromatogram_trace_count: int
     total_area: float | None
     parent_peak_id: str | None
+    signal_file_count: int = 0
+    raw_data_file: str | None = None
+    acquired_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -165,6 +175,80 @@ class ChromatographyRestoreResult:
             "measurements": [measurement.to_dict() for measurement in self.measurements],
             "source_files": list(self.source_files),
             "hypotheses": list(self.hypotheses),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class ChromatographyAssessmentRead:
+    sample_name: str
+    parent_area_percent: float | None
+    known_impurity_area_percent: float | None
+    unknown_area_percent: float | None
+    total_area_change_percent: float | None
+    replicate_rsd_percent: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ChromatographyTrendPoint:
+    timepoint: str
+    parent_area_percent: float | None
+    known_impurity_area_percent: float | None
+    unknown_area_percent: float | None
+    total_area: float | None
+    parent_retention_time_min: float | None
+    change_vs_start_percent: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ChromatographySourceSummary:
+    detector_file_count: int
+    peak_table_file_count: int
+    acquisition_method_file_count: int
+    audit_file_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ChromatographyAnalysisResult:
+    """Toolkit-independent CSV/OpenLab chromatography analysis result."""
+
+    source_kind: str
+    source_name: str
+    experiment: ExperimentSnapshot
+    measurements: tuple[ChromatographyMeasurementSummary, ...]
+    observations: tuple[InvestigationObservation, ...]
+    hypotheses: tuple[str, ...]
+    unsupported_sections: tuple[str, ...]
+    assessment: ChromatographyAssessmentRead | None
+    trends: tuple[ChromatographyTrendPoint, ...]
+    source_summary: ChromatographySourceSummary
+    _experiment: Experiment = field(repr=False, compare=False)
+    api_version: str = AGENT_API_VERSION
+
+    def restore_experiment(self) -> Experiment:
+        return deepcopy(self._experiment)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_kind": self.source_kind,
+            "source_name": self.source_name,
+            "experiment": self.experiment.to_dict(),
+            "measurements": [measurement.to_dict() for measurement in self.measurements],
+            "observations": [observation.to_dict() for observation in self.observations],
+            "hypotheses": list(self.hypotheses),
+            "unsupported_sections": list(self.unsupported_sections),
+            "assessment": self.assessment.to_dict() if self.assessment else None,
+            "trends": [point.to_dict() for point in self.trends],
+            "source_summary": self.source_summary.to_dict(),
             "api_version": self.api_version,
         }
 
@@ -1092,12 +1176,16 @@ def restore_chromatography_experiment(
             technique=measurement.technique,
             timepoint=measurement.timepoint,
             injection_id=measurement.injection_id,
+            method_name=measurement.method_name,
             replicate_id=measurement.replicate_id,
             source_files=tuple(measurement.source_files),
             peak_count=len(measurement.peaks),
             chromatogram_trace_count=len(measurement.chromatogram_traces),
             total_area=measurement.total_area,
             parent_peak_id=measurement.parent_peak_id,
+            signal_file_count=len(measurement.metadata.get("openlab_signal_files", [])),
+            raw_data_file=measurement.metadata.get("raw_data_file"),
+            acquired_at=measurement.metadata.get("measurement_datetime"),
         )
         for measurement in measurements
     )
@@ -1150,6 +1238,140 @@ def chromatography_experiment_from_preview(
             "hypotheses": hypotheses,
             "assessment": assessment.to_dict() if hasattr(assessment, "to_dict") else {},
         },
+    )
+
+
+def analyze_chromatography_source(
+    source: Any,
+    *,
+    label: str = "Chromatography preview",
+    source_name: str | None = None,
+) -> ChromatographyAnalysisResult:
+    """Import and analyze chromatography CSV or OpenLab evidence outside a UI."""
+
+    resolved_name = source_name or getattr(source, "name", None) or str(source)
+    suffix = Path(str(resolved_name)).suffix.lower()
+    if suffix not in {".csv", ".olax"}:
+        raise ValueError("Chromatography source must be a CSV or OpenLab .olax file")
+
+    assessment = None
+    trends: tuple[ChromatographyTrendPoint, ...] = ()
+    hypotheses: tuple[str, ...] = ()
+    if suffix == ".olax":
+        if isinstance(source, (str, Path)):
+            experiment = build_experiment_from_olax(source, label=Path(resolved_name).name)
+        else:
+            source.seek(0)
+            with tempfile.NamedTemporaryFile(suffix=".olax") as temporary:
+                temporary.write(source.read())
+                temporary.flush()
+                experiment = build_experiment_from_olax(
+                    temporary.name, label=Path(resolved_name).name
+                )
+        experiment.label = label.strip() or experiment.label
+        experiment.source_path = str(resolved_name)
+        experiment.metadata["source_name"] = str(resolved_name)
+        source_kind = "openlab_olax"
+    else:
+        measurements = parse_chromatography_csv(source)
+        domain_assessment = assess_chromatography_mass_balance(measurements)
+        observations = chromatography_observations(measurements, domain_assessment)
+        hypotheses = tuple(mass_balance_hypotheses(observations))
+        domain_assessment.hypotheses = list(hypotheses)
+        experiment = chromatography_experiment_from_preview(
+            {
+                "measurements": measurements,
+                "assessment": domain_assessment,
+                "observations": observations,
+                "hypotheses": hypotheses,
+            },
+            label=label,
+            source_name=str(resolved_name),
+        )
+        assessment = ChromatographyAssessmentRead(
+            sample_name=domain_assessment.sample_name,
+            parent_area_percent=domain_assessment.parent_area_percent,
+            known_impurity_area_percent=domain_assessment.known_impurity_area_percent,
+            unknown_area_percent=domain_assessment.unknown_area_percent,
+            total_area_change_percent=domain_assessment.total_area_change_percent,
+            replicate_rsd_percent=domain_assessment.replicate_rsd_percent,
+        )
+        peak_rows = peak_area_trend_table(measurements).to_dict(orient="records")
+        total_rows = {
+            row["Timepoint"]: row
+            for row in total_area_trend_table(measurements).to_dict(orient="records")
+        }
+        trends = tuple(
+            ChromatographyTrendPoint(
+                timepoint=row["Timepoint"],
+                parent_area_percent=row["Parent Area %"],
+                known_impurity_area_percent=row["Known Impurity Area %"],
+                unknown_area_percent=row["Unknown Area %"],
+                total_area=row["Total Area"],
+                parent_retention_time_min=row["Parent RT (min)"],
+                change_vs_start_percent=total_rows.get(row["Timepoint"], {}).get(
+                    "Change vs Start %"
+                ),
+            )
+            for row in peak_rows
+        )
+        source_kind = "chromatography_csv"
+
+    metadata = experiment.metadata
+    return ChromatographyAnalysisResult(
+        source_kind=source_kind,
+        source_name=str(resolved_name),
+        experiment=build_experiment_snapshot(experiment),
+        measurements=_chromatography_measurement_summaries(experiment.measurements),
+        observations=tuple(
+            InvestigationObservation(
+                label=observation.label,
+                category=observation.category,
+                evidence=observation.evidence,
+                sample_name=observation.sample_name,
+                severity=observation.severity,
+                confidence=observation.confidence,
+                source_type=observation.source_type,
+                source_id=observation.source_id,
+                recommendation=observation.recommendation,
+            )
+            for observation in experiment.observations
+        ),
+        hypotheses=hypotheses,
+        unsupported_sections=tuple(experiment.unsupported_sections),
+        assessment=assessment,
+        trends=trends,
+        source_summary=ChromatographySourceSummary(
+            detector_file_count=len(metadata.get("detector_files", [])),
+            peak_table_file_count=len(metadata.get("peak_table_files", [])),
+            acquisition_method_file_count=len(metadata.get("acquisition_method_files", [])),
+            audit_file_count=len(metadata.get("audit_files", [])),
+        ),
+        _experiment=deepcopy(experiment),
+    )
+
+
+def _chromatography_measurement_summaries(
+    measurements: list[Any],
+) -> tuple[ChromatographyMeasurementSummary, ...]:
+    return tuple(
+        ChromatographyMeasurementSummary(
+            sample_name=measurement.sample_name,
+            technique=measurement.technique,
+            timepoint=measurement.timepoint,
+            injection_id=measurement.injection_id,
+            method_name=measurement.method_name,
+            replicate_id=measurement.replicate_id,
+            source_files=tuple(measurement.source_files),
+            peak_count=len(measurement.peaks),
+            chromatogram_trace_count=len(measurement.chromatogram_traces),
+            total_area=measurement.total_area,
+            parent_peak_id=measurement.parent_peak_id,
+            signal_file_count=len(measurement.metadata.get("openlab_signal_files", [])),
+            raw_data_file=measurement.metadata.get("raw_data_file"),
+            acquired_at=measurement.metadata.get("measurement_datetime"),
+        )
+        for measurement in measurements
     )
 
 
@@ -1234,6 +1456,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="import_chromatography_experiment",
         purpose="Assemble a chromatography import preview into an experiment.",
         handler=chromatography_experiment_from_preview,
+    ),
+    CapabilityContract(
+        name="analyze_chromatography_source",
+        purpose="Import and analyze chromatography CSV or OpenLab evidence.",
+        handler=analyze_chromatography_source,
+        caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(
         name="list_experiments",

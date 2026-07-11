@@ -63,6 +63,7 @@ Missing capability boundaries:
 | `import_dls_experiment` | `dls_experiment_from_samples` | Available, transitional input |
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
+| `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `list_experiments` | `list_experiments` | Available; used by desktop History timeline |
 | `compare_experiments` | `compare_experiments` | Available; used by Streamlit History panel |
 | `find_related_experiments` | `find_related_experiments` | Available; used by Streamlit History panel |
@@ -132,6 +133,30 @@ application-level errors.
 
 **Caller Types:** Human UI, CLI, Future API. Agent use should wait for reviewed
 file/provenance handling.
+
+## Analyze Chromatography Source
+
+**Name:** `analyze_chromatography_source`
+
+**Purpose:** Import and analyze a chromatography CSV or OpenLab `.olax` source
+without requiring a shell to select importers, build mass-balance reasoning, or
+handle temporary archive files.
+
+**Inputs:** A path or seekable uploaded source, optional label, and optional
+source name. The `.csv` and `.olax` suffixes select the supported adapter.
+
+**Outputs:** A versioned, frozen `ChromatographyAnalysisResult` containing an
+experiment snapshot, immutable injection summaries, normalized observation
+evidence, hypotheses, limitations, optional mass-balance assessment and trend
+points, and archive summary counts. It contains no pandas DataFrames or mutable
+measurements. `restore_experiment()` returns a fresh copy for an explicit memory save.
+
+**Expected Errors:** `ValueError` for unsupported suffixes or invalid/empty CSV
+evidence, `FileNotFoundError` for missing paths, and existing parser/archive
+exceptions for malformed sources.
+
+**Caller Types:** Human UI, CLI, Future API. Agent use is excluded pending
+reviewed file and provenance handling. Streamlit is the first caller.
 
 ## Analyze Local DLS Dataset
 

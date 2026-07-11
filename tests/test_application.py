@@ -11,6 +11,7 @@ from labassistant.application import (
     ExperimentComparison,
     ExperimentInvestigation,
     ChromatographyRestoreResult,
+    ChromatographyAnalysisResult,
     HistoryOverview,
     RelatedExperiments,
     RelatedScientificContext,
@@ -18,6 +19,7 @@ from labassistant.application import (
     ScientificNoteReceipt,
     add_scientific_note,
     analyze_dls_dataset,
+    analyze_chromatography_source,
     compare_experiments,
     agent_access_policy,
     app_manifest,
@@ -678,6 +680,35 @@ def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
         analyze_dls_dataset([unrelated])
 
 
+def test_analyze_chromatography_csv_returns_typed_tables_and_reasoning():
+    result = analyze_chromatography_source(
+        Path("sample_data/chromatography/mass_balance_demo.csv"),
+        label="Mass balance run",
+    )
+
+    assert isinstance(result, ChromatographyAnalysisResult)
+    assert result.source_kind == "chromatography_csv"
+    assert result.experiment.label == "Mass balance run"
+    assert result.experiment.technique == "HPLC"
+    assert len(result.measurements) == 6
+    assert result.assessment is not None
+    assert result.assessment.total_area_change_percent == approx(-24.710, abs=0.001)
+    assert [point.timepoint for point in result.trends] == ["T0", "T1", "T2"]
+    assert result.trends[-1].change_vs_start_percent == approx(-24.710, abs=0.001)
+    assert "Degradation into detected impurities" in result.hypotheses
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    restored = result.restore_experiment()
+    restored.label = "Caller mutation"
+    assert result.restore_experiment().label == "Mass balance run"
+
+
+def test_analyze_chromatography_source_rejects_unsupported_suffix(tmp_path):
+    source = tmp_path / "chromatography.txt"
+    source.write_text("not supported", encoding="utf-8")
+    with raises(ValueError, match="CSV or OpenLab"):
+        analyze_chromatography_source(source)
+
+
 def test_save_experiment_to_memory_can_use_injected_store():
     experiment = Experiment(
         experiment_id="exp-1",
@@ -715,6 +746,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "import_dls_experiment",
         "analyze_dls_dataset",
         "import_chromatography_experiment",
+        "analyze_chromatography_source",
         "list_experiments",
         "compare_experiments",
         "find_related_experiments",
@@ -757,6 +789,10 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     note = get_capability("add_scientific_note")
     assert note.handler is add_scientific_note
+
+    chromatography = get_capability("analyze_chromatography_source")
+    assert chromatography.handler is analyze_chromatography_source
+    assert "Agent" not in chromatography.caller_types
 
 
 def test_capability_registry_rejects_unknown_names():

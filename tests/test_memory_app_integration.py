@@ -4,8 +4,11 @@ import zipfile
 
 import pandas as pd
 
-from app import load_chromatography_preview
-from labassistant.application import chromatography_experiment_from_preview, dls_experiment_from_samples
+from labassistant.application import (
+    analyze_chromatography_source,
+    chromatography_experiment_from_preview,
+    dls_experiment_from_samples,
+)
 from labassistant.models import (
     ChromatographyMeasurement,
     MassBalanceAssessment,
@@ -97,10 +100,10 @@ def test_openlab_olax_preview_becomes_memory_experiment(tmp_path):
         archive.writestr("Run.rslt%5cRun.acaml", acaml)
         archive.writestr("Run.rslt%5c2026-07-02+12-23-03-04-00-01.dx", b"PK")
 
-    preview = load_chromatography_preview(fixture)
-    experiment = chromatography_experiment_from_preview(preview, label="OpenLab Run", source_name=fixture.name)
+    result = analyze_chromatography_source(fixture, label="OpenLab Run")
+    experiment = result.restore_experiment()
 
-    assert "openlab_experiment" in preview
+    assert result.source_kind == "openlab_olax"
     assert experiment.label == "OpenLab Run"
     assert experiment.source_path == fixture.name
     assert experiment.technique == "HPLC"
