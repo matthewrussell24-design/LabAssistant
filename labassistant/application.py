@@ -9,6 +9,8 @@ from uuid import uuid4
 from labassistant.context_engine import KnowledgeStore
 from labassistant.history import (
     DEFAULT_HISTORY_PATH,
+    compare_experiments as compare_history_experiments,
+    latest_experiment,
     load_experiment_record,
     load_history,
     measurements_from_record,
@@ -160,6 +162,45 @@ class ExperimentListing:
 
 
 @dataclass(frozen=True)
+class ExperimentComparisonRow:
+    """Immutable sample-level drift evidence for two experiments."""
+
+    sample_name: str
+    z_average_nm: float | None
+    previous_z_average_nm: float | None
+    z_change_percent: float | None
+    pdi: float | None
+    previous_pdi: float | None
+    pdi_change: float | None
+    drift: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ExperimentComparison:
+    """Versioned, read-only comparison against persisted history."""
+
+    baseline_record_id: str | None
+    baseline_label: str | None
+    baseline_saved_at: str | None
+    rows: tuple[ExperimentComparisonRow, ...]
+    drifted_sample_count: int
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "baseline_record_id": self.baseline_record_id,
+            "baseline_label": self.baseline_label,
+            "baseline_saved_at": self.baseline_saved_at,
+            "rows": [row.to_dict() for row in self.rows],
+            "drifted_sample_count": self.drifted_sample_count,
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -259,6 +300,48 @@ def list_experiments(
             measurement_count=len(record.measurements),
         )
         for _, record in ordered
+    )
+
+
+def compare_experiments(
+    current: list[Measurement],
+    *,
+    baseline_record_id: str | None = None,
+    exclude_record_id: str | None = None,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> ExperimentComparison:
+    """Compare current DLS evidence with a selected or latest saved run.
+
+    Sample matching and drift thresholds remain owned by ``history``. This
+    application query selects the baseline and translates the DataFrame into a
+    stable immutable read contract suitable for any shell.
+    """
+
+    if baseline_record_id is not None:
+        baseline = load_experiment_record(baseline_record_id, history_path=history_path)
+    else:
+        baseline = latest_experiment(load_history(history_path), exclude_id=exclude_record_id)
+
+    table = compare_history_experiments(current, baseline)
+    rows = tuple(
+        ExperimentComparisonRow(
+            sample_name=row["Sample"],
+            z_average_nm=row["Z-Average"],
+            previous_z_average_nm=row["Previous Z-Average"],
+            z_change_percent=row["Z Change %"],
+            pdi=row["PDI"],
+            previous_pdi=row["Previous PDI"],
+            pdi_change=row["PDI Change"],
+            drift=row["Drift"],
+        )
+        for row in table.to_dict(orient="records")
+    )
+    return ExperimentComparison(
+        baseline_record_id=baseline.id if baseline else None,
+        baseline_label=baseline.label if baseline else None,
+        baseline_saved_at=baseline.saved_at if baseline else None,
+        rows=rows,
+        drifted_sample_count=sum("drift" in row.drift.lower() for row in rows),
     )
 
 
@@ -524,6 +607,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="list_experiments",
         purpose="List persisted experiments newest-first for timeline browsing.",
         handler=list_experiments,
+    ),
+    CapabilityContract(
+        name="compare_experiments",
+        purpose="Explain meaningful DLS differences from a persisted experiment.",
+        handler=compare_experiments,
     ),
     CapabilityContract(
         name="retrieve_experiment",

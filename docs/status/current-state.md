@@ -9,18 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted persisted experiment listing into the
-  application layer (`list_experiments`) and wired the desktop History timeline
-  plus "Open Existing Experiment" to browse and restore persisted records
-  through the application boundary (task 010); inspect `git log -1 --oneline`
-  for the resulting commit identifier.
-- Working Tree: Expected to contain only task 010 changes before commit;
-  inspect `git status --short` before editing.
-- Last Successful Test: `142 passed in 2.00s` from `scripts/test -q` on
-  2026-07-10; clean-process AppKit controller import and an end-to-end
-  list/restore smoke also passed.
+- Latest Completed Change: Promoted experiment comparison into the application
+  layer with immutable versioned read models and routed Streamlit through the
+  new capability (task 011).
+- Working Tree: Task 011 is committed locally; inspect `git status --short`
+  before beginning new work.
+- Last Successful Test: `144 passed in 2.08s` from `scripts/test -q` on
+  2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 010.
+- Last Updated: 2026-07-10 for task 011.
 
 ## North Star
 
@@ -32,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 135 passing.
+- Tests: 🟢 Healthy — 144 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -279,8 +276,8 @@ architecture rationale.
 
 ## Active Work
 
-- Persisted-history task 010 is complete pending commit.
-- No unrelated pre-existing changes were present when task 010 began.
+- Experiment-comparison task 011 is complete.
+- The working tree was clean when task 011 began.
 
 ## Known Risks
 
@@ -318,7 +315,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `142 passed in 2.00s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `144 passed in 2.08s` from `scripts/test -q` on 2026-07-10.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -335,25 +332,17 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote experiment comparison into the application layer by adding
-  a versioned `compare_experiments` capability over the existing history drift
-  logic, then surface it in a shell (Streamlit first, desktop optional).
-- Why this is next: Listing and restore now let a scientist reopen prior work;
-  the next daily-use gap is explaining how a current or restored experiment
-  differs from a prior saved run without the UI owning comparison math.
-- Expected files: Application read contract wrapping
-  `labassistant.history.compare_experiments`/`compare_to_history`, application
-  and history tests, at least one shell caller, prompt 011, capability and
-  architecture docs, and this status page.
-- Expected tests: Stable versioned comparison output, sample-name matching,
-  drift labels, empty/absent-history behavior, and the full suite.
-- Estimated scope: Medium; reuse existing drift thresholds and JSONL persistence
-  without redesigning storage.
-- Risks: Duplicating drift logic in a shell, exposing mutable measurements
-  through comparison results, or implying causality the contract cannot assign.
-- Success criteria: A shell compares a current or restored experiment against
-  saved history through a versioned application capability, and no interface
-  reimplements the comparison math.
+- Objective: Promote similar-experiment search into the application layer with
+  a typed, versioned `find_related_experiments` result and route the existing
+  Streamlit caller through it.
+- Why this is next: History listing, restore, and comparison now cross the
+  application boundary; similar-run search is the remaining history read path
+  still called directly by a shell.
+- Expected scope: Medium; preserve existing ranking and JSONL storage.
+- Risks: Exposing a mutable DataFrame, silently changing ranking weights, or
+  presenting proximity as scientific causality.
+- Success criteria: A shell finds related saved evidence through an immutable
+  application read contract without owning ranking logic.
 
 ## AI Context Window
 

@@ -15,6 +15,7 @@ from labassistant.aggregation import (
 )
 from labassistant.application import (
     chromatography_experiment_from_preview,
+    compare_experiments,
     dls_experiment_from_samples,
     retrieve_experiment,
     save_experiment_to_memory,
@@ -37,7 +38,6 @@ from labassistant.importers.chromatography import (
 from labassistant.importers.filtration import FiltrationImportResult, parse_filtration_csv
 from labassistant.importers.openlab_olax import build_experiment_from_olax
 from labassistant.history import (
-    compare_experiments,
     find_similar_samples,
     history_table,
     latest_experiment,
@@ -1532,7 +1532,23 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
 
         previous = latest_experiment(records)
         if samples and previous is not None:
-            comparison = compare_experiments([sample.measurement for sample in samples], previous)
+            comparison_result = compare_experiments(
+                [sample.measurement for sample in samples],
+                baseline_record_id=previous.id,
+            )
+            comparison = pd.DataFrame(
+                {
+                    "Sample": row.sample_name,
+                    "Z-Average": row.z_average_nm,
+                    "Previous Z-Average": row.previous_z_average_nm,
+                    "Z Change %": row.z_change_percent,
+                    "PDI": row.pdi,
+                    "Previous PDI": row.previous_pdi,
+                    "PDI Change": row.pdi_change,
+                    "Drift": row.drift,
+                }
+                for row in comparison_result.rows
+            )
             drifted = comparison[comparison["Drift"].isin(["Z-average drift", "PDI drift", "Z-average drift, PDI drift"])]
             st.markdown(f"**Change vs last saved experiment** ({previous.label})")
             if drifted.empty:

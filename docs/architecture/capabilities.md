@@ -234,6 +234,27 @@ application function (not a separate catalog entry) that composes
 `DLSAnalysisResult`. It lets the desktop reopen a saved record through the same
 read model as a fresh import without reading storage or recomputing metrics.
 
+## Compare Experiments
+
+**Name:** `compare_experiments`
+
+**Purpose:** Explain sample-level Z-average and PDI changes between current DLS
+evidence and a selected or latest persisted experiment.
+
+**Inputs:** Current `Measurement` objects, an optional baseline record ID, an
+optional record ID to exclude from latest selection, and an injectable history
+path.
+
+**Outputs:** A versioned, frozen `ExperimentComparison` containing immutable
+sample rows, baseline metadata, drift labels, and a drifted-sample count. Empty
+history produces no baseline and labels current rows as new samples.
+
+**Expected Errors:** Explicit lookup preserves existing not-found and malformed
+record errors. Automatic latest selection tolerates absent history.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. Threshold crossings do not
+claim scientific causality.
+
 ## Save Scientific Memory
 
 **Name:** `save_scientific_memory`
@@ -260,7 +281,6 @@ These are capability boundaries, not implemented public contracts:
 
 | Candidate name | Scientific intent | Current owner |
 | --- | --- | --- |
-| `compare_experiments` | Explain meaningful differences | History/UI |
 | `find_related_experiments` | Find similar prior scientific work | History/UI |
 | `retrieve_related_context` | Build a compact evidence-backed context packet | Context engine/UI |
 | `generate_observations` | Normalize supported evidence into findings | Importers/observations/UI |

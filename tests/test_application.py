@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from pytest import approx, raises
@@ -7,7 +8,9 @@ from labassistant.application import (
     APP_DIRECTION,
     HUMAN_APP_SURFACE,
     ExperimentListing,
+    ExperimentComparison,
     analyze_dls_dataset,
+    compare_experiments,
     agent_access_policy,
     app_manifest,
     build_experiment_snapshot,
@@ -174,6 +177,42 @@ def test_list_experiments_skips_malformed_lines(tmp_path):
     assert [listing.record_id for listing in listings] == [saved.id]
 
 
+def test_compare_experiments_returns_versioned_immutable_drift_result(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    baseline = save_experiment(
+        [Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))],
+        label="Baseline",
+        history_path=history_path,
+    )
+    baseline.measurements[0]["summary_metrics"] = {"z_average": 100.0, "pdi": 0.2}
+    history_path.write_text(json.dumps(baseline.to_dict()) + "\n", encoding="utf-8")
+    current = Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))
+    current.summary_metrics.z_average = 130.0
+    current.summary_metrics.pdi = 0.21
+
+    result = compare_experiments(
+        [current], baseline_record_id=baseline.id, history_path=history_path
+    )
+
+    assert isinstance(result, ExperimentComparison)
+    assert result.baseline_record_id == baseline.id
+    assert result.baseline_label == "Baseline"
+    assert result.rows[0].drift == "Z-average drift"
+    assert result.rows[0].z_change_percent == approx(30.0)
+    assert result.drifted_sample_count == 1
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_compare_experiments_handles_absent_history_and_new_samples(tmp_path):
+    current = Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))
+
+    result = compare_experiments([current], history_path=tmp_path / "missing.jsonl")
+
+    assert result.baseline_record_id is None
+    assert result.rows[0].drift == "New sample"
+    assert result.drifted_sample_count == 0
+
+
 def test_restore_dls_experiment_rehydrates_a_saved_record(tmp_path):
     fixture_dir = Path(__file__).parent / "fixtures"
     history_path = tmp_path / "experiments.jsonl"
@@ -316,6 +355,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "analyze_dls_dataset",
         "import_chromatography_experiment",
         "list_experiments",
+        "compare_experiments",
         "retrieve_experiment",
         "retrieve_experiment_summary",
         "save_scientific_memory",
