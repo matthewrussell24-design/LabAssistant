@@ -35,24 +35,15 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` calls importers, history functions, context retrieval, observation
-  generation, investigation helpers, and brief builders directly.
+- `app.py` still coordinates some DLS import and decision-brief helpers directly.
 - DLS and chromatography assembly cross the application boundary, but raw-file
   parsing and import preview orchestration remain UI-owned.
-- Saved-history records are reconstructed into measurements inside `app.py`,
-  duplicating logic already available in `labassistant.history`.
-- Observation and brief generation are reusable functions, but they are not yet
-  expressed as application capabilities.
+- Brief generation remains reusable but is not yet expressed as an application
+  capability.
 
 Missing capability boundaries:
 
-- Compare experiments and find related prior work.
-- Retrieve related scientific context.
-- Generate normalized observations from supported evidence.
-- Investigate an experiment and generate hypotheses.
 - Produce an experiment-level report or brief.
-- Add reviewed notes or other explicit memory commands independently of a full
-  experiment save.
 
 ## Implemented Capability Catalog
 
@@ -65,6 +56,7 @@ Missing capability boundaries:
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
+| `generate_observations` | `generate_observations` | Available; shared DLS, chromatography, and filtration normalization |
 | `list_experiments` | `list_experiments` | Available; used by desktop History timeline |
 | `compare_experiments` | `compare_experiments` | Available; used by Streamlit History panel |
 | `find_related_experiments` | `find_related_experiments` | Available; used by Streamlit History panel |
@@ -180,6 +172,30 @@ columns and invalid rows remain structured diagnostics rather than exceptions.
 **Caller Types:** Human UI, CLI, Future API. Agent use is excluded pending
 reviewed file handling. Streamlit is the first caller; its explicit Attach
 button remains responsible for matching and mutating current DLS evidence.
+
+## Generate Observations
+
+**Name:** `generate_observations`
+
+**Purpose:** Normalize supported technique evidence into traceable scientific
+findings through the established domain rules.
+
+**Inputs:** A non-empty evidence list and explicit technique. DLS accepts parsed
+samples; chromatography accepts measurements plus a mass-balance assessment;
+filtration accepts filtration measurements.
+
+**Outputs:** A frozen, versioned `ObservationGenerationResult` containing the
+normalized technique and immutable `ObservationRead` values with label,
+category, evidence, severity, confidence, source identity, and recommendation.
+Internal experiment assembly can request fresh domain copies without exposing
+mutable authoritative objects in serialized output.
+
+**Expected Errors:** `ValueError` for empty evidence, unsupported techniques,
+or a missing/inapplicable chromatography assessment; `TypeError` for evidence
+that does not match the selected technique.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. DLS assembly,
+chromatography restore, and chromatography CSV analysis are the first callers.
 
 ## Analyze Local DLS Dataset
 
@@ -491,7 +507,6 @@ These are capability boundaries, not implemented public contracts:
 
 | Candidate name | Scientific intent | Current owner |
 | --- | --- | --- |
-| `generate_observations` | Normalize supported evidence into findings | Importers/observations/UI |
 | `generate_hypotheses` | Produce deterministic, evidence-linked hypotheses | Technique modules/UI |
 | `produce_investigation_summary` | Build an experiment-level brief/report | Observations/UI |
 

@@ -11,6 +11,7 @@ from labassistant.application import (
     ExperimentComparison,
     ExperimentInvestigation,
     ExperimentSaveReceipt,
+    ObservationGenerationResult,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -29,6 +30,7 @@ from labassistant.application import (
     build_experiment_snapshot,
     dls_experiment_from_samples,
     find_related_experiments,
+    generate_observations,
     investigate_experiment,
     get_capability,
     list_capabilities,
@@ -47,6 +49,8 @@ from labassistant.models import (
     ChromatographyMeasurement,
     ChromatographyPeak,
     Experiment,
+    FiltrationMeasurement,
+    MassBalanceAssessment,
     Measurement,
     MeasurementMetadata,
     Observation,
@@ -688,6 +692,66 @@ def test_dls_experiment_creation_is_available_outside_streamlit():
     assert [observation.label for observation in experiment.observations] == ["High variability"]
 
 
+def test_generate_observations_returns_immutable_dls_findings_and_fresh_domain_copies():
+    sample = ParsedSample(
+        name="Lot 1",
+        file_name="lot1.csv",
+        data=None,
+        metadata={},
+        metrics={"PDI": 0.42, "Correlogram Noise": None},
+        warnings=["Moderate PDI"],
+        source_text="",
+        measurement=Measurement(metadata=MeasurementMetadata(sample_name="Lot 1")),
+    )
+
+    result = generate_observations([sample], technique=" dls ")
+
+    assert isinstance(result, ObservationGenerationResult)
+    assert result.technique == "DLS"
+    assert result.observations[0].label == "High variability"
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    first = result.restore_observations()
+    first[0].label = "Changed"
+    assert result.restore_observations()[0].label == "High variability"
+
+
+def test_generate_observations_uses_chromatography_and_filtration_domain_rules():
+    chromatography = ChromatographyMeasurement(
+        sample_name="Stress T2",
+        peaks=[ChromatographyPeak(peak_id="unknown", role="unknown", area_percent=1.2)],
+    )
+    assessment = MassBalanceAssessment(sample_name="Stress T2", total_area_change_percent=-9.0)
+    chromatography_result = generate_observations(
+        [chromatography], technique="HPLC", assessment=assessment
+    )
+    filtration_result = generate_observations(
+        [FiltrationMeasurement(sample_name="Stress T2", difficulty_score=4)],
+        technique="filtration",
+    )
+
+    assert chromatography_result.technique == "Chromatography"
+    assert {item.label for item in chromatography_result.observations} >= {
+        "Unknown peak appeared",
+        "Total area decreased",
+    }
+    assert [item.label for item in filtration_result.observations] == [
+        "Filtration difficulty elevated"
+    ]
+
+
+def test_generate_observations_rejects_empty_mismatched_and_unsupported_evidence():
+    with raises(ValueError, match="At least one evidence"):
+        generate_observations([], technique="DLS")
+    with raises(TypeError, match="chromatography measurements"):
+        generate_observations(
+            [object()],
+            technique="HPLC",
+            assessment=MassBalanceAssessment(sample_name="Sample"),
+        )
+    with raises(ValueError, match="Unsupported observation technique"):
+        generate_observations([object()], technique="microscopy")
+
+
 def test_analyze_dls_dataset_runs_file_import_and_summary_outside_ui_code():
     fixture_dir = Path(__file__).parent / "fixtures"
     result = analyze_dls_dataset(
@@ -831,6 +895,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
+        "generate_observations",
         "list_experiments",
         "compare_experiments",
         "find_related_experiments",
@@ -886,6 +951,9 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
     filtration = get_capability("analyze_filtration_csv")
     assert filtration.handler is analyze_filtration_csv
     assert "Agent" not in filtration.caller_types
+
+    observations = get_capability("generate_observations")
+    assert observations.handler is generate_observations
 
 
 def test_capability_registry_rejects_unknown_names():

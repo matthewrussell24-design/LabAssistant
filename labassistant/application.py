@@ -14,7 +14,10 @@ from labassistant.context_engine import (
     KnowledgeStore,
     ResearchJournal,
 )
-from labassistant.chromatography import mass_balance_hypotheses
+from labassistant.chromatography import (
+    mass_balance_hypotheses,
+    observations_from_mass_balance_assessment,
+)
 from labassistant.history import (
     DEFAULT_HISTORY_PATH,
     compare_experiments as compare_history_experiments,
@@ -37,9 +40,17 @@ from labassistant.importers.chromatography import (
 )
 from labassistant.importers.openlab_olax import build_experiment_from_olax
 from labassistant.importers.filtration import parse_filtration_csv
+from labassistant.filtration import observations_from_filtration_measurement
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.investigator import investigate as investigate_domain_experiment
-from labassistant.models import Experiment, FiltrationMeasurement, Measurement
+from labassistant.models import (
+    ChromatographyMeasurement,
+    Experiment,
+    FiltrationMeasurement,
+    MassBalanceAssessment,
+    Measurement,
+    Observation,
+)
 from labassistant.observations import observations_from_samples
 from labassistant.view_models import sample_from_measurement, sample_status
 
@@ -520,6 +531,44 @@ class InvestigationObservation:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class ObservationRead:
+    """Immutable normalized finding returned by observation generation."""
+
+    label: str
+    category: str
+    evidence: str
+    sample_name: str | None
+    severity: str
+    confidence: str
+    source_type: str
+    source_id: str | None
+    recommendation: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ObservationGenerationResult:
+    """Technique-aware observation output with copy-on-access domain evidence."""
+
+    technique: str
+    observations: tuple[ObservationRead, ...]
+    _domain_observations: tuple[Observation, ...] = field(repr=False, compare=False)
+    api_version: str = AGENT_API_VERSION
+
+    def restore_observations(self) -> list[Observation]:
+        return deepcopy(list(self._domain_observations))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "technique": self.technique,
+            "observations": [observation.to_dict() for observation in self.observations],
+            "api_version": self.api_version,
+        }
 
 
 @dataclass(frozen=True)
@@ -1134,6 +1183,70 @@ def find_related_experiments(
     )
 
 
+def generate_observations(
+    evidence: list[object],
+    *,
+    technique: str,
+    assessment: MassBalanceAssessment | None = None,
+) -> ObservationGenerationResult:
+    """Normalize supported technique evidence through authoritative domain helpers."""
+
+    if not evidence:
+        raise ValueError("At least one evidence item is required to generate observations")
+    normalized_technique = technique.strip().lower()
+    if normalized_technique == "dls":
+        if assessment is not None:
+            raise ValueError("DLS observation generation does not accept an assessment")
+        if any(not hasattr(item, "measurement") or not hasattr(item, "warnings") for item in evidence):
+            raise TypeError("DLS observation evidence must contain parsed samples")
+        observations = observations_from_samples(evidence)
+        public_technique = "DLS"
+    elif normalized_technique in {"chromatography", "hplc", "sec"}:
+        if assessment is None:
+            raise ValueError("Chromatography observation generation requires a mass-balance assessment")
+        if any(not isinstance(item, ChromatographyMeasurement) for item in evidence):
+            raise TypeError("Chromatography observation evidence must contain chromatography measurements")
+        assessment_evidence = deepcopy(assessment)
+        assessment_evidence.observations = observations_from_mass_balance_assessment(
+            assessment_evidence
+        )
+        observations = chromatography_observations(evidence, assessment_evidence)
+        public_technique = "Chromatography"
+    elif normalized_technique == "filtration":
+        if assessment is not None:
+            raise ValueError("Filtration observation generation does not accept an assessment")
+        if any(not isinstance(item, FiltrationMeasurement) for item in evidence):
+            raise TypeError("Filtration observation evidence must contain filtration measurements")
+        observations = [
+            observation
+            for measurement in evidence
+            for observation in observations_from_filtration_measurement(measurement)
+        ]
+        public_technique = "Filtration"
+    else:
+        raise ValueError(f"Unsupported observation technique: {technique}")
+
+    domain_observations = tuple(deepcopy(observations))
+    return ObservationGenerationResult(
+        technique=public_technique,
+        observations=tuple(
+            ObservationRead(
+                label=observation.label,
+                category=observation.category,
+                evidence=observation.evidence,
+                sample_name=observation.sample_name,
+                severity=observation.severity,
+                confidence=observation.confidence,
+                source_type=observation.source_type,
+                source_id=observation.source_id,
+                recommendation=observation.recommendation,
+            )
+            for observation in domain_observations
+        ),
+        _domain_observations=domain_observations,
+    )
+
+
 def dls_experiment_from_samples(
     samples: list[Any],
     *,
@@ -1146,7 +1259,7 @@ def dls_experiment_from_samples(
     future API handlers, and future agent SDK can all call the same boundary.
     """
 
-    observations = observations_from_samples(samples)
+    observations = generate_observations(samples, technique="DLS").restore_observations()
     experiment_label = label.strip() or "DLS experiment"
     metadata = {
         "sample_count": len(samples),
@@ -1278,7 +1391,9 @@ def restore_chromatography_experiment(
     record = load_experiment_record(record_id, history_path=history_path)
     measurements = chromatography_measurements_from_record(record)
     assessment = assess_chromatography_mass_balance(measurements)
-    observations = chromatography_observations(measurements, assessment)
+    observations = generate_observations(
+        measurements, technique="Chromatography", assessment=assessment
+    ).restore_observations()
     hypotheses = mass_balance_hypotheses(observations)
     assessment.hypotheses = list(hypotheses)
     source_files = tuple(
@@ -1399,7 +1514,11 @@ def analyze_chromatography_source(
     else:
         measurements = parse_chromatography_csv(source)
         domain_assessment = assess_chromatography_mass_balance(measurements)
-        observations = chromatography_observations(measurements, domain_assessment)
+        observations = generate_observations(
+            measurements,
+            technique="Chromatography",
+            assessment=domain_assessment,
+        ).restore_observations()
         hypotheses = tuple(mass_balance_hypotheses(observations))
         domain_assessment.hypotheses = list(hypotheses)
         experiment = chromatography_experiment_from_preview(
@@ -1648,6 +1767,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         purpose="Parse filtration CSV evidence into immutable summaries.",
         handler=analyze_filtration_csv,
         caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="generate_observations",
+        purpose="Normalize supported technique evidence into immutable findings.",
+        handler=generate_observations,
     ),
     CapabilityContract(
         name="list_experiments",

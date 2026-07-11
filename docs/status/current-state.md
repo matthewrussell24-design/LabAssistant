@@ -9,15 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted explicit persisted-experiment saving into
-  a validated human/CLI-only application command with immutable receipt
-  metadata (task 022).
-- Working Tree: Task 022 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted DLS, chromatography, and filtration
+  observation generation into a typed immutable application workflow (task 023).
+- Working Tree: Task 023 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `168 passed in 2.44s` from `scripts/test -q` on
+- Last Successful Test: `171 passed in 2.49s` from `scripts/test -q` on
   2026-07-11.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-11 for task 022.
+- Last Updated: 2026-07-11 for task 023.
 
 ## North Star
 
@@ -29,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 168 passing.
+- Tests: 🟢 Healthy — 171 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -126,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of nineteen stable capability names, including explicit
+  registry of twenty stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -288,6 +287,8 @@ architecture rationale.
   retaining explicit user-reviewed DLS attachment (task 021).
 - Promoted persisted experiment saving into a validated human/CLI-only command
   that returns immutable receipt metadata (task 022).
+- Promoted normalized DLS, chromatography, and filtration observation generation
+  into one typed immutable application workflow (task 023).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -303,8 +304,8 @@ architecture rationale.
 
 ## Active Work
 
-- Experiment-history save task 022 is complete.
-- The working tree was clean when task 022 began.
+- Observation-generation task 023 is complete.
+- The working tree was clean when task 023 began.
 
 ## Known Risks
 
@@ -339,8 +340,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `168 passed in 2.44s` from `scripts/test -q` on 2026-07-11.
-- The Streamlit shell completed a headless startup smoke after task 022.
+- Latest result: `171 passed in 2.49s` from `scripts/test -q` on 2026-07-11.
+- The Streamlit shell last completed a headless startup smoke after task 022;
+  task 023 did not change UI code.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -357,15 +359,15 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote normalized observation generation into an explicit application workflow.
-- Why this is next: Import workflows generate some observations, but interface and
-  compatibility paths can still coordinate observation helpers outside a stable contract.
-- Expected scope: Small to medium; define immutable inputs/outputs for supported
-  evidence while preserving existing DLS and chromatography behavior.
-- Risks: Duplicating importer-owned interpretation or prematurely forcing every
-  technique into one schema before its evidence contract is mature.
-- Success criteria: Supported shells request normalized findings through one
-  registered application capability without directly coordinating observation helpers.
+- Objective: Promote experiment-level brief/report generation into an application workflow.
+- Why this is next: Normalized findings and investigation results now cross stable
+  application boundaries, but Streamlit still coordinates decision-brief builders directly.
+- Expected scope: Medium; define an immutable experiment-first report preview that
+  composes existing deterministic reasoning without redesigning report presentation.
+- Risks: Duplicating Investigator outputs, coupling the contract to DLS-specific UI
+  sections, or prematurely implementing export and document formatting.
+- Success criteria: Streamlit obtains its experiment brief through one registered
+  application capability whose input is an Experiment and whose output is immutable.
 
 ## AI Context Window
 
