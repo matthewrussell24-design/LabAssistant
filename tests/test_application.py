@@ -13,6 +13,7 @@ from labassistant.application import (
     ChromatographyRestoreResult,
     HistoryOverview,
     RelatedExperiments,
+    RelatedScientificContext,
     analyze_dls_dataset,
     compare_experiments,
     agent_access_policy,
@@ -25,6 +26,7 @@ from labassistant.application import (
     list_capabilities,
     list_experiments,
     retrieve_history_overview,
+    retrieve_related_context,
     restore_chromatography_experiment,
     restore_dls_experiment,
     retrieve_experiment,
@@ -44,6 +46,7 @@ from labassistant.history import (
     MalformedExperimentRecordError,
     save_experiment,
 )
+from labassistant.context_engine import KnowledgeStore
 from labassistant.view_models import ParsedSample
 
 
@@ -156,6 +159,70 @@ def test_investigate_experiment_preserves_empty_evidence_behavior():
     assert result.is_interpretable is False
     assert result.observations == ()
     assert "No substantive observations" in result.interpretation_blockers[0]
+
+
+def test_retrieve_related_context_returns_immutable_ranked_provenance(tmp_path):
+    store = KnowledgeStore(tmp_path / "knowledge.sqlite")
+    experiment = Experiment(
+        experiment_id="exp-context",
+        label="OpenLab stability run",
+        technique="HPLC",
+        instrument="Agilent 1290",
+        source_path="/data/run.olax",
+        observations=[
+            Observation(
+                label="Missing peak table",
+                category="data_completeness",
+                evidence="No peak table was exported.",
+                severity="watch",
+                source_type="openlab_olax",
+                source_id="run.olax",
+                recommendation="Export a peak table.",
+            )
+        ],
+    )
+    store.add_experiment(experiment, project_id="stability", tags=["openlab", "special"])
+    store.add_note(
+        "Review OpenLab integration export.",
+        title="Operator note",
+        experiment_id=experiment.experiment_id,
+        tags=["openlab", "special"],
+    )
+
+    result = retrieve_related_context(
+        "Can the OpenLab run support integration?",
+        tags=("special",),
+        store=store,
+    )
+
+    assert isinstance(result, RelatedScientificContext)
+    assert result.relevant_experiments[0].title == "OpenLab stability run"
+    assert result.relevant_experiments[0].project_id == "stability"
+    assert {"openlab", "special"}.issubset(result.relevant_experiments[0].tags)
+    assert result.relevant_observations[0].source_id == "run.olax"
+    assert result.related_notes[0].title == "Operator note"
+    assert result.confidence == "medium"
+    payload = result.to_dict()
+    assert payload["api_version"] == AGENT_API_VERSION
+    assert "payload" not in payload["relevant_experiments"][0]
+
+
+def test_retrieve_related_context_preserves_empty_memory_behavior(tmp_path):
+    result = retrieve_related_context(
+        "What happened in the DLS run?",
+        knowledge_path=tmp_path / "knowledge.sqlite",
+    )
+
+    assert result.relevant_experiments == ()
+    assert result.confidence == "low"
+    assert "No matching local memory" in result.caveats[0]
+
+
+def test_retrieve_related_context_validates_question_and_limit(tmp_path):
+    with raises(ValueError, match="question"):
+        retrieve_related_context(" ", knowledge_path=tmp_path / "knowledge.sqlite")
+    with raises(ValueError, match="limit"):
+        retrieve_related_context("DLS", limit=0, knowledge_path=tmp_path / "knowledge.sqlite")
 
 
 def test_retrieve_experiment_returns_read_only_metadata_and_fresh_measurements(tmp_path):
@@ -553,6 +620,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_experiment",
         "retrieve_experiment_summary",
         "investigate_experiment",
+        "retrieve_related_context",
         "save_scientific_memory",
     ]
     assert all(capability.version == AGENT_API_VERSION for capability in capabilities)
@@ -571,6 +639,9 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     investigation = get_capability("investigate_experiment")
     assert investigation.handler is investigate_experiment
+
+    context = get_capability("retrieve_related_context")
+    assert context.handler is retrieve_related_context
 
 
 def test_capability_registry_rejects_unknown_names():

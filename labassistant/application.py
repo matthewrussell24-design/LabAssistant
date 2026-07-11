@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
-from labassistant.context_engine import KnowledgeStore
+from labassistant.context_engine import (
+    DEFAULT_KNOWLEDGE_STORE_PATH,
+    ContextRetriever,
+    KnowledgeStore,
+)
 from labassistant.chromatography import mass_balance_hypotheses
 from labassistant.history import (
     DEFAULT_HISTORY_PATH,
@@ -399,6 +403,63 @@ class ExperimentInvestigation:
 
 
 @dataclass(frozen=True)
+class ScientificContextItem:
+    """Immutable local-memory item with stable retrieval provenance."""
+
+    item_id: str
+    layer: str
+    entity_type: str
+    title: str
+    text: str
+    experiment_id: str | None
+    project_id: str | None
+    instrument_id: str | None
+    source_id: str | None
+    tags: tuple[str, ...]
+    confidence: str
+    created_at: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["tags"] = list(self.tags)
+        return payload
+
+
+@dataclass(frozen=True)
+class RelatedScientificContext:
+    """Versioned deterministic context packet for application clients."""
+
+    question: str
+    relevant_experiments: tuple[ScientificContextItem, ...]
+    relevant_observations: tuple[ScientificContextItem, ...]
+    supporting_evidence: tuple[ScientificContextItem, ...]
+    hypotheses: tuple[ScientificContextItem, ...]
+    recommendations: tuple[ScientificContextItem, ...]
+    related_notes: tuple[ScientificContextItem, ...]
+    source_files: tuple[ScientificContextItem, ...]
+    missing_information: tuple[str, ...]
+    confidence: str
+    caveats: tuple[str, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "question": self.question,
+            "relevant_experiments": [item.to_dict() for item in self.relevant_experiments],
+            "relevant_observations": [item.to_dict() for item in self.relevant_observations],
+            "supporting_evidence": [item.to_dict() for item in self.supporting_evidence],
+            "hypotheses": [item.to_dict() for item in self.hypotheses],
+            "recommendations": [item.to_dict() for item in self.recommendations],
+            "related_notes": [item.to_dict() for item in self.related_notes],
+            "source_files": [item.to_dict() for item in self.source_files],
+            "missing_information": list(self.missing_information),
+            "confidence": self.confidence,
+            "caveats": list(self.caveats),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -490,6 +551,61 @@ def investigate_experiment(experiment: Experiment) -> ExperimentInvestigation:
         findings=findings,
         observations=observations,
         observation_counts=tuple(report.observation_counts.items()),
+    )
+
+
+def retrieve_related_context(
+    question: str,
+    *,
+    tags: tuple[str, ...] = (),
+    limit: int = 6,
+    knowledge_path: Path = DEFAULT_KNOWLEDGE_STORE_PATH,
+    store: KnowledgeStore | None = None,
+) -> RelatedScientificContext:
+    """Retrieve compact local scientific context through the application boundary."""
+
+    normalized_question = question.strip()
+    if not normalized_question:
+        raise ValueError("A context question is required")
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    packet = ContextRetriever(store or KnowledgeStore(knowledge_path)).retrieve(
+        normalized_question,
+        tags=tags,
+        limit=limit,
+    )
+
+    def items(values) -> tuple[ScientificContextItem, ...]:
+        return tuple(
+            ScientificContextItem(
+                item_id=item.item_id,
+                layer=item.layer,
+                entity_type=item.entity_type,
+                title=item.title,
+                text=item.text,
+                experiment_id=item.experiment_id,
+                project_id=item.project_id,
+                instrument_id=item.instrument_id,
+                source_id=item.source_id,
+                tags=tuple(item.tags),
+                confidence=item.confidence,
+                created_at=item.created_at,
+            )
+            for item in values
+        )
+
+    return RelatedScientificContext(
+        question=packet.question,
+        relevant_experiments=items(packet.relevant_experiments),
+        relevant_observations=items(packet.relevant_observations),
+        supporting_evidence=items(packet.supporting_evidence),
+        hypotheses=items(packet.hypotheses),
+        recommendations=items(packet.recommendations),
+        related_notes=items(packet.related_notes),
+        source_files=items(packet.source_files),
+        missing_information=tuple(packet.missing_information),
+        confidence=packet.confidence,
+        caveats=tuple(packet.caveats),
     )
 
 
@@ -1001,6 +1117,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="investigate_experiment",
         purpose="Assess experiment completeness and interpretability from normalized observations.",
         handler=investigate_experiment,
+    ),
+    CapabilityContract(
+        name="retrieve_related_context",
+        purpose="Retrieve compact evidence-backed context from local scientific memory.",
+        handler=retrieve_related_context,
     ),
     CapabilityContract(
         name="save_scientific_memory",

@@ -22,6 +22,7 @@ from labassistant.application import (
     list_experiments,
     retrieve_experiment,
     retrieve_history_overview,
+    retrieve_related_context,
     save_experiment_to_memory,
 )
 from labassistant.interpretation import (
@@ -46,7 +47,7 @@ from labassistant.metrics import (
     find_local_peaks,
 )
 from labassistant.chromatography import mass_balance_hypotheses
-from labassistant.context_engine import ContextRetriever, KnowledgeStore, ResearchJournal
+from labassistant.context_engine import KnowledgeStore, ResearchJournal
 from labassistant.filtration import (
     FILTRATION_DIFFICULTY_RUBRIC,
     FiltrationMeasurement,
@@ -381,7 +382,7 @@ def render_memory_panel(
         question = st.text_input("Keyword question", value="", key="memory_question")
         if st.button("Retrieve context", use_container_width=True):
             if question.strip():
-                packet = ContextRetriever(KnowledgeStore()).retrieve(question)
+                packet = retrieve_related_context(question)
                 st.session_state["memory_context_packet"] = packet
             else:
                 st.warning("Enter a keyword question before retrieving context.")

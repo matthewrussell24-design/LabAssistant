@@ -70,6 +70,7 @@ Missing capability boundaries:
 | `retrieve_experiment` | `retrieve_experiment` | Available; first used by Streamlit history loader |
 | `retrieve_experiment_summary` | `build_experiment_snapshot` | Available |
 | `investigate_experiment` | `investigate_experiment` | Available; used by Streamlit Experiment Brief |
+| `retrieve_related_context` | `retrieve_related_context` | Available; used by Streamlit memory panel |
 | `save_scientific_memory` | `save_experiment_to_memory` | Available |
 
 `list_capabilities()` returns immutable `CapabilityContract` metadata.
@@ -326,6 +327,28 @@ callers must not imply a successful save after an exception.
 **Caller Types:** Human UI and CLI. Future API or Agent callers require reviewed
 write commands, authorization, audit behavior, and explicit human approval.
 
+## Retrieve Related Scientific Context
+
+**Name:** `retrieve_related_context`
+
+**Purpose:** Retrieve a compact, deterministic context packet from local
+scientific memory without exposing the mutable store or arbitrary payloads.
+
+**Inputs:** A non-empty keyword question, optional required tags, positive
+result limit, and injectable knowledge-store path or store.
+
+**Outputs:** A versioned, frozen `RelatedScientificContext` containing immutable
+items grouped as experiments, observations, supporting evidence, hypotheses,
+recommendations, notes, and source files. Items retain identity, experiment,
+project, instrument, source, tag, confidence, and timestamp provenance.
+
+**Expected Errors:** `ValueError` for an empty question or limit below one.
+Missing or empty memory returns a low-confidence packet with the established
+empty-memory caveat.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's local-memory
+context panel is the first caller.
+
 ## Investigate Experiment
 
 **Name:** `investigate_experiment`
@@ -352,7 +375,6 @@ These are capability boundaries, not implemented public contracts:
 
 | Candidate name | Scientific intent | Current owner |
 | --- | --- | --- |
-| `retrieve_related_context` | Build a compact evidence-backed context packet | Context engine/UI |
 | `generate_observations` | Normalize supported evidence into findings | Importers/observations/UI |
 | `generate_hypotheses` | Produce deterministic, evidence-linked hypotheses | Technique modules/UI |
 | `produce_investigation_summary` | Build an experiment-level brief/report | Observations/UI |
