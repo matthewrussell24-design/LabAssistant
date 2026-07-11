@@ -14,8 +14,11 @@ from labassistant.aggregation import (
 )
 from labassistant.application import (
     ChromatographyAnalysisResult,
+    FiltrationImportRead,
+    FiltrationMeasurementSummary,
     add_scientific_note,
     analyze_chromatography_source,
+    analyze_filtration_csv,
     compare_experiments,
     dls_experiment_from_samples,
     find_related_experiments,
@@ -35,7 +38,6 @@ from labassistant.interpretation import (
     review_evidence,
 )
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
-from labassistant.importers.filtration import FiltrationImportResult, parse_filtration_csv
 from labassistant.history import save_experiment
 from labassistant.metrics import (
     find_local_peaks,
@@ -1975,16 +1977,16 @@ def render_filtration_csv_import(samples: list[ParsedSample]) -> None:
     filtration_file = st.file_uploader("Upload filtration CSV", type=["csv"], accept_multiple_files=False, key="filtration_csv_upload")
     if filtration_file is None:
         return
-    result = parse_filtration_csv(filtration_file, source_name=filtration_file.name)
+    result = analyze_filtration_csv(filtration_file, source_name=filtration_file.name)
     render_filtration_import_preview(result)
     if result.measurements and st.button("Attach parsed filtration measurements", use_container_width=True):
-        attached, unmatched = attach_filtration_measurements(samples, result.measurements)
+        attached, unmatched = attach_filtration_measurements(samples, result.restore_measurements())
         st.success(f"Attached filtration measurements to {attached} sample(s).")
         if unmatched:
             st.warning("No matching current DLS sample for: " + ", ".join(unmatched))
 
 
-def render_filtration_import_preview(result: FiltrationImportResult) -> None:
+def render_filtration_import_preview(result: FiltrationImportRead) -> None:
     if result.missing_columns:
         st.error("Missing required columns: " + ", ".join(result.missing_columns))
     if result.unsupported_columns:
@@ -1995,10 +1997,30 @@ def render_filtration_import_preview(result: FiltrationImportResult) -> None:
         st.error(error)
     if result.measurements:
         st.dataframe(
-            pd.DataFrame([filtration_measurement_to_table_row(measurement) for measurement in result.measurements]),
+            pd.DataFrame([_filtration_summary_row(measurement) for measurement in result.measurements]),
             use_container_width=True,
             hide_index=True,
         )
+
+
+def _filtration_summary_row(measurement: FiltrationMeasurementSummary) -> dict:
+    return {
+        "Sample": measurement.sample_name,
+        "Difficulty Score": measurement.difficulty_score,
+        "Difficulty Meaning": FILTRATION_DIFFICULTY_RUBRIC.get(
+            int(measurement.difficulty_score or 0), ""
+        ),
+        "Filtration Time (min)": measurement.filtration_time_minutes,
+        "Pressure": measurement.pressure,
+        "Pressure Unit": PRESSURE_UNIT_LABELS.get(
+            measurement.pressure_unit or "", measurement.pressure_unit
+        ),
+        "Pressure (kPa)": measurement.pressure_kpa,
+        "Filter Type": measurement.filter_type,
+        "Clogging": measurement.clogging_observed,
+        "Source": measurement.source_file or measurement.source,
+        "Notes": measurement.notes,
+    }
 
 
 def attach_filtration_measurements(samples: list[ParsedSample], measurements: list[FiltrationMeasurement]) -> tuple[int, list[str]]:

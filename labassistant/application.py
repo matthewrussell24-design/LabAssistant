@@ -35,9 +35,10 @@ from labassistant.importers.chromatography import (
     total_area_trend_table,
 )
 from labassistant.importers.openlab_olax import build_experiment_from_olax
+from labassistant.importers.filtration import parse_filtration_csv
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.investigator import investigate as investigate_domain_experiment
-from labassistant.models import Experiment, Measurement
+from labassistant.models import Experiment, FiltrationMeasurement, Measurement
 from labassistant.observations import observations_from_samples
 from labassistant.view_models import sample_from_measurement, sample_status
 
@@ -249,6 +250,73 @@ class ChromatographyAnalysisResult:
             "assessment": self.assessment.to_dict() if self.assessment else None,
             "trends": [point.to_dict() for point in self.trends],
             "source_summary": self.source_summary.to_dict(),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class FiltrationTraceRead:
+    time_values: tuple[float, ...]
+    time_unit: str | None
+    time_minutes: tuple[float, ...]
+    pressure_values: tuple[float, ...]
+    pressure_unit: str | None
+    pressure_kpa: tuple[float, ...]
+    flow_rate_values: tuple[float, ...]
+    flow_rate_unit: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        for key in ("time_values", "time_minutes", "pressure_values", "pressure_kpa", "flow_rate_values"):
+            payload[key] = list(payload[key])
+        return payload
+
+
+@dataclass(frozen=True)
+class FiltrationMeasurementSummary:
+    sample_name: str
+    difficulty_score: float | None
+    filtration_time_minutes: float | None
+    pressure: float | None
+    pressure_unit: str | None
+    pressure_kpa: float | None
+    filter_type: str | None
+    clogging_observed: bool | None
+    notes: str | None
+    source: str
+    source_file: str | None
+    warnings: tuple[str, ...]
+    trace: FiltrationTraceRead | None
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["warnings"] = list(self.warnings)
+        payload["trace"] = self.trace.to_dict() if self.trace else None
+        return payload
+
+
+@dataclass(frozen=True)
+class FiltrationImportRead:
+    source_name: str | None
+    measurements: tuple[FiltrationMeasurementSummary, ...]
+    warnings: tuple[str, ...]
+    errors: tuple[str, ...]
+    missing_columns: tuple[str, ...]
+    unsupported_columns: tuple[str, ...]
+    _measurements: tuple[FiltrationMeasurement, ...] = field(repr=False, compare=False)
+    api_version: str = AGENT_API_VERSION
+
+    def restore_measurements(self) -> list[FiltrationMeasurement]:
+        return deepcopy(list(self._measurements))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "source_name": self.source_name,
+            "measurements": [measurement.to_dict() for measurement in self.measurements],
+            "warnings": list(self.warnings),
+            "errors": list(self.errors),
+            "missing_columns": list(self.missing_columns),
+            "unsupported_columns": list(self.unsupported_columns),
             "api_version": self.api_version,
         }
 
@@ -1351,6 +1419,62 @@ def analyze_chromatography_source(
     )
 
 
+def analyze_filtration_csv(
+    source: Any,
+    *,
+    source_name: str | None = None,
+) -> FiltrationImportRead:
+    """Parse filtration CSV evidence into immutable application summaries."""
+
+    resolved_name = source_name or getattr(source, "name", None)
+    result = parse_filtration_csv(source, source_name=resolved_name)
+    summaries = tuple(_filtration_measurement_summary(measurement) for measurement in result.measurements)
+    return FiltrationImportRead(
+        source_name=result.source_name,
+        measurements=summaries,
+        warnings=tuple(result.warnings),
+        errors=tuple(result.errors),
+        missing_columns=tuple(result.missing_columns),
+        unsupported_columns=tuple(result.unsupported_columns),
+        _measurements=tuple(deepcopy(result.measurements)),
+    )
+
+
+def _filtration_measurement_summary(
+    measurement: FiltrationMeasurement,
+) -> FiltrationMeasurementSummary:
+    trace = measurement.trace
+    trace_read = (
+        FiltrationTraceRead(
+            time_values=tuple(trace.time_values),
+            time_unit=trace.time_unit,
+            time_minutes=tuple(trace.time_minutes),
+            pressure_values=tuple(trace.pressure_values),
+            pressure_unit=trace.pressure_unit,
+            pressure_kpa=tuple(trace.pressure_kpa),
+            flow_rate_values=tuple(trace.flow_rate_values),
+            flow_rate_unit=trace.flow_rate_unit,
+        )
+        if trace
+        else None
+    )
+    return FiltrationMeasurementSummary(
+        sample_name=measurement.sample_name,
+        difficulty_score=measurement.difficulty_score,
+        filtration_time_minutes=measurement.filtration_time_minutes,
+        pressure=measurement.pressure,
+        pressure_unit=measurement.pressure_unit,
+        pressure_kpa=measurement.pressure_kpa,
+        filter_type=measurement.filter_type,
+        clogging_observed=measurement.clogging_observed,
+        notes=measurement.notes,
+        source=measurement.source,
+        source_file=measurement.source_file,
+        warnings=tuple(measurement.warnings),
+        trace=trace_read,
+    )
+
+
 def _chromatography_measurement_summaries(
     measurements: list[Any],
 ) -> tuple[ChromatographyMeasurementSummary, ...]:
@@ -1461,6 +1585,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="analyze_chromatography_source",
         purpose="Import and analyze chromatography CSV or OpenLab evidence.",
         handler=analyze_chromatography_source,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="analyze_filtration_csv",
+        purpose="Parse filtration CSV evidence into immutable summaries.",
+        handler=analyze_filtration_csv,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

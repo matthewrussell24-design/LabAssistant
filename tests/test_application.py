@@ -10,6 +10,7 @@ from labassistant.application import (
     ExperimentListing,
     ExperimentComparison,
     ExperimentInvestigation,
+    FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
     HistoryOverview,
@@ -20,6 +21,7 @@ from labassistant.application import (
     add_scientific_note,
     analyze_dls_dataset,
     analyze_chromatography_source,
+    analyze_filtration_csv,
     compare_experiments,
     agent_access_policy,
     app_manifest,
@@ -709,6 +711,47 @@ def test_analyze_chromatography_source_rejects_unsupported_suffix(tmp_path):
         analyze_chromatography_source(source)
 
 
+def test_analyze_filtration_csv_returns_immutable_normalized_summaries():
+    from io import StringIO
+
+    result = analyze_filtration_csv(
+        StringIO(
+            "sample name,difficulty score,filtration time,filtration time unit,pressure,pressure unit,filter type,clogging observed,notes\n"
+            "Lot 1,4,30,seconds,10,psi,PES,yes,slow\n"
+            "Lot 2,7,1,minutes,1,bar,PES,no,bad score\n"
+        ),
+        source_name="filtration.csv",
+    )
+
+    assert isinstance(result, FiltrationImportRead)
+    assert len(result.measurements) == 1
+    summary = result.measurements[0]
+    assert summary.sample_name == "Lot 1"
+    assert summary.filtration_time_minutes == 0.5
+    assert summary.pressure_unit == "psi"
+    assert summary.pressure_kpa == approx(68.948, abs=0.001)
+    assert summary.clogging_observed is True
+    assert any("difficulty score" in warning for warning in result.warnings)
+    restored = result.restore_measurements()
+    restored[0].sample_name = "Caller mutation"
+    assert result.restore_measurements()[0].sample_name == "Lot 1"
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_analyze_filtration_csv_preserves_column_diagnostics():
+    from io import StringIO
+
+    result = analyze_filtration_csv(
+        StringIO("sample,pressure,unexpected\nLot 1,10,value\n"),
+        source_name="bad.csv",
+    )
+
+    assert result.measurements == ()
+    assert result.missing_columns == ("difficulty_score",)
+    assert result.unsupported_columns == ("unexpected",)
+    assert "missing required columns" in result.errors[0].lower()
+
+
 def test_save_experiment_to_memory_can_use_injected_store():
     experiment = Experiment(
         experiment_id="exp-1",
@@ -747,6 +790,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "analyze_dls_dataset",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
+        "analyze_filtration_csv",
         "list_experiments",
         "compare_experiments",
         "find_related_experiments",
@@ -793,6 +837,10 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
     chromatography = get_capability("analyze_chromatography_source")
     assert chromatography.handler is analyze_chromatography_source
     assert "Agent" not in chromatography.caller_types
+
+    filtration = get_capability("analyze_filtration_csv")
+    assert filtration.handler is analyze_filtration_csv
+    assert "Agent" not in filtration.caller_types
 
 
 def test_capability_registry_rejects_unknown_names():

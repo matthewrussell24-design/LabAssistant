@@ -64,6 +64,7 @@ Missing capability boundaries:
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
+| `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
 | `list_experiments` | `list_experiments` | Available; used by desktop History timeline |
 | `compare_experiments` | `compare_experiments` | Available; used by Streamlit History panel |
 | `find_related_experiments` | `find_related_experiments` | Available; used by Streamlit History panel |
@@ -157,6 +158,27 @@ exceptions for malformed sources.
 
 **Caller Types:** Human UI, CLI, Future API. Agent use is excluded pending
 reviewed file and provenance handling. Streamlit is the first caller.
+
+## Analyze Filtration CSV
+
+**Name:** `analyze_filtration_csv`
+
+**Purpose:** Parse filtration follow-up CSV evidence without exposing pandas or
+the mutable importer result to interface shells.
+
+**Inputs:** A path or file-like CSV source and optional source name.
+
+**Outputs:** A versioned, frozen `FiltrationImportRead` containing immutable
+measurement and trace summaries, normalized pressure/time units, warnings,
+errors, missing columns, unsupported columns, and source provenance.
+`restore_measurements()` returns fresh copies only for a reviewed attach action.
+
+**Expected Errors:** Existing CSV read/parser exceptions. Missing required
+columns and invalid rows remain structured diagnostics rather than exceptions.
+
+**Caller Types:** Human UI, CLI, Future API. Agent use is excluded pending
+reviewed file handling. Streamlit is the first caller; its explicit Attach
+button remains responsible for matching and mutating current DLS evidence.
 
 ## Analyze Local DLS Dataset
 
