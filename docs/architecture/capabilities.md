@@ -35,11 +35,9 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates some DLS import and decision-brief helpers directly.
-- DLS assembly crosses the application boundary, but uploaded raw-file parsing
-  and import-preview orchestration remain UI-owned.
+- `app.py` still coordinates DLS-specific decision-brief helpers directly.
 
-The remaining visible bypass is the primary uploaded DLS import workflow.
+The remaining visible bypass is DLS-specific decision ranking.
 
 ## Implemented Capability Catalog
 
@@ -49,6 +47,7 @@ The remaining visible bypass is the primary uploaded DLS import workflow.
 | `describe_agent_access` | `agent_access_policy` | Available |
 | `import_dls_experiment` | `dls_experiment_from_samples` | Available, transitional input |
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
+| `analyze_dls_uploads` | `analyze_dls_uploads` | Available; used by Streamlit DLS upload workflow |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -215,6 +214,30 @@ existing parser exceptions for malformed files.
 
 **Caller Types:** Human UI, CLI, Future API. The native AppKit desktop shell is
 the first caller. Agent use is intentionally excluded.
+
+## Analyze Uploaded DLS Evidence
+
+**Name:** `analyze_dls_uploads`
+
+**Purpose:** Classify, group, preview, and import uploaded multi-file DLS
+evidence without coupling the application layer to Streamlit upload objects.
+
+**Inputs:** A non-empty list of generic sources that expose a string `name` and
+readable file interface. Existing CSV/XLS/XLSX classifier behavior determines
+roles and lot grouping.
+
+**Outputs:** A frozen, versioned `DLSUploadImportResult` containing immutable
+group and classified-file diagnostics, plain preview rows, per-lot measurement
+summaries, source names, and flattened import errors. `restore_samples()`
+returns fresh parsed-sample copies for explicit workspace use and retry.
+
+**Expected Errors:** `ValueError` for an empty selection and `TypeError` for
+unnamed or unreadable sources. Established preview/parser exceptions remain
+visible; unexpected grouped-import failures become structured import errors to
+preserve the resilient human upload workflow.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit is the first caller.
+Agent use is excluded pending reviewed file and provenance handling.
 
 ## Import Chromatography Experiment
 

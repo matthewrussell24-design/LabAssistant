@@ -146,6 +146,77 @@ class DLSAnalysisResult:
 
 
 @dataclass(frozen=True)
+class DLSUploadFileRead:
+    """Immutable classification and readable-source diagnostics for one upload."""
+
+    file_name: str
+    file_type: str
+    source_text: str
+    error: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSUploadGroupRead:
+    """Immutable multi-file grouping summary for one detected DLS lot."""
+
+    lot: str
+    status: str
+    summary_files: tuple[DLSUploadFileRead, ...]
+    intensity_files: tuple[DLSUploadFileRead, ...]
+    correlogram_files: tuple[DLSUploadFileRead, ...]
+    files: tuple[DLSUploadFileRead, ...]
+
+    def preview_row(self) -> dict[str, str]:
+        return {
+            "Lot": self.lot,
+            "Summary file": self.summary_files[0].file_name if self.summary_files else "",
+            "Intensity file": self.intensity_files[0].file_name if self.intensity_files else "",
+            "Correlogram file": self.correlogram_files[0].file_name if self.correlogram_files else "",
+            "Status": self.status,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "lot": self.lot,
+            "status": self.status,
+            "summary_files": [item.to_dict() for item in self.summary_files],
+            "intensity_files": [item.to_dict() for item in self.intensity_files],
+            "correlogram_files": [item.to_dict() for item in self.correlogram_files],
+            "files": [item.to_dict() for item in self.files],
+        }
+
+
+@dataclass(frozen=True)
+class DLSUploadImportResult:
+    """Versioned uploaded-DLS preview plus reviewed copy-on-access evidence."""
+
+    groups: tuple[DLSUploadGroupRead, ...]
+    measurements: tuple[DLSMeasurementSummary, ...]
+    source_files: tuple[str, ...]
+    import_errors: tuple[str, ...]
+    _samples: tuple[Any, ...] = field(repr=False, compare=False)
+    api_version: str = AGENT_API_VERSION
+
+    def restore_samples(self) -> list[Any]:
+        return deepcopy(list(self._samples))
+
+    def preview_rows(self) -> list[dict[str, str]]:
+        return [group.preview_row() for group in self.groups]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "groups": [group.to_dict() for group in self.groups],
+            "measurements": [measurement.to_dict() for measurement in self.measurements],
+            "source_files": list(self.source_files),
+            "import_errors": list(self.import_errors),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class ChromatographyMeasurementSummary:
     """Concise immutable summary of one persisted chromatography injection."""
 
@@ -1368,6 +1439,65 @@ def dls_experiment_from_samples(
     )
 
 
+def analyze_dls_uploads(sources: list[object]) -> DLSUploadImportResult:
+    """Classify and import seekable uploaded DLS sources without a UI dependency."""
+
+    if not sources:
+        raise ValueError("Select at least one uploaded DLS file.")
+    if any(not isinstance(getattr(source, "name", None), str) for source in sources):
+        raise TypeError("Every uploaded DLS source must provide a file name")
+    if any(not callable(getattr(source, "read", None)) for source in sources):
+        raise TypeError("Every uploaded DLS source must be readable")
+
+    preview = build_import_preview(sources)
+    file_read_cache: dict[int, DLSUploadFileRead] = {}
+
+    def file_read(classified) -> DLSUploadFileRead:
+        key = id(classified)
+        if key not in file_read_cache:
+            parsed_source = (
+                classified.parsed_result.source_text
+                if classified.parsed_result is not None
+                else ""
+            )
+            file_read_cache[key] = DLSUploadFileRead(
+                file_name=classified.file_name,
+                file_type=classified.file_type,
+                source_text=classified.source_text or parsed_source,
+                error=classified.error,
+            )
+        return file_read_cache[key]
+
+    groups = tuple(
+        DLSUploadGroupRead(
+            lot=group.lot,
+            status=group.status,
+            summary_files=tuple(file_read(item) for item in group.summary_files),
+            intensity_files=tuple(file_read(item) for item in group.intensity_files),
+            correlogram_files=tuple(file_read(item) for item in group.correlogram_files),
+            files=tuple(file_read(item) for item in group.files),
+        )
+        for group in preview.groups
+    )
+    try:
+        imports = import_measurement_groups(preview.groups)
+        measurements = [result.measurement for result in imports if result.measurement is not None]
+        errors = [error for result in imports for error in result.errors]
+        samples = [sample_from_measurement(measurement) for measurement in measurements]
+    except Exception as error:  # preserve the existing resilient upload workflow
+        samples = []
+        errors = [f"Import failed: {error}"]
+
+    frozen_samples = tuple(deepcopy(samples))
+    return DLSUploadImportResult(
+        groups=groups,
+        measurements=_dls_measurement_summaries(samples),
+        source_files=tuple(source.name for source in sources),
+        import_errors=tuple(errors),
+        _samples=frozen_samples,
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -1839,6 +1969,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="analyze_dls_dataset",
         purpose="Import and analyze an existing local DLS dataset.",
         handler=analyze_dls_dataset,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="analyze_dls_uploads",
+        purpose="Preview and import uploaded DLS evidence into immutable summaries.",
+        handler=analyze_dls_uploads,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

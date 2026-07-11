@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 from pathlib import Path
 
 from pytest import approx, raises
@@ -13,6 +14,7 @@ from labassistant.application import (
     ExperimentBriefPreview,
     ExperimentSaveReceipt,
     ObservationGenerationResult,
+    DLSUploadImportResult,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -23,6 +25,7 @@ from labassistant.application import (
     ScientificNoteReceipt,
     add_scientific_note,
     analyze_dls_dataset,
+    analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
     compare_experiments,
@@ -84,6 +87,12 @@ class RecordingStore:
 
     def add_note(self, text, **kwargs):
         self.notes.append((text, kwargs))
+
+
+class NamedUpload(BytesIO):
+    def __init__(self, name: str, content: str):
+        super().__init__(content.encode("utf-8"))
+        self.name = name
 
 
 def test_app_manifest_declares_standalone_human_first_direction():
@@ -814,6 +823,53 @@ def test_analyze_dls_dataset_runs_file_import_and_summary_outside_ui_code():
     assert "measurements" in result.to_dict()
 
 
+def test_analyze_dls_uploads_preserves_preview_diagnostics_and_restores_fresh_samples():
+    result = analyze_dls_uploads(
+        [
+            NamedUpload(
+                "Lot 1 summary.csv",
+                "Index,Sample Name,Scattering Collection (°),Z-Average (nm),PDI\n"
+                "1,Lot 1,173,125,0.21\n",
+            ),
+            NamedUpload(
+                "Lot 1 intensity distribution.csv",
+                "Diameter (nm),Intensity Rep 1 (%)\n50,5\n100,100\n",
+            ),
+        ]
+    )
+
+    assert isinstance(result, DLSUploadImportResult)
+    assert result.preview_rows() == [
+        {
+            "Lot": "Lot 1",
+            "Summary file": "Lot 1 summary.csv",
+            "Intensity file": "Lot 1 intensity distribution.csv",
+            "Correlogram file": "",
+            "Status": "Missing correlogram",
+        }
+    ]
+    assert result.groups[0].files[0].source_text.startswith("Index,Sample Name")
+    assert result.source_files == (
+        "Lot 1 summary.csv",
+        "Lot 1 intensity distribution.csv",
+    )
+    assert result.import_errors == ()
+    assert result.measurements[0].sample_name == "Lot 1"
+    first = result.restore_samples()
+    first[0].name = "Changed"
+    assert result.restore_samples()[0].name == "Lot 1"
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_analyze_dls_uploads_validates_generic_seekable_sources():
+    with raises(ValueError, match="at least one uploaded"):
+        analyze_dls_uploads([])
+    with raises(TypeError, match="file name"):
+        analyze_dls_uploads([BytesIO(b"data")])
+    with raises(TypeError, match="readable"):
+        analyze_dls_uploads([type("Named", (), {"name": "sample.csv"})()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -933,6 +989,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "describe_agent_access",
         "import_dls_experiment",
         "analyze_dls_dataset",
+        "analyze_dls_uploads",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -999,6 +1056,10 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     observations = get_capability("generate_observations")
     assert observations.handler is generate_observations
+
+    dls_uploads = get_capability("analyze_dls_uploads")
+    assert dls_uploads.handler is analyze_dls_uploads
+    assert "Agent" not in dls_uploads.caller_types
 
 
 def test_capability_registry_rejects_unknown_names():

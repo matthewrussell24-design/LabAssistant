@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted the generic Experiment Brief into an
-  immutable Experiment-first application workflow and migrated Streamlit (task 024).
-- Working Tree: Task 024 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted Streamlit's uploaded multi-file DLS preview
+  and import orchestration into a typed immutable application workflow (task 025).
+- Working Tree: Task 025 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `173 passed in 2.58s` from `scripts/test -q` on
+- Last Successful Test: `175 passed in 2.44s` from `scripts/test -q` on
   2026-07-11.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-11 for task 024.
+- Last Updated: 2026-07-11 for task 025.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 173 passing.
+- Tests: 🟢 Healthy — 175 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of twenty-one stable capability names, including explicit
+  registry of twenty-two stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -291,6 +291,8 @@ architecture rationale.
   into one typed immutable application workflow (task 023).
 - Promoted the generic Experiment Brief into an immutable Experiment-first report
   preview and routed Streamlit through it (task 024).
+- Promoted uploaded multi-file DLS preview and import orchestration into an
+  immutable application result and routed Streamlit through it (task 025).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -306,8 +308,8 @@ architecture rationale.
 
 ## Active Work
 
-- Experiment-brief task 024 is complete.
-- The working tree was clean when task 024 began.
+- Uploaded-DLS import task 025 is complete.
+- The working tree was clean when task 025 began.
 
 ## Known Risks
 
@@ -342,8 +344,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `173 passed in 2.58s` from `scripts/test -q` on 2026-07-11.
-- The Streamlit shell completed a headless startup smoke after task 024.
+- Latest result: `175 passed in 2.44s` from `scripts/test -q` on 2026-07-11.
+- The Streamlit shell completed a headless startup smoke after task 025.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -360,15 +362,15 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote Streamlit's uploaded DLS import-preview orchestration into a typed application workflow.
-- Why this is next: Local-path DLS analysis has an application contract, but the
-  primary Streamlit upload path still coordinates preview grouping and importers directly.
-- Expected scope: Medium; accept uploaded seekable sources, preserve group diagnostics
-  and errors, and return immutable summaries plus reviewed copy-on-access evidence.
-- Risks: Regressing multi-file grouping, losing vendor/parser diagnostics, or coupling
-  the application contract to Streamlit upload objects.
-- Success criteria: Streamlit imports uploaded DLS evidence through one registered
-  application capability without directly calling measurement preview/import helpers.
+- Objective: Promote DLS-specific decision ranking into an immutable application workflow.
+- Why this is next: Uploaded evidence, normalized findings, and the generic brief now
+  cross application contracts, but Streamlit still calls the DLS decision-brief builder directly.
+- Expected scope: Medium; return best/attention candidates, flagged counts, next check,
+  unusual changes, and immutable attention rows without exposing pandas.
+- Risks: Conflating DLS screening rank with instrument-independent investigation or
+  changing established warning thresholds and tie-breaking behavior.
+- Success criteria: Streamlit renders its DLS Decision Brief through one registered
+  application capability and no longer imports the decision-brief builder.
 
 ## AI Context Window
 

@@ -14,11 +14,13 @@ from labassistant.aggregation import (
 )
 from labassistant.application import (
     ChromatographyAnalysisResult,
+    DLSUploadImportResult,
     FiltrationImportRead,
     FiltrationMeasurementSummary,
     add_scientific_note,
     analyze_chromatography_source,
     analyze_filtration_csv,
+    analyze_dls_uploads,
     compare_experiments,
     dls_experiment_from_samples,
     find_related_experiments,
@@ -38,7 +40,6 @@ from labassistant.interpretation import (
     format_metric,
     review_evidence,
 )
-from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.metrics import (
     find_local_peaks,
 )
@@ -1373,7 +1374,7 @@ def render_raw_data(samples: list[ParsedSample], metrics: pd.DataFrame, groups=N
                 "label": f"{group.lot} - {classified.file_type}: {classified.file_name}",
                 "name": classified.file_name,
                 "type": classified.file_type,
-                "text": classified.source_text or (classified.parsed_result.source_text if classified.parsed_result else ""),
+                "text": classified.source_text,
                 "error": classified.error,
             }
             for group in (groups or [])
@@ -1423,23 +1424,15 @@ def upload_batch_signature(uploaded_files) -> tuple[tuple[str, int | None], ...]
     return tuple((uploaded_file.name, getattr(uploaded_file, "size", None)) for uploaded_file in uploaded_files)
 
 
-def import_preview_to_session(preview, upload_signature) -> None:
-    try:
-        import_results = import_measurement_groups(preview.groups)
-        st.session_state["imported_upload_signature"] = upload_signature
-        st.session_state["imported_samples"] = [
-            sample_from_measurement(result.measurement) for result in import_results if result.measurement is not None
-        ]
-        st.session_state["import_errors"] = [error for result in import_results for error in result.errors]
-    except Exception as error:  # keep the demo alive on unexpected parser failures
-        st.session_state["imported_upload_signature"] = upload_signature
-        st.session_state["imported_samples"] = []
-        st.session_state["import_errors"] = [f"Import failed: {error}"]
+def import_preview_to_session(result: DLSUploadImportResult, upload_signature) -> None:
+    st.session_state["imported_upload_signature"] = upload_signature
+    st.session_state["imported_samples"] = result.restore_samples()
+    st.session_state["import_errors"] = list(result.import_errors)
 
 
 def render_import_details(preview, import_errors: list[str]) -> None:
     with st.expander("Import details", expanded=bool(import_errors)):
-        st.dataframe(preview.table, use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(preview.preview_rows()), use_container_width=True, hide_index=True)
         for error in import_errors:
             st.error(error)
 
@@ -2354,7 +2347,7 @@ def main() -> None:
             st.session_state.pop("imported_samples", None)
             st.session_state.pop("import_errors", None)
 
-        preview = build_import_preview(uploaded_files)
+        preview = analyze_dls_uploads(uploaded_files)
         if st.session_state.get("imported_upload_signature") != upload_signature:
             import_preview_to_session(preview, upload_signature)
 
@@ -2363,7 +2356,7 @@ def main() -> None:
         if preview is not None:
             st.divider()
             st.header("Import")
-            st.dataframe(preview.table, use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(preview.preview_rows()), use_container_width=True, hide_index=True)
             import_label = "Re-import grouped measurements" if has_imported_samples else "Retry grouped import"
             if st.button(import_label, use_container_width=True):
                 import_preview_to_session(preview, upload_signature)
