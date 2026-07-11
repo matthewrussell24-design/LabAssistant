@@ -245,7 +245,6 @@ def build_ai_summary(samples: list[ParsedSample], metrics: pd.DataFrame) -> dict
 def build_data_analysis(samples: list[ParsedSample], metrics: pd.DataFrame) -> dict[str, list[str]]:
     flagged = [sample for sample in samples if sample_status(sample) != STATUS_NORMAL]
     review_samples = [sample for sample in samples if sample_status(sample) == STATUS_REVIEW]
-    normal_samples = [sample for sample in samples if sample_status(sample) == STATUS_NORMAL]
 
     highest_z = metric_extreme(metrics, "Z-Average", "max")
     lowest_z = metric_extreme(metrics, "Z-Average", "min")

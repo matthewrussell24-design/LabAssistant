@@ -7,7 +7,6 @@ from collections.abc import Callable, Sequence
 
 import objc
 from AppKit import (
-    NSApp,
     NSApplication,
     NSApplicationActivationPolicyRegular,
     NSBackingStoreBuffered,

@@ -14,7 +14,6 @@ from labassistant.importers.dls import (
 from labassistant.importers.file_classifier import (
     CORRELOGRAM,
     INTENSITY_DISTRIBUTION,
-    SUMMARY_EXPORT,
     ClassifiedFile,
     classify_uploaded_file,
 )

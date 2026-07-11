@@ -6,7 +6,7 @@ from typing import Any
 import pandas as pd
 
 from labassistant.models import Observation
-from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
+from labassistant.quality import STATUS_REVIEW, STATUS_WATCH
 from labassistant.view_models import ParsedSample, sample_status
 
 
