@@ -7,9 +7,11 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from labassistant.context_engine import KnowledgeStore
+from labassistant.chromatography import mass_balance_hypotheses
 from labassistant.history import (
     DEFAULT_HISTORY_PATH,
     compare_experiments as compare_history_experiments,
+    chromatography_measurements_from_record,
     find_similar_samples,
     history_table,
     latest_experiment,
@@ -17,6 +19,10 @@ from labassistant.history import (
     load_history,
     measurements_from_record,
     trend_table,
+)
+from labassistant.importers.chromatography import (
+    assess_chromatography_mass_balance,
+    chromatography_observations,
 )
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.models import Experiment, Measurement
@@ -110,6 +116,49 @@ class DLSAnalysisResult:
             "measurements": [measurement.to_dict() for measurement in self.measurements],
             "source_files": list(self.source_files),
             "import_errors": list(self.import_errors),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class ChromatographyMeasurementSummary:
+    """Concise immutable summary of one persisted chromatography injection."""
+
+    sample_name: str
+    technique: str
+    timepoint: str | None
+    injection_id: str | None
+    replicate_id: str | None
+    source_files: tuple[str, ...]
+    peak_count: int
+    chromatogram_trace_count: int
+    total_area: float | None
+    parent_peak_id: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ChromatographyRestoreResult:
+    """Versioned read model rebuilt from persisted chromatography evidence."""
+
+    record_id: str
+    saved_at: str
+    experiment: ExperimentSnapshot
+    measurements: tuple[ChromatographyMeasurementSummary, ...]
+    source_files: tuple[str, ...]
+    hypotheses: tuple[str, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "record_id": self.record_id,
+            "saved_at": self.saved_at,
+            "experiment": self.experiment.to_dict(),
+            "measurements": [measurement.to_dict() for measurement in self.measurements],
+            "source_files": list(self.source_files),
+            "hypotheses": list(self.hypotheses),
             "api_version": self.api_version,
         }
 
@@ -634,6 +683,57 @@ def _dls_measurement_summaries(samples: list[Any]) -> tuple[DLSMeasurementSummar
             warnings=tuple(sample.warnings),
         )
         for sample in samples
+    )
+
+
+def restore_chromatography_experiment(
+    record_id: str,
+    *,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> ChromatographyRestoreResult:
+    """Restore persisted chromatography evidence into a stable read model."""
+
+    record = load_experiment_record(record_id, history_path=history_path)
+    measurements = chromatography_measurements_from_record(record)
+    assessment = assess_chromatography_mass_balance(measurements)
+    observations = chromatography_observations(measurements, assessment)
+    hypotheses = mass_balance_hypotheses(observations)
+    assessment.hypotheses = list(hypotheses)
+    source_files = tuple(
+        dict.fromkeys(source for measurement in measurements for source in measurement.source_files)
+    )
+    experiment = chromatography_experiment_from_preview(
+        {
+            "measurements": measurements,
+            "assessment": assessment,
+            "observations": observations,
+            "hypotheses": hypotheses,
+        },
+        label=record.label,
+        source_name=source_files[0] if len(source_files) == 1 else None,
+    )
+    summaries = tuple(
+        ChromatographyMeasurementSummary(
+            sample_name=measurement.sample_name,
+            technique=measurement.technique,
+            timepoint=measurement.timepoint,
+            injection_id=measurement.injection_id,
+            replicate_id=measurement.replicate_id,
+            source_files=tuple(measurement.source_files),
+            peak_count=len(measurement.peaks),
+            chromatogram_trace_count=len(measurement.chromatogram_traces),
+            total_area=measurement.total_area,
+            parent_peak_id=measurement.parent_peak_id,
+        )
+        for measurement in measurements
+    )
+    return ChromatographyRestoreResult(
+        record_id=record.id,
+        saved_at=record.saved_at,
+        experiment=build_experiment_snapshot(experiment),
+        measurements=summaries,
+        source_files=source_files,
+        hypotheses=tuple(hypotheses),
     )
 
 

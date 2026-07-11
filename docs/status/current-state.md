@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted persisted history summaries and DLS trend
-  retrieval into the application layer and removed direct JSONL reads from the
-  Streamlit History panel (task 013).
-- Working Tree: Task 013 is committed locally; inspect `git status --short`
+- Latest Completed Change: Added typed persisted chromatography restoration,
+  including nested peak/trace reconstruction and deterministic reasoning
+  rebuilds (task 014).
+- Working Tree: Task 014 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `148 passed` from `scripts/test -q` on
+- Last Successful Test: `151 passed` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 013.
+- Last Updated: 2026-07-10 for task 014.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 146 passing.
+- Tests: 🟢 Healthy — 151 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -122,9 +122,9 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   AppKit/WebKit controller.
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
-  persisted experiment retrieval, listing, summary/trend history views, local
-  DLS dataset analysis, and a transport-independent registry of twelve stable
-  capability names.
+  persisted experiment retrieval, listing, summary/trend history views,
+  technique-aware DLS and chromatography restoration, local DLS dataset
+  analysis, and a transport-independent registry of twelve stable capability names.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -267,6 +267,8 @@ architecture rationale.
   contracts (tasks 011 and 012).
 - Promoted history summary and trend retrieval into an immutable application
   read contract and routed the Streamlit History panel through it (task 013).
+- Generalized persisted restoration for chromatography with nested evidence
+  reconstruction and an immutable application read result (task 014).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -282,8 +284,8 @@ architecture rationale.
 
 ## Active Work
 
-- History-overview task 013 is complete.
-- The working tree was clean when task 013 began.
+- Chromatography-restore task 014 is complete.
+- The working tree was clean when task 014 began.
 
 ## Known Risks
 
@@ -299,9 +301,8 @@ architecture rationale.
   services.
 - AppKit/WebKit proves native shell independence but is not yet packaged,
   notarized, or validated across target macOS versions.
-- Desktop restore assembles a DLS read model; persisted history browsing and
-  restoration now flow through `list_experiments`/`restore_dls_experiment`, but
-  generalizing restore for a second persisted technique is still pending.
+- Persisted technique detection currently relies on measurement shape because
+  the JSONL record envelope predates an explicit technique discriminator.
 - PySide6 6.11.1, 6.10.1, and 6.8.3 all failed to initialize their installed
   Cocoa plugin reliably across fresh target macOS 26 `zsh` login shells. Qt is
   removed; the shell now pins PyObjC 12.2.1 and uses AppKit directly.
@@ -321,7 +322,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `148 passed` from `scripts/test -q` on 2026-07-10.
+- Latest result: `151 passed` from `scripts/test -q` on 2026-07-10.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -338,14 +339,16 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Generalize persisted experiment restoration for chromatography.
-- Why this is next: DLS has a shared restore composition, while a second
-  persisted technique is needed to prove the history boundary is not DLS-only.
-- Expected scope: Medium; add a typed chromatography restore result without
-  changing JSONL persistence or UI behavior.
-- Risks: Older chromatography records may have incomplete provenance or fields.
-- Success criteria: A saved chromatography experiment can be restored through
-  the application layer into an immutable, technique-appropriate read model.
+- Objective: Add a representative cross-technique investigation test case.
+- Why this is next: DLS, chromatography, and filtration evidence are individually
+  modeled, but their shared experiment-level reasoning has not been proven end to end.
+- Expected scope: Medium; assemble existing normalized observations without
+  adding technique-specific logic to the investigator.
+- Risks: The fixture could overstate causality or encode conclusions not
+  supported by the underlying evidence.
+- Success criteria: One deterministic test connects chromatography missing
+  mass, DLS aggregation evidence, and filtration outcomes with traceable,
+  appropriately qualified hypotheses.
 
 ## AI Context Window
 

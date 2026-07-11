@@ -256,6 +256,14 @@ application function (not a separate catalog entry) that composes
 `DLSAnalysisResult`. It lets the desktop reopen a saved record through the same
 read model as a fresh import without reading storage or recomputing metrics.
 
+`restore_chromatography_experiment(record_id)` is the corresponding
+technique-aware composition for HPLC evidence. It reconstructs nested peaks and
+chromatogram traces, annotates history provenance, reruns deterministic
+mass-balance assessment and observation generation, and returns a frozen
+`ChromatographyRestoreResult` with immutable injection summaries. DLS, empty,
+and malformed chromatography records are rejected with
+`MalformedExperimentRecordError`; the JSONL schema is unchanged.
+
 ## Compare Experiments
 
 **Name:** `compare_experiments`

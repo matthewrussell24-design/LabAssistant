@@ -9,6 +9,7 @@ from labassistant.application import (
     HUMAN_APP_SURFACE,
     ExperimentListing,
     ExperimentComparison,
+    ChromatographyRestoreResult,
     HistoryOverview,
     RelatedExperiments,
     analyze_dls_dataset,
@@ -22,12 +23,25 @@ from labassistant.application import (
     list_capabilities,
     list_experiments,
     retrieve_history_overview,
+    restore_chromatography_experiment,
     restore_dls_experiment,
     retrieve_experiment,
     save_experiment_to_memory,
 )
-from labassistant.models import Experiment, Measurement, MeasurementMetadata, Observation
-from labassistant.history import ExperimentRecordNotFoundError, save_experiment
+from labassistant.models import (
+    ChromatogramTrace,
+    ChromatographyMeasurement,
+    ChromatographyPeak,
+    Experiment,
+    Measurement,
+    MeasurementMetadata,
+    Observation,
+)
+from labassistant.history import (
+    ExperimentRecordNotFoundError,
+    MalformedExperimentRecordError,
+    save_experiment,
+)
 from labassistant.view_models import ParsedSample
 
 
@@ -300,6 +314,70 @@ def test_restore_dls_experiment_rehydrates_a_saved_record(tmp_path):
 def test_restore_dls_experiment_reports_missing_record(tmp_path):
     with raises(ExperimentRecordNotFoundError):
         restore_dls_experiment("does-not-exist", history_path=tmp_path / "experiments.jsonl")
+
+
+def test_restore_chromatography_experiment_rebuilds_nested_evidence(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    measurement = ChromatographyMeasurement(
+        sample_name="Formulation A",
+        timepoint="T0",
+        injection_id="inj-1",
+        source_files=["run.olax"],
+        peaks=[
+            ChromatographyPeak(
+                peak_id="parent", role="parent", retention_time_min=5.2, area=900.0
+            ),
+            ChromatographyPeak(peak_id="unknown", role="unknown", area=100.0),
+        ],
+        chromatogram_traces=[
+            ChromatogramTrace(
+                source_file="run.olax", time_min=[0.0, 1.0], intensity=[1.0, 2.0]
+            )
+        ],
+        total_area=1000.0,
+        parent_peak_id="parent",
+    )
+    saved = save_experiment([measurement], label="HPLC Run", history_path=history_path)
+
+    result = restore_chromatography_experiment(saved.id, history_path=history_path)
+
+    assert isinstance(result, ChromatographyRestoreResult)
+    assert result.record_id == saved.id
+    assert result.experiment.label == "HPLC Run"
+    assert result.experiment.technique == "HPLC"
+    assert result.experiment.observation_count > 0
+    assert result.measurements[0].peak_count == 2
+    assert result.measurements[0].chromatogram_trace_count == 1
+    assert result.source_files == ("run.olax",)
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_restore_chromatography_experiment_rejects_non_chromatography_records(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    dls = save_experiment(
+        [Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))],
+        history_path=history_path,
+    )
+    empty = save_experiment([], history_path=history_path)
+
+    with raises(MalformedExperimentRecordError, match="not a chromatography"):
+        restore_chromatography_experiment(dls.id, history_path=history_path)
+    with raises(MalformedExperimentRecordError, match="no chromatography"):
+        restore_chromatography_experiment(empty.id, history_path=history_path)
+
+
+def test_restore_chromatography_experiment_rejects_malformed_nested_evidence(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    saved = save_experiment(
+        [ChromatographyMeasurement(sample_name="Sample A")],
+        history_path=history_path,
+    )
+    payload = json.loads(history_path.read_text(encoding="utf-8"))
+    payload["measurements"][0]["peaks"] = "not-a-list"
+    history_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    with raises(MalformedExperimentRecordError, match="invalid measurement payload"):
+        restore_chromatography_experiment(saved.id, history_path=history_path)
 
 
 def _import_fixture_measurements(fixture_dir):

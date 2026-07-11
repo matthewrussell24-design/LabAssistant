@@ -17,6 +17,9 @@ from labassistant.models import (
     MeasurementFlag,
     MeasurementMetadata,
     SummaryMetrics,
+    ChromatogramTrace,
+    ChromatographyMeasurement,
+    ChromatographyPeak,
 )
 from labassistant.quality import status_from_warnings
 
@@ -42,7 +45,7 @@ class ExperimentRecord:
     measurements: list[dict]
 
     @classmethod
-    def from_measurements(cls, measurements: list[Measurement], label: str = "") -> "ExperimentRecord":
+    def from_measurements(cls, measurements: list[object], label: str = "") -> "ExperimentRecord":
         return cls(
             id=uuid4().hex,
             saved_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -90,6 +93,59 @@ def measurements_from_record(record: ExperimentRecord) -> list[Measurement]:
     return measurements
 
 
+def chromatography_measurements_from_record(
+    record: ExperimentRecord,
+) -> list[ChromatographyMeasurement]:
+    """Reconstruct chromatography evidence with persisted-record provenance."""
+
+    if not record.measurements:
+        raise MalformedExperimentRecordError(
+            f"Malformed experiment record {record.id}: no chromatography measurements"
+        )
+    measurements = []
+    for payload in record.measurements:
+        if not isinstance(payload, dict) or not isinstance(payload.get("sample_name"), str):
+            raise MalformedExperimentRecordError(
+                f"Malformed experiment record {record.id}: not a chromatography measurement"
+            )
+        try:
+            measurement = chromatography_measurement_from_dict(payload)
+        except (TypeError, ValueError) as error:
+            raise MalformedExperimentRecordError(
+                f"Malformed experiment record {record.id}: invalid chromatography payload"
+            ) from error
+        measurement.metadata = dict(measurement.metadata)
+        measurement.metadata["loaded_from_history"] = {
+            "record_id": record.id,
+            "label": record.label,
+            "saved_at": record.saved_at,
+        }
+        measurements.append(measurement)
+    return measurements
+
+
+def chromatography_measurement_from_dict(payload: dict) -> ChromatographyMeasurement:
+    """Restore nested chromatography dataclasses while tolerating newer fields."""
+
+    peaks_payload = payload.get("peaks") or []
+    traces_payload = payload.get("chromatogram_traces") or []
+    if not isinstance(peaks_payload, list) or not all(isinstance(item, dict) for item in peaks_payload):
+        raise TypeError("peaks must be a list of objects")
+    if not isinstance(traces_payload, list) or not all(isinstance(item, dict) for item in traces_payload):
+        raise TypeError("chromatogram_traces must be a list of objects")
+    values = {
+        key: value
+        for key, value in payload.items()
+        if key in ChromatographyMeasurement.__dataclass_fields__
+        and key not in {"peaks", "chromatogram_traces"}
+    }
+    values["peaks"] = [_dataclass_from_dict(ChromatographyPeak, item) for item in peaks_payload]
+    values["chromatogram_traces"] = [
+        _dataclass_from_dict(ChromatogramTrace, item) for item in traces_payload
+    ]
+    return ChromatographyMeasurement(**values)
+
+
 def measurement_from_dict(payload: dict) -> Measurement:
     metadata = _dataclass_from_dict(MeasurementMetadata, payload.get("metadata") or {})
     summary_metrics = _dataclass_from_dict(SummaryMetrics, payload.get("summary_metrics") or {})
@@ -128,7 +184,7 @@ def _dataclass_from_dict(dataclass_type, payload: dict):
 
 
 def save_experiment(
-    measurements: list[Measurement],
+    measurements: list[object],
     label: str = "",
     history_path: Path = DEFAULT_HISTORY_PATH,
 ) -> ExperimentRecord:
@@ -199,7 +255,10 @@ def load_experiment_record(
                 )
             record = ExperimentRecord.from_dict(payload)
             try:
-                measurements_from_record(record)
+                if measurements and all("sample_name" in measurement for measurement in measurements):
+                    chromatography_measurements_from_record(record)
+                else:
+                    measurements_from_record(record)
             except (AttributeError, TypeError, ValueError) as error:
                 raise MalformedExperimentRecordError(
                     f"Malformed experiment record {requested_id}: invalid measurement payload"
