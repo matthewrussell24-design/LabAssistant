@@ -75,6 +75,7 @@ Missing capability boundaries:
 | `retrieve_related_context` | `retrieve_related_context` | Available; used by Streamlit memory panel |
 | `retrieve_research_journal` | `retrieve_research_journal` | Available; used by Streamlit Research Journal |
 | `add_scientific_note` | `add_scientific_note` | Available; explicit Streamlit journal write |
+| `save_experiment_history` | `save_experiment_history` | Available; explicit Streamlit history write |
 | `save_scientific_memory` | `save_experiment_to_memory` | Available |
 
 `list_capabilities()` returns immutable `CapabilityContract` metadata.
@@ -355,6 +356,29 @@ history returns an empty match tuple.
 
 **Caller Types:** Human UI, Agent, CLI, Future API. Relatedness indicates feature
 proximity and must not be presented as causal evidence.
+
+## Save Experiment History
+
+**Name:** `save_experiment_history`
+
+**Purpose:** Append explicitly confirmed experiment evidence to local JSONL
+history without exposing the persistence writer to interface shells.
+
+**Inputs:** One or more serializable measurements, an optional label, optional
+loaded-record identity and label for append-only lineage, and an injectable
+history path.
+
+**Outputs:** A frozen, versioned `ExperimentSaveReceipt` containing record
+identity, saved timestamp, normalized label, measurement count, and optional
+source record identity. Evidence is copied before lineage is added, so the
+active analysis is not mutated by saving.
+
+**Expected Errors:** `ValueError` for empty evidence, `TypeError` for evidence
+without the established `to_dict()` serialization contract, and local I/O
+errors when persistence fails.
+
+**Caller Types:** Human UI and CLI only. Agent and Future API use are excluded
+because this is an explicit reviewed write. Streamlit is the first caller.
 
 ## Save Scientific Memory
 

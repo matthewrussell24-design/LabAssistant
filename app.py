@@ -29,6 +29,7 @@ from labassistant.application import (
     retrieve_related_context,
     retrieve_research_journal,
     save_experiment_to_memory,
+    save_experiment_history,
 )
 from labassistant.interpretation import (
     build_ai_summary,
@@ -38,7 +39,6 @@ from labassistant.interpretation import (
     review_evidence,
 )
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
-from labassistant.history import save_experiment
 from labassistant.metrics import (
     find_local_peaks,
 )
@@ -2398,15 +2398,13 @@ def main() -> None:
             st.caption(f"Loaded saved version: {loaded_record.get('label')} ({str(loaded_record.get('record_id', ''))[:8]}). Saving appends a new version.")
         history_label = st.text_input("Experiment label", value=st.session_state.get("history_label", ""), key="history_label")
         if st.button("Save current experiment", use_container_width=True):
-            for sample in samples:
-                if loaded_record:
-                    sample.measurement.provenance["history_lineage"] = {
-                        "loaded_from_record_id": loaded_record.get("record_id"),
-                        "loaded_from_label": loaded_record.get("label"),
-                        "save_semantics": "append_new_version",
-                    }
-            record = save_experiment([sample.measurement for sample in samples], history_label)
-            st.success(f"Saved {record.label}")
+            receipt = save_experiment_history(
+                [sample.measurement for sample in samples],
+                history_label,
+                loaded_from_record_id=(loaded_record or {}).get("record_id"),
+                loaded_from_label=(loaded_record or {}).get("label"),
+            )
+            st.success(f"Saved {receipt.label}")
         st.divider()
         st.header("Report")
         st.button("Export report", use_container_width=True, disabled=True, help="Report export is coming in a future version.")

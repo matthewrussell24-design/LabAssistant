@@ -25,6 +25,7 @@ from labassistant.history import (
     load_experiment_record,
     load_history,
     measurements_from_record,
+    save_experiment as save_history_experiment,
     trend_table,
 )
 from labassistant.importers.chromatography import (
@@ -688,6 +689,21 @@ class ScientificNoteReceipt:
 
 
 @dataclass(frozen=True)
+class ExperimentSaveReceipt:
+    """Immutable metadata for one append-only experiment-history write."""
+
+    record_id: str
+    saved_at: str
+    label: str
+    measurement_count: int
+    loaded_from_record_id: str | None = None
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -910,6 +926,46 @@ def add_scientific_note(
         tags=tuple(item.tags),
         confidence=item.confidence,
         created_at=item.created_at,
+    )
+
+
+def save_experiment_history(
+    measurements: list[object],
+    label: str = "",
+    *,
+    loaded_from_record_id: str | None = None,
+    loaded_from_label: str | None = None,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> ExperimentSaveReceipt:
+    """Append reviewed experiment evidence to local history and return a receipt."""
+
+    if not measurements:
+        raise ValueError("At least one measurement is required to save an experiment")
+    if any(not callable(getattr(measurement, "to_dict", None)) for measurement in measurements):
+        raise TypeError("Every saved measurement must provide to_dict() evidence")
+
+    normalized_record_id = (loaded_from_record_id or "").strip() or None
+    normalized_loaded_label = (loaded_from_label or "").strip() or None
+    evidence = deepcopy(measurements)
+    if normalized_record_id:
+        lineage = {
+            "loaded_from_record_id": normalized_record_id,
+            "loaded_from_label": normalized_loaded_label,
+            "save_semantics": "append_new_version",
+        }
+        for measurement in evidence:
+            if isinstance(getattr(measurement, "provenance", None), dict):
+                measurement.provenance["history_lineage"] = dict(lineage)
+            elif isinstance(getattr(measurement, "metadata", None), dict):
+                measurement.metadata["history_lineage"] = dict(lineage)
+
+    record = save_history_experiment(evidence, label.strip(), history_path=history_path)
+    return ExperimentSaveReceipt(
+        record_id=record.id,
+        saved_at=record.saved_at,
+        label=record.label,
+        measurement_count=len(evidence),
+        loaded_from_record_id=normalized_record_id,
     )
 
 
@@ -1642,6 +1698,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="add_scientific_note",
         purpose="Persist one explicitly confirmed human scientific note.",
         handler=add_scientific_note,
+        caller_types=("Human UI", "CLI"),
+    ),
+    CapabilityContract(
+        name="save_experiment_history",
+        purpose="Append explicitly confirmed experiment evidence to local history.",
+        handler=save_experiment_history,
         caller_types=("Human UI", "CLI"),
     ),
     CapabilityContract(

@@ -10,6 +10,7 @@ from labassistant.application import (
     ExperimentListing,
     ExperimentComparison,
     ExperimentInvestigation,
+    ExperimentSaveReceipt,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -38,6 +39,7 @@ from labassistant.application import (
     restore_chromatography_experiment,
     restore_dls_experiment,
     retrieve_experiment,
+    save_experiment_history,
     save_experiment_to_memory,
 )
 from labassistant.models import (
@@ -329,6 +331,44 @@ def test_add_scientific_note_defaults_title_and_rejects_empty_text(tmp_path):
     with raises(ValueError, match="text"):
         add_scientific_note("  ", store=store)
     assert len(store.list_items(entity_type="note")) == 1
+
+
+def test_save_experiment_history_validates_copies_lineage_and_returns_receipt(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    measurement = Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))
+
+    receipt = save_experiment_history(
+        [measurement],
+        "  Follow-up run  ",
+        loaded_from_record_id="  prior-id  ",
+        loaded_from_label="  Baseline  ",
+        history_path=history_path,
+    )
+
+    assert isinstance(receipt, ExperimentSaveReceipt)
+    assert receipt.label == "Follow-up run"
+    assert receipt.measurement_count == 1
+    assert receipt.loaded_from_record_id == "prior-id"
+    assert receipt.saved_at
+    assert receipt.to_dict()["api_version"] == AGENT_API_VERSION
+    assert "history_lineage" not in measurement.provenance
+    saved = json.loads(history_path.read_text(encoding="utf-8"))
+    assert saved["id"] == receipt.record_id
+    assert saved["measurements"][0]["provenance"]["history_lineage"] == {
+        "loaded_from_label": "Baseline",
+        "loaded_from_record_id": "prior-id",
+        "save_semantics": "append_new_version",
+    }
+
+
+def test_save_experiment_history_rejects_missing_or_unserializable_evidence(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+
+    with raises(ValueError, match="At least one measurement"):
+        save_experiment_history([], history_path=history_path)
+    with raises(TypeError, match="to_dict"):
+        save_experiment_history([object()], history_path=history_path)
+    assert not history_path.exists()
 
 
 def test_retrieve_experiment_returns_read_only_metadata_and_fresh_measurements(tmp_path):
@@ -801,6 +841,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_related_context",
         "retrieve_research_journal",
         "add_scientific_note",
+        "save_experiment_history",
         "save_scientific_memory",
     ]
     assert all(capability.version == AGENT_API_VERSION for capability in capabilities)
@@ -808,9 +849,10 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     assert all(
         "Future API" in capability.caller_types
         for capability in capabilities
-        if capability.name != "add_scientific_note"
+        if capability.name not in {"add_scientific_note", "save_experiment_history"}
     )
     assert get_capability("add_scientific_note").caller_types == ("Human UI", "CLI")
+    assert get_capability("save_experiment_history").caller_types == ("Human UI", "CLI")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():
@@ -833,6 +875,9 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     note = get_capability("add_scientific_note")
     assert note.handler is add_scientific_note
+
+    history_save = get_capability("save_experiment_history")
+    assert history_save.handler is save_experiment_history
 
     chromatography = get_capability("analyze_chromatography_source")
     assert chromatography.handler is analyze_chromatography_source

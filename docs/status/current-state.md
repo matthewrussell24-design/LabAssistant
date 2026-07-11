@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted filtration CSV import diagnostics and
-  summaries into a typed application workflow while preserving explicit
-  reviewed attachment to DLS samples (task 021).
-- Working Tree: Task 021 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted explicit persisted-experiment saving into
+  a validated human/CLI-only application command with immutable receipt
+  metadata (task 022).
+- Working Tree: Task 022 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `166 passed in 2.11s` from `scripts/test -q` on
-  2026-07-10.
+- Last Successful Test: `168 passed in 2.44s` from `scripts/test -q` on
+  2026-07-11.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 021.
+- Last Updated: 2026-07-11 for task 022.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 166 passing.
+- Tests: 🟢 Healthy — 168 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -126,8 +126,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of eighteen stable capability names, including an explicit
-  human/CLI-only note command.
+  registry of nineteen stable capability names, including explicit
+  human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -286,6 +286,8 @@ architecture rationale.
   application workflow and routed Streamlit through it (task 020).
 - Promoted filtration CSV import into immutable application summaries while
   retaining explicit user-reviewed DLS attachment (task 021).
+- Promoted persisted experiment saving into a validated human/CLI-only command
+  that returns immutable receipt metadata (task 022).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -301,8 +303,8 @@ architecture rationale.
 
 ## Active Work
 
-- Filtration-import task 021 is complete.
-- The working tree was clean when task 021 began.
+- Experiment-history save task 022 is complete.
+- The working tree was clean when task 022 began.
 
 ## Known Risks
 
@@ -337,8 +339,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `166 passed in 2.11s` from `scripts/test -q` on 2026-07-10.
-- The Streamlit shell completed a headless startup smoke after task 021.
+- Latest result: `168 passed in 2.44s` from `scripts/test -q` on 2026-07-11.
+- The Streamlit shell completed a headless startup smoke after task 022.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -355,15 +357,15 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote persisted experiment saving into an explicit application command.
-- Why this is next: History reads and restores use application contracts, but
-  Streamlit's confirmed Save Current Experiment action still writes JSONL directly.
-- Expected scope: Small to medium; validate evidence, preserve append-only labels
-  and lineage provenance, and return immutable receipt metadata.
-- Risks: Confusing local history persistence with scientific-memory storage or
-  widening write access beyond explicit human/CLI actions.
-- Success criteria: Streamlit saves the current experiment through a human/CLI-only
-  application command and no longer imports the JSONL history writer.
+- Objective: Promote normalized observation generation into an explicit application workflow.
+- Why this is next: Import workflows generate some observations, but interface and
+  compatibility paths can still coordinate observation helpers outside a stable contract.
+- Expected scope: Small to medium; define immutable inputs/outputs for supported
+  evidence while preserving existing DLS and chromatography behavior.
+- Risks: Duplicating importer-owned interpretation or prematurely forcing every
+  technique into one schema before its evidence contract is mature.
+- Success criteria: Supported shells request normalized findings through one
+  registered application capability without directly coordinating observation helpers.
 
 ## AI Context Window
 
