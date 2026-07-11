@@ -9,6 +9,7 @@ from labassistant.application import (
     HUMAN_APP_SURFACE,
     ExperimentListing,
     ExperimentComparison,
+    ExperimentInvestigation,
     ChromatographyRestoreResult,
     HistoryOverview,
     RelatedExperiments,
@@ -19,6 +20,7 @@ from labassistant.application import (
     build_experiment_snapshot,
     dls_experiment_from_samples,
     find_related_experiments,
+    investigate_experiment,
     get_capability,
     list_capabilities,
     list_experiments,
@@ -111,6 +113,49 @@ def test_experiment_snapshot_exposes_stable_summary_not_raw_payload():
     assert payload["observation_categories"] == {"quality": 2, "particle_size": 1}
     assert "measurements" not in payload
     assert "observations" not in payload
+
+
+def test_investigate_experiment_returns_versioned_immutable_evidence():
+    experiment = Experiment(
+        experiment_id="exp-investigate",
+        label="Stress study",
+        technique="HPLC",
+        observations=[
+            Observation(
+                label="Total area decreased",
+                category="mass_balance",
+                evidence="Total area changed by -12%.",
+                sample_name="Stress T2",
+                severity="review",
+                source_type="mass_balance_assessment",
+                source_id="assessment-1",
+                recommendation="Check recovery.",
+            )
+        ],
+    )
+
+    result = investigate_experiment(experiment)
+    experiment.observations[0].label = "Mutated after query"
+
+    assert isinstance(result, ExperimentInvestigation)
+    assert result.experiment_id == "exp-investigate"
+    assert result.is_complete is True
+    assert result.is_interpretable is True
+    assert len(result.findings) == 5
+    assert result.findings[0].question == "What happened?"
+    assert result.observations[0].label == "Total area decreased"
+    assert result.observations[0].source_id == "assessment-1"
+    assert result.observation_counts == (("review", 1),)
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_investigate_experiment_preserves_empty_evidence_behavior():
+    result = investigate_experiment(Experiment(experiment_id="empty", label="Empty"))
+
+    assert result.is_complete is True
+    assert result.is_interpretable is False
+    assert result.observations == ()
+    assert "No substantive observations" in result.interpretation_blockers[0]
 
 
 def test_retrieve_experiment_returns_read_only_metadata_and_fresh_measurements(tmp_path):
@@ -507,6 +552,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_history_overview",
         "retrieve_experiment",
         "retrieve_experiment_summary",
+        "investigate_experiment",
         "save_scientific_memory",
     ]
     assert all(capability.version == AGENT_API_VERSION for capability in capabilities)
@@ -522,6 +568,9 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     persisted = get_capability("retrieve_experiment")
     assert persisted.handler is retrieve_experiment
+
+    investigation = get_capability("investigate_experiment")
+    assert investigation.handler is investigate_experiment
 
 
 def test_capability_registry_rejects_unknown_names():

@@ -25,6 +25,7 @@ from labassistant.importers.chromatography import (
     chromatography_observations,
 )
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
+from labassistant.investigator import investigate as investigate_domain_experiment
 from labassistant.models import Experiment, Measurement
 from labassistant.observations import observations_from_samples
 from labassistant.view_models import sample_from_measurement, sample_status
@@ -334,6 +335,70 @@ class HistoryOverview:
 
 
 @dataclass(frozen=True)
+class InvestigationFinding:
+    """Immutable answer to one canonical Investigator question."""
+
+    question: str
+    answer: str
+    details: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"question": self.question, "answer": self.answer, "details": list(self.details)}
+
+
+@dataclass(frozen=True)
+class InvestigationObservation:
+    """Immutable normalized evidence retained with investigation provenance."""
+
+    label: str
+    category: str
+    evidence: str
+    sample_name: str | None
+    severity: str
+    confidence: str
+    source_type: str
+    source_id: str | None
+    recommendation: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class ExperimentInvestigation:
+    """Versioned read-only Investigator result for application clients."""
+
+    experiment_id: str
+    what_happened: str
+    is_complete: bool
+    is_interpretable: bool
+    completeness_gaps: tuple[str, ...]
+    interpretation_blockers: tuple[str, ...]
+    confidence_improvers: tuple[str, ...]
+    highlights: tuple[str, ...]
+    findings: tuple[InvestigationFinding, ...]
+    observations: tuple[InvestigationObservation, ...]
+    observation_counts: tuple[tuple[str, int], ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "experiment_id": self.experiment_id,
+            "what_happened": self.what_happened,
+            "is_complete": self.is_complete,
+            "is_interpretable": self.is_interpretable,
+            "completeness_gaps": list(self.completeness_gaps),
+            "interpretation_blockers": list(self.interpretation_blockers),
+            "confidence_improvers": list(self.confidence_improvers),
+            "highlights": list(self.highlights),
+            "findings": [finding.to_dict() for finding in self.findings],
+            "observations": [observation.to_dict() for observation in self.observations],
+            "observation_counts": dict(self.observation_counts),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -384,6 +449,47 @@ def build_experiment_snapshot(experiment: Experiment) -> ExperimentSnapshot:
         measurement_count=len(experiment.measurements),
         observation_count=len(experiment.observations),
         observation_categories=categories,
+    )
+
+
+def investigate_experiment(experiment: Experiment) -> ExperimentInvestigation:
+    """Run the Scientific Investigator and return immutable evidence-backed results."""
+
+    report = investigate_domain_experiment(experiment)
+    findings = tuple(
+        InvestigationFinding(
+            question=finding.question,
+            answer=finding.answer,
+            details=tuple(finding.details),
+        )
+        for finding in report.findings
+    )
+    observations = tuple(
+        InvestigationObservation(
+            label=observation.label,
+            category=observation.category,
+            evidence=observation.evidence,
+            sample_name=observation.sample_name,
+            severity=observation.severity,
+            confidence=observation.confidence,
+            source_type=observation.source_type,
+            source_id=observation.source_id,
+            recommendation=observation.recommendation,
+        )
+        for observation in experiment.observations
+    )
+    return ExperimentInvestigation(
+        experiment_id=report.experiment_id,
+        what_happened=report.what_happened,
+        is_complete=report.is_complete,
+        is_interpretable=report.is_interpretable,
+        completeness_gaps=tuple(report.completeness_gaps),
+        interpretation_blockers=tuple(report.interpretation_blockers),
+        confidence_improvers=tuple(report.confidence_improvers),
+        highlights=tuple(report.highlights),
+        findings=findings,
+        observations=observations,
+        observation_counts=tuple(report.observation_counts.items()),
     )
 
 
@@ -890,6 +996,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_experiment_summary",
         purpose="Return a stable read-only summary of an experiment.",
         handler=build_experiment_snapshot,
+    ),
+    CapabilityContract(
+        name="investigate_experiment",
+        purpose="Assess experiment completeness and interpretability from normalized observations.",
+        handler=investigate_experiment,
     ),
     CapabilityContract(
         name="save_scientific_memory",

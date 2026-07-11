@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Added the first end-to-end cross-technique
-  investigation case linking chromatography missing mass, DLS aggregation, and
-  filtration outcomes through normalized observations (task 015).
-- Working Tree: Task 015 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted the Scientific Investigator into a
+  versioned immutable application contract and routed Streamlit's Experiment
+  Brief through it (task 016).
+- Working Tree: Task 016 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `153 passed` from `scripts/test -q` on
+- Last Successful Test: `155 passed in 2.01s` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 015.
+- Last Updated: 2026-07-10 for task 016.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 153 passing.
+- Tests: 🟢 Healthy — 155 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -124,7 +124,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
   persisted experiment retrieval, listing, summary/trend history views,
   technique-aware DLS and chromatography restoration, local DLS dataset
-  analysis, and a transport-independent registry of twelve stable capability names.
+  analysis, immutable investigation results, and a transport-independent
+  registry of thirteen stable capability names.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -271,6 +272,8 @@ architecture rationale.
   reconstruction and an immutable application read result (task 014).
 - Added normalized filtration observations and proved a qualified three-technique
   investigation path without adding instrument logic to the Investigator (task 015).
+- Promoted experiment investigation into an immutable application read contract
+  and routed the Streamlit Experiment Brief through it (task 016).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -286,8 +289,8 @@ architecture rationale.
 
 ## Active Work
 
-- Cross-technique investigation task 015 is complete.
-- The working tree was clean when task 015 began.
+- Experiment-investigation task 016 is complete.
+- The working tree was clean when task 016 began.
 
 ## Known Risks
 
@@ -322,7 +325,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `153 passed` from `scripts/test -q` on 2026-07-10.
+- Latest result: `155 passed in 2.01s` from `scripts/test -q` on 2026-07-10.
+- The Streamlit shell completed a headless startup smoke after task 016.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -339,17 +343,14 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote experiment investigation into the application layer and
-  route the first human shell through a versioned read contract.
-- Why this is next: The instrument-independent Investigator now handles a
-  representative multi-technique observation stream, but remains an internal
-  domain function without a stable application result.
-- Expected scope: Medium; preserve the five canonical questions and confidence
-  behavior while translating mutable report fields into immutable read models.
-- Risks: Flattening evidence provenance or letting presentation concerns enter
-  the application contract.
-- Success criteria: A human shell renders an investigation obtained through a
-  registered, immutable application capability without calling the Investigator directly.
+- Objective: Promote related scientific context retrieval into the application layer.
+- Why this is next: Streamlit still constructs and queries `ContextRetriever`
+  directly, leaving a reusable read workflow outside the application boundary.
+- Expected scope: Medium; define an immutable context packet and preserve current
+  relevance, provenance, filtering, and empty-state behavior.
+- Risks: Exposing mutable knowledge-store records or mixing UI formatting into retrieval.
+- Success criteria: The Streamlit context panel receives related scientific
+  context through a registered application query without constructing the retriever itself.
 
 ## AI Context Window
 

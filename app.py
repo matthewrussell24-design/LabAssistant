@@ -18,6 +18,7 @@ from labassistant.application import (
     compare_experiments,
     dls_experiment_from_samples,
     find_related_experiments,
+    investigate_experiment,
     list_experiments,
     retrieve_experiment,
     retrieve_history_overview,
@@ -65,11 +66,7 @@ from labassistant.models import (
     MeasurementMetadata,
     SummaryMetrics,
 )
-from labassistant.observations import (
-    build_experiment_brief_from_observations,
-    observation_table,
-    observations_from_samples,
-)
+from labassistant.observations import observation_table
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
     ForwardScatterPoint,
@@ -251,29 +248,30 @@ def render_decision_brief(samples: list[ParsedSample], metrics: pd.DataFrame) ->
 
 
 def render_experiment_brief(samples: list[ParsedSample]) -> None:
-    observations = observations_from_samples(samples)
-    brief = build_experiment_brief_from_observations(observations, sample_count=len(samples))
+    experiment = dls_experiment_from_samples(samples, label="Current DLS experiment")
+    investigation = investigate_experiment(experiment)
 
     st.subheader("Experiment Brief")
     st.caption("Generated from normalized observations derived from the current DLS measurements.")
 
-    columns = st.columns(4)
-    for column, (question, answers) in zip(columns, brief.items()):
+    columns = st.columns(len(investigation.findings))
+    for column, finding in zip(columns, investigation.findings):
         with column:
             st.markdown(
                 f"""
                 <div class="summary-card">
-                    <div class="summary-title">{html.escape(question)}</div>
+                    <div class="summary-title">{html.escape(finding.question)}</div>
                     <ul>
-                        {''.join(f'<li>{html.escape(answer)}</li>' for answer in answers)}
+                        <li>{html.escape(finding.answer)}</li>
+                        {''.join(f'<li>{html.escape(detail)}</li>' for detail in finding.details)}
                     </ul>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-    with st.expander("Observations", expanded=any(observation.severity in {"review", "watch"} for observation in observations)):
-        table = observation_table(observations)
+    with st.expander("Observations", expanded=any(observation.severity in {"review", "watch"} for observation in investigation.observations)):
+        table = pd.DataFrame(observation.to_dict() for observation in investigation.observations)
         if table.empty:
             st.info("No observations generated yet.")
         else:

@@ -69,6 +69,7 @@ Missing capability boundaries:
 | `retrieve_history_overview` | `retrieve_history_overview` | Available; used by Streamlit History panel |
 | `retrieve_experiment` | `retrieve_experiment` | Available; first used by Streamlit history loader |
 | `retrieve_experiment_summary` | `build_experiment_snapshot` | Available |
+| `investigate_experiment` | `investigate_experiment` | Available; used by Streamlit Experiment Brief |
 | `save_scientific_memory` | `save_experiment_to_memory` | Available |
 
 `list_capabilities()` returns immutable `CapabilityContract` metadata.
@@ -325,6 +326,26 @@ callers must not imply a successful save after an exception.
 **Caller Types:** Human UI and CLI. Future API or Agent callers require reviewed
 write commands, authorization, audit behavior, and explicit human approval.
 
+## Investigate Experiment
+
+**Name:** `investigate_experiment`
+
+**Purpose:** Assess experiment completeness and interpretability from its
+normalized observation stream without exposing the mutable domain report.
+
+**Inputs:** An `Experiment` containing normalized observations.
+
+**Outputs:** A versioned, frozen `ExperimentInvestigation` containing the five
+canonical question/answer findings, completeness and interpretability state,
+confidence improvements, highlights, severity counts, and immutable observation
+evidence with source provenance.
+
+**Expected Errors:** `TypeError` or `AttributeError` for invalid experiment or
+observation inputs. Empty observations return a valid non-interpretable result.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's Experiment Brief
+is the first caller.
+
 ## Candidate Capability Backlog
 
 These are capability boundaries, not implemented public contracts:
@@ -333,7 +354,6 @@ These are capability boundaries, not implemented public contracts:
 | --- | --- | --- |
 | `retrieve_related_context` | Build a compact evidence-backed context packet | Context engine/UI |
 | `generate_observations` | Normalize supported evidence into findings | Importers/observations/UI |
-| `investigate_experiment` | Assess completeness and interpretability | Investigator/UI |
 | `generate_hypotheses` | Produce deterministic, evidence-linked hypotheses | Technique modules/UI |
 | `produce_investigation_summary` | Build an experiment-level brief/report | Observations/UI |
 | `add_scientific_note` | Append a reviewed human note with provenance | Context engine/UI |
