@@ -36,14 +36,10 @@ Existing application operations:
 Duplicated or bypassed workflows:
 
 - `app.py` still coordinates some DLS import and decision-brief helpers directly.
-- DLS and chromatography assembly cross the application boundary, but raw-file
-  parsing and import preview orchestration remain UI-owned.
-- Brief generation remains reusable but is not yet expressed as an application
-  capability.
+- DLS assembly crosses the application boundary, but uploaded raw-file parsing
+  and import-preview orchestration remain UI-owned.
 
-Missing capability boundaries:
-
-- Produce an experiment-level report or brief.
+The remaining visible bypass is the primary uploaded DLS import workflow.
 
 ## Implemented Capability Catalog
 
@@ -63,7 +59,8 @@ Missing capability boundaries:
 | `retrieve_history_overview` | `retrieve_history_overview` | Available; used by Streamlit History panel |
 | `retrieve_experiment` | `retrieve_experiment` | Available; first used by Streamlit history loader |
 | `retrieve_experiment_summary` | `build_experiment_snapshot` | Available |
-| `investigate_experiment` | `investigate_experiment` | Available; used by Streamlit Experiment Brief |
+| `investigate_experiment` | `investigate_experiment` | Available; composed by experiment brief preview |
+| `produce_experiment_brief` | `produce_experiment_brief` | Available; used by Streamlit Experiment Brief |
 | `retrieve_related_context` | `retrieve_related_context` | Available; used by Streamlit memory panel |
 | `retrieve_research_journal` | `retrieve_research_journal` | Available; used by Streamlit Research Journal |
 | `add_scientific_note` | `add_scientific_note` | Available; explicit Streamlit journal write |
@@ -498,8 +495,30 @@ evidence with source provenance.
 **Expected Errors:** `TypeError` or `AttributeError` for invalid experiment or
 observation inputs. Empty observations return a valid non-interpretable result.
 
-**Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's Experiment Brief
-is the first caller.
+**Caller Types:** Human UI, Agent, CLI, Future API. The experiment brief preview
+is the first composed application caller.
+
+## Produce Experiment Brief
+
+**Name:** `produce_experiment_brief`
+
+**Purpose:** Compose an instrument-independent report preview from an Experiment
+without coupling scientific reasoning to Streamlit, document export, or DLS-only
+decision ranking.
+
+**Inputs:** One `Experiment` containing its normalized observations and evidence counts.
+
+**Outputs:** A deeply frozen, versioned `ExperimentBriefPreview` containing an
+immutable experiment identity, summary, completeness and interpretability state,
+five canonical report sections, and immutable observation evidence. Serialization
+returns plain dictionaries and lists without exposing domain models or DataFrames.
+
+**Expected Errors:** `TypeError` when the input is not an `Experiment`. Empty
+observation streams produce a valid non-interpretable preview through the established
+Investigator behavior.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's generic Experiment
+Brief is the first direct caller.
 
 ## Candidate Capability Backlog
 
@@ -508,7 +527,6 @@ These are capability boundaries, not implemented public contracts:
 | Candidate name | Scientific intent | Current owner |
 | --- | --- | --- |
 | `generate_hypotheses` | Produce deterministic, evidence-linked hypotheses | Technique modules/UI |
-| `produce_investigation_summary` | Build an experiment-level brief/report | Observations/UI |
 
 Promote candidates one at a time when an existing human workflow can become the
 first real caller. Define typed inputs, stable read outputs, validation, and

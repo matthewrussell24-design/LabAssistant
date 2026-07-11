@@ -10,6 +10,7 @@ from labassistant.application import (
     ExperimentListing,
     ExperimentComparison,
     ExperimentInvestigation,
+    ExperimentBriefPreview,
     ExperimentSaveReceipt,
     ObservationGenerationResult,
     FiltrationImportRead,
@@ -32,6 +33,7 @@ from labassistant.application import (
     find_related_experiments,
     generate_observations,
     investigate_experiment,
+    produce_experiment_brief,
     get_capability,
     list_capabilities,
     list_experiments,
@@ -173,6 +175,45 @@ def test_investigate_experiment_preserves_empty_evidence_behavior():
     assert result.is_interpretable is False
     assert result.observations == ()
     assert "No substantive observations" in result.interpretation_blockers[0]
+
+
+def test_produce_experiment_brief_composes_immutable_investigator_preview():
+    experiment = Experiment(
+        experiment_id="exp-brief",
+        label="Stress study",
+        technique="HPLC",
+        instrument="Chromatography",
+        measurements=[ChromatographyMeasurement(sample_name="Stress T2")],
+        observations=[
+            Observation(
+                label="Total area decreased",
+                category="mass_balance",
+                evidence="Total area changed by -12%.",
+                severity="review",
+                recommendation="Check recovery.",
+            )
+        ],
+    )
+
+    result = produce_experiment_brief(experiment)
+    experiment.label = "Changed"
+    experiment.observations[0].label = "Changed"
+
+    assert isinstance(result, ExperimentBriefPreview)
+    assert result.experiment.label == "Stress study"
+    assert result.experiment.observation_categories == (("mass_balance", 1),)
+    assert len(result.sections) == 5
+    assert result.sections[0].heading == "What happened?"
+    assert result.observations[0].label == "Total area decreased"
+    assert result.is_interpretable is True
+    payload = result.to_dict()
+    assert payload["experiment"]["observation_categories"] == {"mass_balance": 1}
+    assert payload["api_version"] == AGENT_API_VERSION
+
+
+def test_produce_experiment_brief_rejects_non_experiment_input():
+    with raises(TypeError, match="must be an Experiment"):
+        produce_experiment_brief(object())
 
 
 def test_retrieve_related_context_returns_immutable_ranked_provenance(tmp_path):
@@ -903,6 +944,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_experiment",
         "retrieve_experiment_summary",
         "investigate_experiment",
+        "produce_experiment_brief",
         "retrieve_related_context",
         "retrieve_research_journal",
         "add_scientific_note",
@@ -931,6 +973,9 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     investigation = get_capability("investigate_experiment")
     assert investigation.handler is investigate_experiment
+
+    brief = get_capability("produce_experiment_brief")
+    assert brief.handler is produce_experiment_brief
 
     context = get_capability("retrieve_related_context")
     assert context.handler is retrieve_related_context

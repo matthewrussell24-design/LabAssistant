@@ -606,6 +606,64 @@ class ExperimentInvestigation:
 
 
 @dataclass(frozen=True)
+class ExperimentBriefSection:
+    """Immutable report-preview section derived from one Investigator finding."""
+
+    heading: str
+    summary: str
+    details: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "heading": self.heading,
+            "summary": self.summary,
+            "details": list(self.details),
+        }
+
+
+@dataclass(frozen=True)
+class ExperimentBriefIdentity:
+    """Deeply immutable experiment header for report previews."""
+
+    experiment_id: str
+    label: str
+    technique: str | None
+    instrument: str | None
+    measurement_count: int
+    observation_count: int
+    observation_categories: tuple[tuple[str, int], ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["observation_categories"] = dict(self.observation_categories)
+        return payload
+
+
+@dataclass(frozen=True)
+class ExperimentBriefPreview:
+    """Versioned experiment-first brief without presentation or export concerns."""
+
+    experiment: ExperimentBriefIdentity
+    summary: str
+    is_complete: bool
+    is_interpretable: bool
+    sections: tuple[ExperimentBriefSection, ...]
+    observations: tuple[InvestigationObservation, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "experiment": self.experiment.to_dict(),
+            "summary": self.summary,
+            "is_complete": self.is_complete,
+            "is_interpretable": self.is_interpretable,
+            "sections": [section.to_dict() for section in self.sections],
+            "observations": [observation.to_dict() for observation in self.observations],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class ScientificContextItem:
     """Immutable local-memory item with stable retrieval provenance."""
 
@@ -844,6 +902,38 @@ def investigate_experiment(experiment: Experiment) -> ExperimentInvestigation:
         findings=findings,
         observations=observations,
         observation_counts=tuple(report.observation_counts.items()),
+    )
+
+
+def produce_experiment_brief(experiment: Experiment) -> ExperimentBriefPreview:
+    """Compose a stable report preview from an Experiment and Investigator result."""
+
+    if not isinstance(experiment, Experiment):
+        raise TypeError("Experiment brief input must be an Experiment")
+    investigation = investigate_experiment(experiment)
+    snapshot = build_experiment_snapshot(experiment)
+    return ExperimentBriefPreview(
+        experiment=ExperimentBriefIdentity(
+            experiment_id=snapshot.experiment_id,
+            label=snapshot.label,
+            technique=snapshot.technique,
+            instrument=snapshot.instrument,
+            measurement_count=snapshot.measurement_count,
+            observation_count=snapshot.observation_count,
+            observation_categories=tuple(snapshot.observation_categories.items()),
+        ),
+        summary=investigation.what_happened,
+        is_complete=investigation.is_complete,
+        is_interpretable=investigation.is_interpretable,
+        sections=tuple(
+            ExperimentBriefSection(
+                heading=finding.question,
+                summary=finding.answer,
+                details=finding.details,
+            )
+            for finding in investigation.findings
+        ),
+        observations=investigation.observations,
     )
 
 
@@ -1807,6 +1897,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="investigate_experiment",
         purpose="Assess experiment completeness and interpretability from normalized observations.",
         handler=investigate_experiment,
+    ),
+    CapabilityContract(
+        name="produce_experiment_brief",
+        purpose="Compose an immutable experiment-level report preview.",
+        handler=produce_experiment_brief,
     ),
     CapabilityContract(
         name="retrieve_related_context",

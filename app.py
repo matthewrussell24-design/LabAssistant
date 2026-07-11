@@ -22,7 +22,7 @@ from labassistant.application import (
     compare_experiments,
     dls_experiment_from_samples,
     find_related_experiments,
-    investigate_experiment,
+    produce_experiment_brief,
     list_experiments,
     retrieve_experiment,
     retrieve_history_overview,
@@ -233,29 +233,29 @@ def render_decision_brief(samples: list[ParsedSample], metrics: pd.DataFrame) ->
 
 def render_experiment_brief(samples: list[ParsedSample]) -> None:
     experiment = dls_experiment_from_samples(samples, label="Current DLS experiment")
-    investigation = investigate_experiment(experiment)
+    brief = produce_experiment_brief(experiment)
 
     st.subheader("Experiment Brief")
     st.caption("Generated from normalized observations derived from the current DLS measurements.")
 
-    columns = st.columns(len(investigation.findings))
-    for column, finding in zip(columns, investigation.findings):
+    columns = st.columns(len(brief.sections))
+    for column, section in zip(columns, brief.sections):
         with column:
             st.markdown(
                 f"""
                 <div class="summary-card">
-                    <div class="summary-title">{html.escape(finding.question)}</div>
+                    <div class="summary-title">{html.escape(section.heading)}</div>
                     <ul>
-                        <li>{html.escape(finding.answer)}</li>
-                        {''.join(f'<li>{html.escape(detail)}</li>' for detail in finding.details)}
+                        <li>{html.escape(section.summary)}</li>
+                        {''.join(f'<li>{html.escape(detail)}</li>' for detail in section.details)}
                     </ul>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-    with st.expander("Observations", expanded=any(observation.severity in {"review", "watch"} for observation in investigation.observations)):
-        table = pd.DataFrame(observation.to_dict() for observation in investigation.observations)
+    with st.expander("Observations", expanded=any(observation.severity in {"review", "watch"} for observation in brief.observations)):
+        table = pd.DataFrame(observation.to_dict() for observation in brief.observations)
         if table.empty:
             st.info("No observations generated yet.")
         else:
