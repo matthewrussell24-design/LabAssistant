@@ -14,6 +14,7 @@ from labassistant.application import (
     HistoryOverview,
     RelatedExperiments,
     RelatedScientificContext,
+    ResearchJournalRead,
     analyze_dls_dataset,
     compare_experiments,
     agent_access_policy,
@@ -27,6 +28,7 @@ from labassistant.application import (
     list_experiments,
     retrieve_history_overview,
     retrieve_related_context,
+    retrieve_research_journal,
     restore_chromatography_experiment,
     restore_dls_experiment,
     retrieve_experiment,
@@ -223,6 +225,70 @@ def test_retrieve_related_context_validates_question_and_limit(tmp_path):
         retrieve_related_context(" ", knowledge_path=tmp_path / "knowledge.sqlite")
     with raises(ValueError, match="limit"):
         retrieve_related_context("DLS", limit=0, knowledge_path=tmp_path / "knowledge.sqlite")
+
+
+def test_retrieve_research_journal_preserves_grouping_filters_and_export(tmp_path):
+    store = KnowledgeStore(tmp_path / "knowledge.sqlite")
+    experiment = Experiment(
+        experiment_id="exp-journal",
+        label="HPLC stability run",
+        technique="HPLC",
+        instrument="Agilent 1290",
+        source_path="/data/run.olax",
+        measurements=[ChromatographyMeasurement(sample_name="Sample A")],
+        observations=[
+            Observation(
+                label="Missing peak table",
+                category="data_completeness",
+                evidence="No peak table was exported.",
+                recommendation="Export a peak table.",
+            )
+        ],
+    )
+    store.add_experiment(experiment, tags=["openlab", "stability"])
+    store.add_hypothesis(
+        "Quantitative mass balance needs peak areas.",
+        experiment_id=experiment.experiment_id,
+        tags=["openlab"],
+    )
+    store.add_note(
+        "Review integration settings.",
+        experiment_id=experiment.experiment_id,
+        tags=["openlab"],
+    )
+
+    result = retrieve_research_journal(
+        keyword="mass balance",
+        tag="openlab",
+        instrument="Agilent",
+        sample="Sample A",
+        store=store,
+    )
+
+    assert isinstance(result, ResearchJournalRead)
+    assert len(result.entries) == 1
+    entry = result.entries[0]
+    assert entry.entry_id == experiment.experiment_id
+    assert entry.samples == ("Sample A",)
+    assert entry.hypotheses == ("Quantitative mass balance needs peak areas.",)
+    assert entry.notes == ("Review integration settings.",)
+    assert "_Filters: keyword: mass balance, tag: openlab, instrument: Agilent, sample: Sample A_" in result.markdown
+    assert "## HPLC stability run" in result.markdown
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_retrieve_research_journal_handles_empty_and_standalone_notes(tmp_path):
+    store = KnowledgeStore(tmp_path / "knowledge.sqlite")
+    empty = retrieve_research_journal(keyword="missing", store=store)
+    assert empty.entries == ()
+    assert "No journal entries matched" in empty.markdown
+
+    store.add_note("Compare DLS and HPLC.", title="Synthesis", tags=["cross-technique"])
+    result = retrieve_research_journal(tag="cross-technique", store=store)
+
+    assert len(result.entries) == 1
+    assert result.entries[0].experiment_id is None
+    assert result.entries[0].notes == ("Compare DLS and HPLC.",)
 
 
 def test_retrieve_experiment_returns_read_only_metadata_and_fresh_measurements(tmp_path):
@@ -621,6 +687,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_experiment_summary",
         "investigate_experiment",
         "retrieve_related_context",
+        "retrieve_research_journal",
         "save_scientific_memory",
     ]
     assert all(capability.version == AGENT_API_VERSION for capability in capabilities)
@@ -642,6 +709,9 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     context = get_capability("retrieve_related_context")
     assert context.handler is retrieve_related_context
+
+    journal = get_capability("retrieve_research_journal")
+    assert journal.handler is retrieve_research_journal
 
 
 def test_capability_registry_rejects_unknown_names():

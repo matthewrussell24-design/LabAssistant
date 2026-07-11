@@ -71,6 +71,7 @@ Missing capability boundaries:
 | `retrieve_experiment_summary` | `build_experiment_snapshot` | Available |
 | `investigate_experiment` | `investigate_experiment` | Available; used by Streamlit Experiment Brief |
 | `retrieve_related_context` | `retrieve_related_context` | Available; used by Streamlit memory panel |
+| `retrieve_research_journal` | `retrieve_research_journal` | Available; used by Streamlit Research Journal |
 | `save_scientific_memory` | `save_experiment_to_memory` | Available |
 
 `list_capabilities()` returns immutable `CapabilityContract` metadata.
@@ -348,6 +349,27 @@ empty-memory caveat.
 
 **Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's local-memory
 context panel is the first caller.
+
+## Retrieve Research Journal
+
+**Name:** `retrieve_research_journal`
+
+**Purpose:** List and export the deterministic Research Journal without
+exposing its mutable store or grouping implementation.
+
+**Inputs:** Optional keyword, tag, instrument, and sample filters plus an
+injectable knowledge-store path or store.
+
+**Outputs:** A versioned, frozen `ResearchJournalRead` containing immutable
+grouped entries in newest-first order and the exact matching Markdown export.
+Entries retain identity, experiment, instrument, tags, samples, observations,
+hypotheses, recommendations, source files, notes, and timestamps.
+
+**Expected Errors:** Local SQLite read errors. Empty or unmatched memory returns
+an empty entry tuple and the established no-matches Markdown document.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's Research Journal
+panel is the first caller. Standalone note creation is not part of this read query.
 
 ## Investigate Experiment
 

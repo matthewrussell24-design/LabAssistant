@@ -23,6 +23,7 @@ from labassistant.application import (
     retrieve_experiment,
     retrieve_history_overview,
     retrieve_related_context,
+    retrieve_research_journal,
     save_experiment_to_memory,
 )
 from labassistant.interpretation import (
@@ -47,7 +48,7 @@ from labassistant.metrics import (
     find_local_peaks,
 )
 from labassistant.chromatography import mass_balance_hypotheses
-from labassistant.context_engine import KnowledgeStore, ResearchJournal
+from labassistant.context_engine import KnowledgeStore
 from labassistant.filtration import (
     FILTRATION_DIFFICULTY_RUBRIC,
     FiltrationMeasurement,
@@ -415,7 +416,6 @@ def render_research_journal_panel() -> None:
     with st.expander("Research Journal", expanded=False):
         st.caption("A local journal view over saved experiments and manual notes. No LLM generation is used.")
         store = KnowledgeStore()
-        journal = ResearchJournal(store)
 
         st.markdown("**Standalone journal note**")
         note_cols = st.columns([1, 1, 1])
@@ -443,16 +443,20 @@ def render_research_journal_panel() -> None:
         instrument = filter_cols[2].text_input("Instrument", value="", key="journal_filter_instrument")
         sample = filter_cols[3].text_input("Sample", value="", key="journal_filter_sample")
 
-        entries = journal.entries(keyword=keyword, tag=tag, instrument=instrument, sample=sample)
-        if not entries:
+        journal_result = retrieve_research_journal(
+            keyword=keyword,
+            tag=tag,
+            instrument=instrument,
+            sample=sample,
+        )
+        if not journal_result.entries:
             st.info("No research journal entries matched the current filters.")
         else:
-            st.dataframe(_journal_entries_table(entries), use_container_width=True, hide_index=True)
+            st.dataframe(_journal_entries_table(journal_result.entries), use_container_width=True, hide_index=True)
 
-        markdown = journal.export_markdown(keyword=keyword, tag=tag, instrument=instrument, sample=sample)
         st.download_button(
             "Export journal to Markdown",
-            data=markdown,
+            data=journal_result.markdown,
             file_name="labassistant_research_journal.md",
             mime="text/markdown",
             use_container_width=True,

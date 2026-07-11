@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted deterministic scientific-context retrieval
-  into a versioned immutable application contract and routed Streamlit's memory
-  panel through it (task 017).
-- Working Tree: Task 017 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted Research Journal listing, filtering, and
+  Markdown export into a versioned immutable application contract and routed
+  Streamlit through it (task 018).
+- Working Tree: Task 018 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `158 passed in 2.10s` from `scripts/test -q` on
+- Last Successful Test: `160 passed in 2.12s` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 017.
+- Last Updated: 2026-07-10 for task 018.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 158 passing.
+- Tests: 🟢 Healthy — 160 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -124,9 +124,9 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
   persisted experiment retrieval, listing, summary/trend history views,
   technique-aware DLS and chromatography restoration, local DLS dataset
-  analysis, immutable investigation results, and a transport-independent
-  scientific-context retrieval, and a transport-independent registry of
-  fourteen stable capability names.
+  analysis, immutable investigation results, scientific-context and Research
+  Journal reads, and a transport-independent registry of fifteen stable
+  capability names.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -277,6 +277,8 @@ architecture rationale.
   and routed the Streamlit Experiment Brief through it (task 016).
 - Promoted related scientific-context retrieval into an immutable application
   read contract and routed the Streamlit memory panel through it (task 017).
+- Promoted Research Journal reads and Markdown export into an immutable
+  application contract and routed Streamlit through it (task 018).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -292,8 +294,8 @@ architecture rationale.
 
 ## Active Work
 
-- Related-context task 017 is complete.
-- The working tree was clean when task 017 began.
+- Research-Journal read task 018 is complete.
+- The working tree was clean when task 018 began.
 
 ## Known Risks
 
@@ -328,8 +330,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `158 passed in 2.10s` from `scripts/test -q` on 2026-07-10.
-- The Streamlit shell completed a headless startup smoke after task 017.
+- Latest result: `160 passed in 2.12s` from `scripts/test -q` on 2026-07-10.
+- The Streamlit shell completed a headless startup smoke after task 018.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -346,15 +348,16 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote Research Journal read, filter, and export workflows into
-  the application layer.
-- Why this is next: Streamlit still constructs `KnowledgeStore` and
-  `ResearchJournal` directly for a substantial reusable memory-reading workflow.
-- Expected scope: Medium; define immutable journal entries and preserve keyword,
-  tag, instrument, sample, grouping, ordering, and Markdown export behavior.
-- Risks: Combining the read query with note-creation writes or leaking mutable store items.
-- Success criteria: Streamlit lists and exports journal entries through application
-  contracts while standalone note creation remains an explicit separate command.
+- Objective: Promote standalone scientific-note creation into an explicit
+  application command.
+- Why this is next: Journal reads now cross the application boundary, but the
+  same Streamlit panel still writes directly to `KnowledgeStore`.
+- Expected scope: Small to medium; validate note text, normalize optional title,
+  instrument and tags, persist once, and return immutable receipt metadata.
+- Risks: Blurring read and write capabilities or implying authorization beyond
+  the existing explicit user button action.
+- Success criteria: Streamlit's confirmed Add Journal Note action calls a
+  registered application command and no longer constructs storage for that write.
 
 ## AI Context Window
 

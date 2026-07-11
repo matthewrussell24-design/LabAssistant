@@ -10,6 +10,7 @@ from labassistant.context_engine import (
     DEFAULT_KNOWLEDGE_STORE_PATH,
     ContextRetriever,
     KnowledgeStore,
+    ResearchJournal,
 )
 from labassistant.chromatography import mass_balance_hypotheses
 from labassistant.history import (
@@ -460,6 +461,57 @@ class RelatedScientificContext:
 
 
 @dataclass(frozen=True)
+class ResearchJournalEntryRead:
+    """Immutable grouped Research Journal entry."""
+
+    entry_id: str
+    created_at: str
+    title: str
+    experiment_id: str | None
+    instrument: str | None
+    tags: tuple[str, ...]
+    samples: tuple[str, ...]
+    key_observations: tuple[str, ...]
+    hypotheses: tuple[str, ...]
+    recommendations: tuple[str, ...]
+    source_files: tuple[str, ...]
+    notes: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        for key in (
+            "tags", "samples", "key_observations", "hypotheses",
+            "recommendations", "source_files", "notes",
+        ):
+            payload[key] = list(payload[key])
+        return payload
+
+
+@dataclass(frozen=True)
+class ResearchJournalRead:
+    """Versioned filtered journal entries with the matching Markdown export."""
+
+    keyword: str
+    tag: str
+    instrument: str
+    sample: str
+    entries: tuple[ResearchJournalEntryRead, ...]
+    markdown: str
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "keyword": self.keyword,
+            "tag": self.tag,
+            "instrument": self.instrument,
+            "sample": self.sample,
+            "entries": [entry.to_dict() for entry in self.entries],
+            "markdown": self.markdown,
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -606,6 +658,49 @@ def retrieve_related_context(
         missing_information=tuple(packet.missing_information),
         confidence=packet.confidence,
         caveats=tuple(packet.caveats),
+    )
+
+
+def retrieve_research_journal(
+    *,
+    keyword: str = "",
+    tag: str = "",
+    instrument: str = "",
+    sample: str = "",
+    knowledge_path: Path = DEFAULT_KNOWLEDGE_STORE_PATH,
+    store: KnowledgeStore | None = None,
+) -> ResearchJournalRead:
+    """Return filtered journal entries and their established Markdown export."""
+
+    filters = {
+        "keyword": keyword,
+        "tag": tag,
+        "instrument": instrument,
+        "sample": sample,
+    }
+    journal = ResearchJournal(store or KnowledgeStore(knowledge_path))
+    entries = journal.entries(**filters)
+    read_entries = tuple(
+        ResearchJournalEntryRead(
+            entry_id=entry.entry_id,
+            created_at=entry.created_at,
+            title=entry.title,
+            experiment_id=entry.experiment_id,
+            instrument=entry.instrument,
+            tags=tuple(entry.tags),
+            samples=tuple(entry.samples),
+            key_observations=tuple(entry.key_observations),
+            hypotheses=tuple(entry.hypotheses),
+            recommendations=tuple(entry.recommendations),
+            source_files=tuple(entry.source_files),
+            notes=tuple(entry.notes),
+        )
+        for entry in entries
+    )
+    return ResearchJournalRead(
+        **filters,
+        entries=read_entries,
+        markdown=journal.export_markdown(**filters),
     )
 
 
@@ -1122,6 +1217,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_related_context",
         purpose="Retrieve compact evidence-backed context from local scientific memory.",
         handler=retrieve_related_context,
+    ),
+    CapabilityContract(
+        name="retrieve_research_journal",
+        purpose="List and export filtered Research Journal entries.",
+        handler=retrieve_research_journal,
     ),
     CapabilityContract(
         name="save_scientific_memory",
