@@ -11,10 +11,12 @@ from labassistant.history import (
     DEFAULT_HISTORY_PATH,
     compare_experiments as compare_history_experiments,
     find_similar_samples,
+    history_table,
     latest_experiment,
     load_experiment_record,
     load_history,
     measurements_from_record,
+    trend_table,
 )
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.models import Experiment, Measurement
@@ -235,6 +237,54 @@ class RelatedExperiments:
 
 
 @dataclass(frozen=True)
+class HistorySummary:
+    """Immutable experiment-level row for persisted history displays."""
+
+    record_id: str
+    saved_at: str
+    experiment_label: str
+    measurement_count: int
+    flagged_count: int
+    review_count: int
+    median_z_average_nm: float | None
+    median_pdi: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class HistoryTrendPoint:
+    """Immutable sample metric point in persisted append order."""
+
+    saved_at: str
+    experiment_label: str
+    sample_name: str | None
+    z_average_nm: float | None
+    pdi: float | None
+    status: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class HistoryOverview:
+    """Versioned history summary and trend evidence for interface shells."""
+
+    summaries: tuple[HistorySummary, ...]
+    trend_points: tuple[HistoryTrendPoint, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "summaries": [row.to_dict() for row in self.summaries],
+            "trend_points": [point.to_dict() for point in self.trend_points],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -377,6 +427,39 @@ def compare_experiments(
         rows=rows,
         drifted_sample_count=sum("drift" in row.drift.lower() for row in rows),
     )
+
+
+def retrieve_history_overview(
+    *, history_path: Path = DEFAULT_HISTORY_PATH
+) -> HistoryOverview:
+    """Return persisted summary and trend evidence without exposing storage."""
+
+    records = load_history(history_path)
+    summaries = tuple(
+        HistorySummary(
+            record_id=row["Record ID"],
+            saved_at=row["Saved At"],
+            experiment_label=row["Experiment"],
+            measurement_count=row["Measurements"],
+            flagged_count=row["Flagged"],
+            review_count=row["Review"],
+            median_z_average_nm=row["Median Z-Average"],
+            median_pdi=row["Median PDI"],
+        )
+        for row in history_table(records).to_dict(orient="records")
+    )
+    points = tuple(
+        HistoryTrendPoint(
+            saved_at=row["Saved At"],
+            experiment_label=row["Experiment"],
+            sample_name=row["Sample"],
+            z_average_nm=row["Z-Average"],
+            pdi=row["PDI"],
+            status=row["Status"],
+        )
+        for row in trend_table(records).to_dict(orient="records")
+    )
+    return HistoryOverview(summaries=summaries, trend_points=points)
 
 
 def find_related_experiments(
@@ -692,6 +775,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="find_related_experiments",
         purpose="Rank saved DLS samples by feature similarity.",
         handler=find_related_experiments,
+    ),
+    CapabilityContract(
+        name="retrieve_history_overview",
+        purpose="Return persisted experiment summaries and sample trend evidence.",
+        handler=retrieve_history_overview,
     ),
     CapabilityContract(
         name="retrieve_experiment",

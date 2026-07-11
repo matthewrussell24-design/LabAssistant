@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted related-experiment search into the
-  application layer with immutable versioned read models and routed Streamlit
-  through the new capability (task 012).
-- Working Tree: Task 012 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted persisted history summaries and DLS trend
+  retrieval into the application layer and removed direct JSONL reads from the
+  Streamlit History panel (task 013).
+- Working Tree: Task 013 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `146 passed in 2.11s` from `scripts/test -q` on
+- Last Successful Test: `148 passed` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 012.
+- Last Updated: 2026-07-10 for task 013.
 
 ## North Star
 
@@ -122,8 +122,9 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   AppKit/WebKit controller.
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
-  persisted experiment retrieval and listing, local DLS dataset analysis, and a
-  transport-independent registry of eleven stable capability names.
+  persisted experiment retrieval, listing, summary/trend history views, local
+  DLS dataset analysis, and a transport-independent registry of twelve stable
+  capability names.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -264,6 +265,8 @@ architecture rationale.
 - Promoted immutable experiment comparison and related-experiment search into
   the application layer and routed both Streamlit workflows through the shared
   contracts (tasks 011 and 012).
+- Promoted history summary and trend retrieval into an immutable application
+  read contract and routed the Streamlit History panel through it (task 013).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -279,8 +282,8 @@ architecture rationale.
 
 ## Active Work
 
-- Related-experiment task 012 is complete.
-- The working tree was clean when task 012 began.
+- History-overview task 013 is complete.
+- The working tree was clean when task 013 began.
 
 ## Known Risks
 
@@ -318,7 +321,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `146 passed in 2.11s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `148 passed` from `scripts/test -q` on 2026-07-10.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -335,14 +338,14 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote history summary and trend retrieval into the application
-  layer and route the Streamlit History panel through typed read models.
-- Why this is next: Comparison and related-search no longer bypass the boundary,
-  but the same panel still loads JSONL and builds summary/trend DataFrames.
-- Expected scope: Medium; preserve current history tables and plotting behavior.
-- Risks: Expanding a query into presentation concerns or changing trend ordering.
-- Success criteria: The History panel receives persisted summary and trend data
-  through immutable application contracts without reading JSONL directly.
+- Objective: Generalize persisted experiment restoration for chromatography.
+- Why this is next: DLS has a shared restore composition, while a second
+  persisted technique is needed to prove the history boundary is not DLS-only.
+- Expected scope: Medium; add a typed chromatography restore result without
+  changing JSONL persistence or UI behavior.
+- Risks: Older chromatography records may have incomplete provenance or fields.
+- Success criteria: A saved chromatography experiment can be restored through
+  the application layer into an immutable, technique-appropriate read model.
 
 ## AI Context Window
 

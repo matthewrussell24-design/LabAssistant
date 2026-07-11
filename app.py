@@ -18,7 +18,9 @@ from labassistant.application import (
     compare_experiments,
     dls_experiment_from_samples,
     find_related_experiments,
+    list_experiments,
     retrieve_experiment,
+    retrieve_history_overview,
     save_experiment_to_memory,
 )
 from labassistant.interpretation import (
@@ -38,13 +40,7 @@ from labassistant.importers.chromatography import (
 )
 from labassistant.importers.filtration import FiltrationImportResult, parse_filtration_csv
 from labassistant.importers.openlab_olax import build_experiment_from_olax
-from labassistant.history import (
-    history_table,
-    latest_experiment,
-    load_history,
-    save_experiment,
-    trend_table,
-)
+from labassistant.history import save_experiment
 from labassistant.metrics import (
     find_local_peaks,
 )
@@ -1442,22 +1438,23 @@ def render_empty_state() -> None:
 
 
 def render_saved_experiment_loader() -> None:
-    records = load_history()
-    compatible_records = [record for record in records if record.measurements]
+    compatible_records = [
+        record for record in reversed(list_experiments()) if record.measurement_count
+    ]
     if not compatible_records:
         return
     st.subheader("Load Saved DLS Experiment")
     st.caption("History is append-only. Loading a saved experiment restores editable UI state; saving again creates a new saved version.")
     labels = [
-        f"{record.saved_at} · {record.label} · {len(record.measurements)} sample(s) · {record.id[:8]}"
+        f"{record.saved_at} · {record.label} · {record.measurement_count} sample(s) · {record.record_id[:8]}"
         for record in compatible_records
     ]
     selected_label = st.selectbox("Saved experiment", labels, key="saved_experiment_to_load")
     selected_record = compatible_records[labels.index(selected_label)]
     if st.button("Load saved experiment into workspace", use_container_width=True):
-        retrieved = retrieve_experiment(selected_record.id)
+        retrieved = retrieve_experiment(selected_record.record_id)
         measurements = retrieved.restore_measurements()
-        st.session_state["imported_upload_signature"] = ("history", selected_record.id)
+        st.session_state["imported_upload_signature"] = ("history", selected_record.record_id)
         st.session_state["imported_samples"] = [sample_from_measurement(measurement) for measurement in measurements]
         st.session_state["import_errors"] = []
         st.session_state["loaded_history_record"] = retrieved.to_dict()
@@ -1521,20 +1518,20 @@ def render_data_completeness(groups) -> None:
 
 
 def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
-    records = load_history()
+    history = retrieve_history_overview()
     with st.expander("Experiment History", expanded=False):
-        if not records:
+        if not history.summaries:
             st.info("No saved experiments yet.")
             return
 
         render_saved_experiment_loader()
         st.divider()
 
-        previous = latest_experiment(records)
-        if samples and previous is not None:
+        previous = history.summaries[-1]
+        if samples:
             comparison_result = compare_experiments(
                 [sample.measurement for sample in samples],
-                baseline_record_id=previous.id,
+                baseline_record_id=previous.record_id,
             )
             comparison = pd.DataFrame(
                 {
@@ -1550,7 +1547,7 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
                 for row in comparison_result.rows
             )
             drifted = comparison[comparison["Drift"].isin(["Z-average drift", "PDI drift", "Z-average drift, PDI drift"])]
-            st.markdown(f"**Change vs last saved experiment** ({previous.label})")
+            st.markdown(f"**Change vs last saved experiment** ({previous.experiment_label})")
             if drifted.empty:
                 st.caption("No sample drifted beyond the Z-average or PDI thresholds since the last saved run.")
             else:
@@ -1562,7 +1559,12 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
                 display[column] = pd.to_numeric(display[column], errors="coerce").round(3)
             st.dataframe(display, use_container_width=True, hide_index=True)
 
-        summary = history_table(records)
+        summary = pd.DataFrame({
+            "Saved At": row.saved_at, "Experiment": row.experiment_label,
+            "Measurements": row.measurement_count, "Flagged": row.flagged_count,
+            "Review": row.review_count, "Median Z-Average": row.median_z_average_nm,
+            "Median PDI": row.median_pdi, "Record ID": row.record_id,
+        } for row in history.summaries)
         st.dataframe(summary, use_container_width=True, hide_index=True)
 
         if samples:
@@ -1591,7 +1593,13 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
                 display["PDI"] = pd.to_numeric(display["PDI"], errors="coerce").round(3)
                 st.dataframe(display, use_container_width=True, hide_index=True)
 
-        trends = trend_table(records).dropna(subset=["Sample"])
+        trends = pd.DataFrame(({
+            "Saved At": point.saved_at, "Experiment": point.experiment_label,
+            "Sample": point.sample_name, "Z-Average": point.z_average_nm,
+            "PDI": point.pdi, "Status": point.status,
+        } for point in history.trend_points), columns=[
+            "Saved At", "Experiment", "Sample", "Z-Average", "PDI", "Status"
+        ]).dropna(subset=["Sample"])
         if trends.empty:
             st.info("Saved experiments do not contain trendable sample metrics yet.")
             return

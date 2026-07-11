@@ -64,6 +64,9 @@ Missing capability boundaries:
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `list_experiments` | `list_experiments` | Available; used by desktop History timeline |
+| `compare_experiments` | `compare_experiments` | Available; used by Streamlit History panel |
+| `find_related_experiments` | `find_related_experiments` | Available; used by Streamlit History panel |
+| `retrieve_history_overview` | `retrieve_history_overview` | Available; used by Streamlit History panel |
 | `retrieve_experiment` | `retrieve_experiment` | Available; first used by Streamlit history loader |
 | `retrieve_experiment_summary` | `build_experiment_snapshot` | Available |
 | `save_scientific_memory` | `save_experiment_to_memory` | Available |
@@ -227,6 +230,25 @@ cannot safely interpret the JSONL or measurement payload.
 
 **Caller Types:** Human UI, Agent, CLI, Future API. The Streamlit saved DLS
 experiment loader is the first caller.
+
+## Retrieve History Overview
+
+**Name:** `retrieve_history_overview`
+
+**Purpose:** Return persisted experiment-level summaries and sample-level DLS
+trend evidence without requiring interface shells to read JSONL or derive
+history metrics.
+
+**Inputs:** An optional history path for local or test storage.
+
+**Outputs:** A versioned, frozen `HistoryOverview` containing immutable
+`HistorySummary` and `HistoryTrendPoint` tuples. Summary order preserves JSONL
+append order; trend points preserve experiment and measurement order.
+
+**Expected Errors:** None under normal operation. Missing history yields empty
+tuples and malformed lines retain the tolerant history-reader behavior.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. Streamlit is the first caller.
 
 **Restore composition:** `restore_dls_experiment(record_id)` is a supporting
 application function (not a separate catalog entry) that composes

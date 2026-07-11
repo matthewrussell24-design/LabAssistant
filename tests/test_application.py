@@ -9,6 +9,7 @@ from labassistant.application import (
     HUMAN_APP_SURFACE,
     ExperimentListing,
     ExperimentComparison,
+    HistoryOverview,
     RelatedExperiments,
     analyze_dls_dataset,
     compare_experiments,
@@ -20,6 +21,7 @@ from labassistant.application import (
     get_capability,
     list_capabilities,
     list_experiments,
+    retrieve_history_overview,
     restore_dls_experiment,
     retrieve_experiment,
     save_experiment_to_memory,
@@ -251,6 +253,35 @@ def test_find_related_experiments_handles_empty_history_exclusion_and_limit(tmp_
         find_related_experiments(query, top_n=0, history_path=history_path)
 
 
+def test_retrieve_history_overview_returns_immutable_summary_and_trends(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    measurement = Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))
+    measurement.summary_metrics.z_average = 125.0
+    measurement.summary_metrics.pdi = 0.23
+    saved = save_experiment([measurement], label="Run A", history_path=history_path)
+
+    result = retrieve_history_overview(history_path=history_path)
+
+    assert isinstance(result, HistoryOverview)
+    assert result.summaries[0].record_id == saved.id
+    assert result.summaries[0].median_z_average_nm == 125.0
+    assert result.trend_points[0].sample_name == "Lot 1"
+    assert result.trend_points[0].pdi == 0.23
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_retrieve_history_overview_handles_missing_and_empty_measurements(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    assert retrieve_history_overview(history_path=history_path) == HistoryOverview((), ())
+    save_experiment([], label="Empty", history_path=history_path)
+
+    result = retrieve_history_overview(history_path=history_path)
+
+    assert len(result.summaries) == 1
+    assert result.summaries[0].measurement_count == 0
+    assert result.trend_points == ()
+
+
 def test_restore_dls_experiment_rehydrates_a_saved_record(tmp_path):
     fixture_dir = Path(__file__).parent / "fixtures"
     history_path = tmp_path / "experiments.jsonl"
@@ -395,6 +426,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "list_experiments",
         "compare_experiments",
         "find_related_experiments",
+        "retrieve_history_overview",
         "retrieve_experiment",
         "retrieve_experiment_summary",
         "save_scientific_memory",
