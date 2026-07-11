@@ -4,6 +4,7 @@ from labassistant.filtration import (
     FILTRATION_DIFFICULTY_RUBRIC,
     filtration_measurement_from_dict,
     normalize_pressure,
+    observations_from_filtration_measurement,
     pressure_unit_label,
     validate_difficulty_score,
 )
@@ -17,6 +18,25 @@ def test_filtration_rubric_and_score_validation_are_ordinal():
     assert validate_difficulty_score(5.0) == 5
     assert validate_difficulty_score(2.5) is None
     assert validate_difficulty_score(6) is None
+
+
+def test_filtration_outcomes_become_traceable_qualified_observations():
+    measurement = FiltrationMeasurement(
+        sample_name="Stress T3",
+        difficulty_score=4,
+        clogging_observed=True,
+        source_file="filtration.csv",
+    )
+
+    observations = observations_from_filtration_measurement(measurement)
+
+    assert [observation.label for observation in observations] == [
+        "Filtration difficulty elevated",
+        "Filter clogging observed",
+    ]
+    assert all(observation.source_type == "filtration_follow_up" for observation in observations)
+    assert all(observation.source_id == "filtration.csv" for observation in observations)
+    assert "before attributing" in observations[1].recommendation
 
 
 def test_pressure_normalization_to_kpa():

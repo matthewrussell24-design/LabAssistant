@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
+
+if TYPE_CHECKING:
+    from labassistant.models import Observation
 
 
 FILTRATION_DIFFICULTY_RUBRIC = {
@@ -66,6 +69,48 @@ class FiltrationMeasurement:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def observations_from_filtration_measurement(
+    measurement: FiltrationMeasurement,
+) -> list[Observation]:
+    """Normalize filtration outcomes for instrument-independent reasoning."""
+
+    from labassistant.models import Observation
+
+    observations: list[Observation] = []
+    source_id = measurement.source_file or measurement.source or measurement.sample_name
+    difficulty = measurement.difficulty_score
+    if difficulty is not None and difficulty >= 3:
+        severity = "review" if difficulty >= 4 else "watch"
+        observations.append(
+            Observation(
+                label="Filtration difficulty elevated",
+                category="filtration_performance",
+                sample_name=measurement.sample_name,
+                severity=severity,
+                confidence="high",
+                evidence=f"Filtration difficulty score {difficulty:g}/5.",
+                source_type="filtration_follow_up",
+                source_id=source_id,
+                recommendation="Inspect retained material and compare filtration behavior with particle and recovery evidence.",
+            )
+        )
+    if measurement.clogging_observed is True:
+        observations.append(
+            Observation(
+                label="Filter clogging observed",
+                category="filtration_performance",
+                sample_name=measurement.sample_name,
+                severity="review",
+                confidence="high",
+                evidence="Clogging was recorded during filtration.",
+                source_type="filtration_follow_up",
+                source_id=source_id,
+                recommendation="Characterize retained material before attributing the outcome to aggregation.",
+            )
+        )
+    return observations
 
 
 def normalize_pressure(value: float | int, unit: str) -> float:

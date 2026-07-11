@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Added typed persisted chromatography restoration,
-  including nested peak/trace reconstruction and deterministic reasoning
-  rebuilds (task 014).
-- Working Tree: Task 014 is committed locally; inspect `git status --short`
+- Latest Completed Change: Added the first end-to-end cross-technique
+  investigation case linking chromatography missing mass, DLS aggregation, and
+  filtration outcomes through normalized observations (task 015).
+- Working Tree: Task 015 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `151 passed` from `scripts/test -q` on
+- Last Successful Test: `153 passed` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 014.
+- Last Updated: 2026-07-10 for task 015.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 151 passing.
+- Tests: 🟢 Healthy — 153 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -269,6 +269,8 @@ architecture rationale.
   read contract and routed the Streamlit History panel through it (task 013).
 - Generalized persisted restoration for chromatography with nested evidence
   reconstruction and an immutable application read result (task 014).
+- Added normalized filtration observations and proved a qualified three-technique
+  investigation path without adding instrument logic to the Investigator (task 015).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -284,8 +286,8 @@ architecture rationale.
 
 ## Active Work
 
-- Chromatography-restore task 014 is complete.
-- The working tree was clean when task 014 began.
+- Cross-technique investigation task 015 is complete.
+- The working tree was clean when task 015 began.
 
 ## Known Risks
 
@@ -317,12 +319,10 @@ architecture rationale.
 - Validate OpenLab ingestion against more representative archives and add peak
   table, quantitation, system-suitability, calibration, audit-trail, and
   provenance coverage incrementally.
-- Unify chromatography missing-mass hypotheses, DLS aggregation evidence, and
-  filtration outcomes in an experiment-level investigation test case.
 
 ## Testing Status
 
-- Latest result: `151 passed` from `scripts/test -q` on 2026-07-10.
+- Latest result: `153 passed` from `scripts/test -q` on 2026-07-10.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -339,16 +339,17 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Add a representative cross-technique investigation test case.
-- Why this is next: DLS, chromatography, and filtration evidence are individually
-  modeled, but their shared experiment-level reasoning has not been proven end to end.
-- Expected scope: Medium; assemble existing normalized observations without
-  adding technique-specific logic to the investigator.
-- Risks: The fixture could overstate causality or encode conclusions not
-  supported by the underlying evidence.
-- Success criteria: One deterministic test connects chromatography missing
-  mass, DLS aggregation evidence, and filtration outcomes with traceable,
-  appropriately qualified hypotheses.
+- Objective: Promote experiment investigation into the application layer and
+  route the first human shell through a versioned read contract.
+- Why this is next: The instrument-independent Investigator now handles a
+  representative multi-technique observation stream, but remains an internal
+  domain function without a stable application result.
+- Expected scope: Medium; preserve the five canonical questions and confidence
+  behavior while translating mutable report fields into immutable read models.
+- Risks: Flattening evidence provenance or letting presentation concerns enter
+  the application contract.
+- Success criteria: A human shell renders an investigation obtained through a
+  registered, immutable application capability without calling the Investigator directly.
 
 ## AI Context Window
 

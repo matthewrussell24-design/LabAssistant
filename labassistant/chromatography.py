@@ -229,9 +229,13 @@ def mass_balance_hypotheses(
     observations: list[Observation],
     *,
     dls_observations: list[Observation] | None = None,
+    filtration_observations: list[Observation] | None = None,
 ) -> list[str]:
     labels = {observation.label for observation in observations}
     dls_labels = {observation.label for observation in dls_observations or []}
+    filtration_labels = {
+        observation.label for observation in filtration_observations or []
+    }
     hypotheses: list[str] = []
 
     if "Parent peak decreased" in labels and "Known impurity increased" in labels:
@@ -255,6 +259,10 @@ def mass_balance_hypotheses(
         "Particle-size distribution broadened",
     }:
         hypotheses.append("Missing mass may be associated with insoluble or aggregated material")
+        if filtration_labels & {"Filtration difficulty elevated", "Filter clogging observed"}:
+            hypotheses.append(
+                "Missing mass, particle growth, and filtration difficulty may share an insoluble or aggregated-material association"
+            )
 
     return list(dict.fromkeys(hypotheses))
 

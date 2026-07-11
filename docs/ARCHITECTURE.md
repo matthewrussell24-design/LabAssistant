@@ -317,11 +317,12 @@ decreased, retention time shifted, peak broadened, peak tailing increased,
 baseline changed, integration boundary changed, replicate percent RSD elevated,
 and recovery control failed.
 
-The cross-instrument reasoning target is important: when DLS observations
-suggest aggregation or large-particle formation and chromatography observations
-suggest reduced recovery or unexplained mass loss, LabAssistant should raise the
-hypothesis that missing mass may be associated with insoluble or aggregated
-material rather than chromatographically visible degradation.
+The first cross-instrument reasoning path is now covered end to end: when DLS
+observations suggest aggregation or large-particle formation, chromatography
+observations suggest reduced recovery or unexplained mass loss, and filtration
+observations report elevated difficulty or clogging, LabAssistant raises a
+qualified association hypothesis. It does not claim that aggregation caused
+the filtration outcome or missing mass.
 
 See `docs/CHROMATOGRAPHY_MASS_BALANCE.md` for the full module proposal.
 

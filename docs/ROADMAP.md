@@ -384,9 +384,9 @@ Phase 8 *locates* chromatographic evidence; Phase 9 *decodes and interprets* it.
 4. **Chromatography Investigator rules.** Extend the Investigator with
    technique-aware checks: system suitability (blanks/standards present),
    calibration validity, replicate %RSD, mass-balance conservation.
-5. **Cross-technique reasoning.** Link HPLC "missing mass" to DLS aggregation
-   observations (the hypothesis link already exists) to move toward true
-   mass-balance investigation.
+5. **Cross-technique reasoning.** The first deterministic path now links HPLC
+   missing mass, DLS aggregation observations, and filtration difficulty through
+   normalized evidence. Expand only with traceable evidence and qualified claims.
 6. **Second instrument.** Add one more importer (SEC or UV-Vis) against the same
    Experiment/Observation contract to prove the architecture generalizes.
 7. **Audit trail + provenance surfacing.** Parse the audit trail and expose
