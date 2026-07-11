@@ -72,6 +72,7 @@ Missing capability boundaries:
 | `investigate_experiment` | `investigate_experiment` | Available; used by Streamlit Experiment Brief |
 | `retrieve_related_context` | `retrieve_related_context` | Available; used by Streamlit memory panel |
 | `retrieve_research_journal` | `retrieve_research_journal` | Available; used by Streamlit Research Journal |
+| `add_scientific_note` | `add_scientific_note` | Available; explicit Streamlit journal write |
 | `save_scientific_memory` | `save_experiment_to_memory` | Available |
 
 `list_capabilities()` returns immutable `CapabilityContract` metadata.
@@ -371,6 +372,28 @@ an empty entry tuple and the established no-matches Markdown document.
 **Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's Research Journal
 panel is the first caller. Standalone note creation is not part of this read query.
 
+## Add Scientific Note
+
+**Name:** `add_scientific_note`
+
+**Purpose:** Persist one explicitly confirmed standalone human note to local
+scientific memory and return immutable receipt metadata.
+
+**Inputs:** Required non-empty text; optional title, instrument identifier,
+tags, and injectable knowledge-store path or store. Whitespace is trimmed,
+blank titles become `Research note`, blank instruments are omitted, and tags
+retain the store's normalized/deduplicated ordering.
+
+**Outputs:** A frozen `ScientificNoteReceipt` containing item ID, title,
+instrument, tags, human confidence, timestamp, and API version. Note text is
+not echoed in the receipt.
+
+**Expected Errors:** `ValueError` for empty note text and local SQLite write errors.
+
+**Caller Types:** Human UI and CLI only. The explicit Streamlit button action is
+the first caller. Agent and Future API callers are intentionally excluded until
+authorization, approval, and audit policies exist.
+
 ## Investigate Experiment
 
 **Name:** `investigate_experiment`
@@ -400,7 +423,6 @@ These are capability boundaries, not implemented public contracts:
 | `generate_observations` | Normalize supported evidence into findings | Importers/observations/UI |
 | `generate_hypotheses` | Produce deterministic, evidence-linked hypotheses | Technique modules/UI |
 | `produce_investigation_summary` | Build an experiment-level brief/report | Observations/UI |
-| `add_scientific_note` | Append a reviewed human note with provenance | Context engine/UI |
 
 Promote candidates one at a time when an existing human workflow can become the
 first real caller. Define typed inputs, stable read outputs, validation, and

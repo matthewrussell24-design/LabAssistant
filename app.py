@@ -14,6 +14,7 @@ from labassistant.aggregation import (
     assess_dual_angle_aggregation,
 )
 from labassistant.application import (
+    add_scientific_note,
     chromatography_experiment_from_preview,
     compare_experiments,
     dls_experiment_from_samples,
@@ -48,7 +49,6 @@ from labassistant.metrics import (
     find_local_peaks,
 )
 from labassistant.chromatography import mass_balance_hypotheses
-from labassistant.context_engine import KnowledgeStore
 from labassistant.filtration import (
     FILTRATION_DIFFICULTY_RUBRIC,
     FiltrationMeasurement,
@@ -415,7 +415,6 @@ def _journal_entries_table(entries) -> pd.DataFrame:
 def render_research_journal_panel() -> None:
     with st.expander("Research Journal", expanded=False):
         st.caption("A local journal view over saved experiments and manual notes. No LLM generation is used.")
-        store = KnowledgeStore()
 
         st.markdown("**Standalone journal note**")
         note_cols = st.columns([1, 1, 1])
@@ -425,11 +424,11 @@ def render_research_journal_panel() -> None:
         note_text = st.text_area("Note text", value="", key="journal_note_text")
         if st.button("Add journal note", use_container_width=True):
             if note_text.strip():
-                store.add_note(
+                add_scientific_note(
                     note_text.strip(),
                     title=note_title.strip() or "Research note",
                     instrument_id=note_instrument.strip() or None,
-                    tags=[tag.strip() for tag in note_tags.split(",") if tag.strip()],
+                    tags=tuple(tag.strip() for tag in note_tags.split(",") if tag.strip()),
                 )
                 st.success("Journal note added.")
             else:

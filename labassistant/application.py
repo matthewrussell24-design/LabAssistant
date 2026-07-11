@@ -512,6 +512,30 @@ class ResearchJournalRead:
 
 
 @dataclass(frozen=True)
+class ScientificNoteReceipt:
+    """Immutable receipt for one explicitly requested local scientific note."""
+
+    item_id: str
+    title: str
+    instrument_id: str | None
+    tags: tuple[str, ...]
+    confidence: str
+    created_at: str | None
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "item_id": self.item_id,
+            "title": self.title,
+            "instrument_id": self.instrument_id,
+            "tags": list(self.tags),
+            "confidence": self.confidence,
+            "created_at": self.created_at,
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -701,6 +725,39 @@ def retrieve_research_journal(
         **filters,
         entries=read_entries,
         markdown=journal.export_markdown(**filters),
+    )
+
+
+def add_scientific_note(
+    text: str,
+    *,
+    title: str = "",
+    instrument_id: str | None = None,
+    tags: tuple[str, ...] = (),
+    knowledge_path: Path = DEFAULT_KNOWLEDGE_STORE_PATH,
+    store: KnowledgeStore | None = None,
+) -> ScientificNoteReceipt:
+    """Persist one explicitly requested human note and return its receipt."""
+
+    normalized_text = text.strip()
+    if not normalized_text:
+        raise ValueError("Scientific note text is required")
+    normalized_title = title.strip() or "Research note"
+    normalized_instrument = (instrument_id or "").strip() or None
+    normalized_tags = tuple(tag.strip() for tag in tags if tag.strip())
+    item = (store or KnowledgeStore(knowledge_path)).add_note(
+        normalized_text,
+        title=normalized_title,
+        instrument_id=normalized_instrument,
+        tags=normalized_tags,
+    )
+    return ScientificNoteReceipt(
+        item_id=item.item_id,
+        title=item.title,
+        instrument_id=item.instrument_id,
+        tags=tuple(item.tags),
+        confidence=item.confidence,
+        created_at=item.created_at,
     )
 
 
@@ -1222,6 +1279,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_research_journal",
         purpose="List and export filtered Research Journal entries.",
         handler=retrieve_research_journal,
+    ),
+    CapabilityContract(
+        name="add_scientific_note",
+        purpose="Persist one explicitly confirmed human scientific note.",
+        handler=add_scientific_note,
+        caller_types=("Human UI", "CLI"),
     ),
     CapabilityContract(
         name="save_scientific_memory",

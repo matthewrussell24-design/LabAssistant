@@ -15,6 +15,8 @@ from labassistant.application import (
     RelatedExperiments,
     RelatedScientificContext,
     ResearchJournalRead,
+    ScientificNoteReceipt,
+    add_scientific_note,
     analyze_dls_dataset,
     compare_experiments,
     agent_access_policy,
@@ -289,6 +291,40 @@ def test_retrieve_research_journal_handles_empty_and_standalone_notes(tmp_path):
     assert len(result.entries) == 1
     assert result.entries[0].experiment_id is None
     assert result.entries[0].notes == ("Compare DLS and HPLC.",)
+
+
+def test_add_scientific_note_validates_normalizes_and_returns_receipt(tmp_path):
+    store = KnowledgeStore(tmp_path / "knowledge.sqlite")
+
+    receipt = add_scientific_note(
+        "  Compare DLS aggregation with HPLC recovery.  ",
+        title="  Cross-technique review  ",
+        instrument_id="  Agilent 1290  ",
+        tags=(" Weekend ", "dls", "Weekend", ""),
+        store=store,
+    )
+
+    assert isinstance(receipt, ScientificNoteReceipt)
+    assert receipt.title == "Cross-technique review"
+    assert receipt.instrument_id == "Agilent 1290"
+    assert receipt.tags == ("dls", "weekend")
+    assert receipt.confidence == "human"
+    assert receipt.created_at
+    assert receipt.to_dict()["api_version"] == AGENT_API_VERSION
+    notes = store.list_items(entity_type="note")
+    assert len(notes) == 1
+    assert notes[0].item_id == receipt.item_id
+    assert notes[0].text == "Compare DLS aggregation with HPLC recovery."
+
+
+def test_add_scientific_note_defaults_title_and_rejects_empty_text(tmp_path):
+    store = KnowledgeStore(tmp_path / "knowledge.sqlite")
+    receipt = add_scientific_note("Useful context", store=store)
+    assert receipt.title == "Research note"
+
+    with raises(ValueError, match="text"):
+        add_scientific_note("  ", store=store)
+    assert len(store.list_items(entity_type="note")) == 1
 
 
 def test_retrieve_experiment_returns_read_only_metadata_and_fresh_measurements(tmp_path):
@@ -688,11 +724,17 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "investigate_experiment",
         "retrieve_related_context",
         "retrieve_research_journal",
+        "add_scientific_note",
         "save_scientific_memory",
     ]
     assert all(capability.version == AGENT_API_VERSION for capability in capabilities)
     assert all("Human UI" in capability.caller_types for capability in capabilities)
-    assert all("Future API" in capability.caller_types for capability in capabilities)
+    assert all(
+        "Future API" in capability.caller_types
+        for capability in capabilities
+        if capability.name != "add_scientific_note"
+    )
+    assert get_capability("add_scientific_note").caller_types == ("Human UI", "CLI")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():
@@ -712,6 +754,9 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
 
     journal = get_capability("retrieve_research_journal")
     assert journal.handler is retrieve_research_journal
+
+    note = get_capability("add_scientific_note")
+    assert note.handler is add_scientific_note
 
 
 def test_capability_registry_rejects_unknown_names():
