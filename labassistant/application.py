@@ -10,6 +10,7 @@ from labassistant.context_engine import KnowledgeStore
 from labassistant.history import (
     DEFAULT_HISTORY_PATH,
     compare_experiments as compare_history_experiments,
+    find_similar_samples,
     latest_experiment,
     load_experiment_record,
     load_history,
@@ -201,6 +202,39 @@ class ExperimentComparison:
 
 
 @dataclass(frozen=True)
+class RelatedExperimentMatch:
+    """Immutable saved-sample match returned by related-experiment search."""
+
+    experiment_label: str
+    saved_at: str
+    sample_name: str
+    z_average_nm: float | None
+    pdi: float | None
+    primary_peak_nm: float | None
+    distance: float
+    similarity_score: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RelatedExperiments:
+    """Versioned, read-only ranked matches for one query measurement."""
+
+    query_sample_name: str
+    matches: tuple[RelatedExperimentMatch, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "query_sample_name": self.query_sample_name,
+            "matches": [match.to_dict() for match in self.matches],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class CapabilityContract:
     """Discoverable application operation shared by all future interfaces.
 
@@ -342,6 +376,47 @@ def compare_experiments(
         baseline_saved_at=baseline.saved_at if baseline else None,
         rows=rows,
         drifted_sample_count=sum("drift" in row.drift.lower() for row in rows),
+    )
+
+
+def find_related_experiments(
+    measurement: Measurement,
+    *,
+    top_n: int = 5,
+    exclude_record_id: str | None = None,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> RelatedExperiments:
+    """Find the nearest saved DLS samples through the application boundary.
+
+    Ranking, feature weighting, and the readability score remain owned by the
+    history layer. The score expresses relative feature proximity, not a
+    probability or a causal scientific relationship.
+    """
+
+    if top_n < 1:
+        raise ValueError("top_n must be at least 1")
+    table = find_similar_samples(
+        measurement,
+        load_history(history_path),
+        top_n=top_n,
+        exclude_id=exclude_record_id,
+    )
+    matches = tuple(
+        RelatedExperimentMatch(
+            experiment_label=row["Experiment"],
+            saved_at=row["Saved At"],
+            sample_name=row["Sample"],
+            z_average_nm=row["Z-Average"],
+            pdi=row["PDI"],
+            primary_peak_nm=row["Primary Peak"],
+            distance=row["Distance"],
+            similarity_score=row["Similarity"],
+        )
+        for row in table.to_dict(orient="records")
+    )
+    return RelatedExperiments(
+        query_sample_name=measurement.metadata.sample_name,
+        matches=matches,
     )
 
 
@@ -612,6 +687,11 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="compare_experiments",
         purpose="Explain meaningful DLS differences from a persisted experiment.",
         handler=compare_experiments,
+    ),
+    CapabilityContract(
+        name="find_related_experiments",
+        purpose="Rank saved DLS samples by feature similarity.",
+        handler=find_related_experiments,
     ),
     CapabilityContract(
         name="retrieve_experiment",

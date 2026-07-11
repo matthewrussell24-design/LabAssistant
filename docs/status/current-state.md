@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted experiment comparison into the application
-  layer with immutable versioned read models and routed Streamlit through the
-  new capability (task 011).
-- Working Tree: Task 011 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted related-experiment search into the
+  application layer with immutable versioned read models and routed Streamlit
+  through the new capability (task 012).
+- Working Tree: Task 012 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `144 passed in 2.08s` from `scripts/test -q` on
+- Last Successful Test: `146 passed in 2.11s` from `scripts/test -q` on
   2026-07-10.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-10 for task 011.
+- Last Updated: 2026-07-10 for task 012.
 
 ## North Star
 
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 144 passing.
+- Tests: 🟢 Healthy — 146 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -123,7 +123,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
 - `labassistant.application` exposes app and agent-access policy, read-only
   experiment snapshots, DLS/chromatography assembly, knowledge persistence, and
   persisted experiment retrieval and listing, local DLS dataset analysis, and a
-  transport-independent registry of nine stable capability names.
+  transport-independent registry of eleven stable capability names.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -261,6 +261,9 @@ architecture rationale.
   composition over `retrieve_experiment`; wired the desktop History timeline and
   "Open Existing Experiment" to browse and restore persisted records without the
   UI reading JSONL storage (task 010).
+- Promoted immutable experiment comparison and related-experiment search into
+  the application layer and routed both Streamlit workflows through the shared
+  contracts (tasks 011 and 012).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -276,8 +279,8 @@ architecture rationale.
 
 ## Active Work
 
-- Experiment-comparison task 011 is complete.
-- The working tree was clean when task 011 began.
+- Related-experiment task 012 is complete.
+- The working tree was clean when task 012 began.
 
 ## Known Risks
 
@@ -315,7 +318,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `144 passed in 2.08s` from `scripts/test -q` on 2026-07-10.
+- Latest result: `146 passed in 2.11s` from `scripts/test -q` on 2026-07-10.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -332,17 +335,14 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote similar-experiment search into the application layer with
-  a typed, versioned `find_related_experiments` result and route the existing
-  Streamlit caller through it.
-- Why this is next: History listing, restore, and comparison now cross the
-  application boundary; similar-run search is the remaining history read path
-  still called directly by a shell.
-- Expected scope: Medium; preserve existing ranking and JSONL storage.
-- Risks: Exposing a mutable DataFrame, silently changing ranking weights, or
-  presenting proximity as scientific causality.
-- Success criteria: A shell finds related saved evidence through an immutable
-  application read contract without owning ranking logic.
+- Objective: Promote history summary and trend retrieval into the application
+  layer and route the Streamlit History panel through typed read models.
+- Why this is next: Comparison and related-search no longer bypass the boundary,
+  but the same panel still loads JSONL and builds summary/trend DataFrames.
+- Expected scope: Medium; preserve current history tables and plotting behavior.
+- Risks: Expanding a query into presentation concerns or changing trend ordering.
+- Success criteria: The History panel receives persisted summary and trend data
+  through immutable application contracts without reading JSONL directly.
 
 ## AI Context Window
 

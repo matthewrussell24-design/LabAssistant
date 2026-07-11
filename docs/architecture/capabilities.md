@@ -255,6 +255,26 @@ record errors. Automatic latest selection tolerates absent history.
 **Caller Types:** Human UI, Agent, CLI, Future API. Threshold crossings do not
 claim scientific causality.
 
+## Find Related Experiments
+
+**Name:** `find_related_experiments`
+
+**Purpose:** Rank saved DLS samples by proximity to one query measurement using
+the established size and PDI feature distance.
+
+**Inputs:** A query `Measurement`, optional top-N limit, optional record ID to
+exclude, and an injectable history path.
+
+**Outputs:** A versioned, frozen `RelatedExperiments` envelope containing
+immutable ranked matches. Similarity is a readability score derived from
+distance, not a probability.
+
+**Expected Errors:** `ValueError` when `top_n` is less than one. Missing or empty
+history returns an empty match tuple.
+
+**Caller Types:** Human UI, Agent, CLI, Future API. Relatedness indicates feature
+proximity and must not be presented as causal evidence.
+
 ## Save Scientific Memory
 
 **Name:** `save_scientific_memory`
@@ -281,7 +301,6 @@ These are capability boundaries, not implemented public contracts:
 
 | Candidate name | Scientific intent | Current owner |
 | --- | --- | --- |
-| `find_related_experiments` | Find similar prior scientific work | History/UI |
 | `retrieve_related_context` | Build a compact evidence-backed context packet | Context engine/UI |
 | `generate_observations` | Normalize supported evidence into findings | Importers/observations/UI |
 | `investigate_experiment` | Assess completeness and interpretability | Investigator/UI |

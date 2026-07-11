@@ -9,12 +9,14 @@ from labassistant.application import (
     HUMAN_APP_SURFACE,
     ExperimentListing,
     ExperimentComparison,
+    RelatedExperiments,
     analyze_dls_dataset,
     compare_experiments,
     agent_access_policy,
     app_manifest,
     build_experiment_snapshot,
     dls_experiment_from_samples,
+    find_related_experiments,
     get_capability,
     list_capabilities,
     list_experiments,
@@ -213,6 +215,42 @@ def test_compare_experiments_handles_absent_history_and_new_samples(tmp_path):
     assert result.drifted_sample_count == 0
 
 
+def test_find_related_experiments_returns_ranked_versioned_matches(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    near = Measurement(metadata=MeasurementMetadata(sample_name="Near"))
+    near.summary_metrics.z_average = 100.0
+    near.summary_metrics.pdi = 0.20
+    far = Measurement(metadata=MeasurementMetadata(sample_name="Far"))
+    far.summary_metrics.z_average = 400.0
+    far.summary_metrics.pdi = 0.40
+    save_experiment([far, near], label="Baseline", history_path=history_path)
+    query = Measurement(metadata=MeasurementMetadata(sample_name="Query"))
+    query.summary_metrics.z_average = 105.0
+    query.summary_metrics.pdi = 0.21
+
+    result = find_related_experiments(query, top_n=2, history_path=history_path)
+
+    assert isinstance(result, RelatedExperiments)
+    assert result.query_sample_name == "Query"
+    assert [match.sample_name for match in result.matches] == ["Near", "Far"]
+    assert result.matches[0].distance <= result.matches[1].distance
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_find_related_experiments_handles_empty_history_exclusion_and_limit(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    query = Measurement(metadata=MeasurementMetadata(sample_name="Query"))
+    assert find_related_experiments(query, history_path=history_path).matches == ()
+
+    saved = save_experiment([query], label="Only", history_path=history_path)
+    excluded = find_related_experiments(
+        query, exclude_record_id=saved.id, history_path=history_path
+    )
+    assert excluded.matches == ()
+    with raises(ValueError, match="top_n"):
+        find_related_experiments(query, top_n=0, history_path=history_path)
+
+
 def test_restore_dls_experiment_rehydrates_a_saved_record(tmp_path):
     fixture_dir = Path(__file__).parent / "fixtures"
     history_path = tmp_path / "experiments.jsonl"
@@ -356,6 +394,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "import_chromatography_experiment",
         "list_experiments",
         "compare_experiments",
+        "find_related_experiments",
         "retrieve_experiment",
         "retrieve_experiment_summary",
         "save_scientific_memory",

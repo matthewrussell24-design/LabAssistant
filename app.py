@@ -17,6 +17,7 @@ from labassistant.application import (
     chromatography_experiment_from_preview,
     compare_experiments,
     dls_experiment_from_samples,
+    find_related_experiments,
     retrieve_experiment,
     save_experiment_to_memory,
 )
@@ -38,7 +39,6 @@ from labassistant.importers.chromatography import (
 from labassistant.importers.filtration import FiltrationImportResult, parse_filtration_csv
 from labassistant.importers.openlab_olax import build_experiment_from_olax
 from labassistant.history import (
-    find_similar_samples,
     history_table,
     latest_experiment,
     load_history,
@@ -1569,11 +1569,23 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
             st.markdown("**Find similar past runs**")
             query_name = st.selectbox("Match this sample", [sample.name for sample in samples], key="similar_query_sample")
             query_sample = next(sample for sample in samples if sample.name == query_name)
-            similar = find_similar_samples(query_sample.measurement, records, top_n=5)
-            if similar.empty:
+            related = find_related_experiments(query_sample.measurement, top_n=5)
+            if not related.matches:
                 st.caption("No comparable samples in saved history yet.")
             else:
-                display = similar.copy()
+                display = pd.DataFrame(
+                    {
+                        "Experiment": match.experiment_label,
+                        "Saved At": match.saved_at,
+                        "Sample": match.sample_name,
+                        "Z-Average": match.z_average_nm,
+                        "PDI": match.pdi,
+                        "Primary Peak": match.primary_peak_nm,
+                        "Distance": match.distance,
+                        "Similarity": match.similarity_score,
+                    }
+                    for match in related.matches
+                )
                 display["Z-Average"] = pd.to_numeric(display["Z-Average"], errors="coerce").round(1)
                 display["Primary Peak"] = pd.to_numeric(display["Primary Peak"], errors="coerce").round(1)
                 display["PDI"] = pd.to_numeric(display["PDI"], errors="coerce").round(3)
