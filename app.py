@@ -23,6 +23,7 @@ from labassistant.application import (
     analyze_dls_uploads,
     analyze_dls_trend_diagnostics,
     analyze_dls_forward_scatter_trends,
+    analyze_filtration_follow_up_trends,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -30,6 +31,8 @@ from labassistant.application import (
     DLSTrendDiagnostics,
     DLSForwardScatterPoint,
     DLSRelationshipSummary,
+    FiltrationRelationshipSummary,
+    FiltrationTrendPointRead,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -62,11 +65,9 @@ from labassistant.filtration import (
 from labassistant.models import Experiment
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
-    FiltrationTrendPoint,
     RelationshipAnalysis,
     apply_circulation_time,
     apply_filtration_measurement,
-    build_filtration_trend_analysis,
     circulation_time_from_measurement,
     filtration_measurement_from_provenance,
 )
@@ -1819,7 +1820,11 @@ def _forward_scatter_trend_chart(
 
 
 def render_relationship_summary(
-    analysis: DLSRelationshipSummary | RelationshipAnalysis,
+    analysis: (
+        DLSRelationshipSummary
+        | FiltrationRelationshipSummary
+        | RelationshipAnalysis
+    ),
 ) -> None:
     if analysis.correlation is None:
         st.info(analysis.message)
@@ -1854,7 +1859,7 @@ def render_filtration_follow_up(samples: list[ParsedSample]) -> None:
     apply_session_experimental_variables(samples)
     render_attached_filtration_measurements(samples)
 
-    filtration_analysis = build_filtration_trend_analysis(samples)
+    filtration_analysis = analyze_filtration_follow_up_trends(samples)
     if not filtration_analysis.points:
         st.info("Attach filtration difficulty scores for at least three samples to compare filtration behavior with DLS forward-scatter attributes.")
         return
@@ -1865,7 +1870,7 @@ def render_filtration_follow_up(samples: list[ParsedSample]) -> None:
         st.plotly_chart(
             _filtration_trend_chart(
                 filtration_analysis.points,
-                "forward_z_average",
+                "forward_z_average_nm",
                 "Forward Z-Average vs Filtration Difficulty",
                 "Forward Z-Average (nm)",
             ),
@@ -2062,12 +2067,12 @@ def render_attached_filtration_measurements(samples: list[ParsedSample]) -> None
     )
 
 
-def render_filtration_trend_table(points: list[FiltrationTrendPoint]) -> None:
+def render_filtration_trend_table(points: tuple[FiltrationTrendPointRead, ...]) -> None:
     table = pd.DataFrame(
         {
-            "Sample": [point.sample for point in points],
+            "Sample": [point.sample_name for point in points],
             "Difficulty Score": [point.difficulty_score for point in points],
-            "Forward Z-Average": [point.forward_z_average for point in points],
+            "Forward Z-Average": [point.forward_z_average_nm for point in points],
             "Forward PDI": [point.forward_pdi for point in points],
             "Circulation Time (min)": [point.circulation_time_minutes for point in points],
         }
@@ -2080,7 +2085,7 @@ def render_filtration_trend_table(points: list[FiltrationTrendPoint]) -> None:
 
 
 def _filtration_trend_chart(
-    points: list[FiltrationTrendPoint],
+    points: tuple[FiltrationTrendPointRead, ...],
     value_attribute: str,
     title: str,
     y_title: str,
@@ -2096,7 +2101,7 @@ def _filtration_trend_chart(
             x=[point.difficulty_score for point in chart_points],
             y=[getattr(point, value_attribute) for point in chart_points],
             mode="markers+text",
-            text=[point.sample for point in chart_points],
+            text=[point.sample_name for point in chart_points],
             textposition="top center",
             marker={"size": 11, "color": "#0f766e", "line": {"width": 1, "color": "#134e4a"}},
             hovertemplate="<b>%{text}</b><br>Filtration difficulty: %{x:.3g}<br>%{y:.3g}<extra></extra>",

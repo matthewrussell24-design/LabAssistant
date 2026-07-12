@@ -21,6 +21,7 @@ from labassistant.application import (
     DLSHealthOverview,
     DLSTrendDiagnostics,
     DLSForwardScatterTrendRead,
+    FiltrationTrendRead,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -33,6 +34,7 @@ from labassistant.application import (
     analyze_dls_dataset,
     analyze_dls_trend_diagnostics,
     analyze_dls_forward_scatter_trends,
+    analyze_filtration_follow_up_trends,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -81,6 +83,8 @@ from labassistant.context_engine import KnowledgeStore
 from labassistant.interpretation import build_ai_summary, build_data_analysis
 from labassistant.trend_analysis import (
     apply_circulation_time,
+    apply_filtration_measurement,
+    build_filtration_trend_analysis,
     build_forward_scatter_trend_analysis_from_measurements,
     build_data_story,
     control_chart_table,
@@ -1162,6 +1166,60 @@ def test_analyze_dls_forward_scatter_trends_validates_and_preserves_empty_result
         analyze_dls_forward_scatter_trends([object()])
 
 
+def test_analyze_filtration_follow_up_trends_preserves_points_and_relationships():
+    samples = [
+        _decision_sample("A", 0.20, []),
+        _decision_sample("B", 0.21, []),
+        _decision_sample("C", 0.22, []),
+    ]
+    for index, sample in enumerate(samples, start=1):
+        sample.measurement.angle_summaries = [
+            AngleSummary(
+                label="Forward 12.8°",
+                angle_degrees=12.8,
+                position="forward",
+                z_average=float(index * 60 + 40),
+                pdi=float(index) / 10 + 0.1,
+            )
+        ]
+        apply_circulation_time(sample.measurement, index * 10, "minutes")
+        apply_filtration_measurement(
+            sample.measurement,
+            FiltrationMeasurement(
+                sample_name=sample.name,
+                difficulty_score=float(index),
+            ),
+        )
+
+    result = analyze_filtration_follow_up_trends(samples)
+    expected = build_filtration_trend_analysis(samples)
+
+    assert isinstance(result, FiltrationTrendRead)
+    assert [point.sample_name for point in result.points] == ["A", "B", "C"]
+    assert [point.difficulty_score for point in result.points] == [1.0, 2.0, 3.0]
+    assert result.z_average.method == "Spearman"
+    assert result.z_average.correlation == expected.z_average.correlation
+    assert result.z_average.relationship == "strong"
+    assert result.pdi.message == expected.pdi.message
+    assert result.circulation_time.correlation == expected.circulation_time.correlation
+    assert "correlation only" in result.circulation_time.message
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.points[0].difficulty_score = 5.0
+
+
+def test_analyze_filtration_follow_up_trends_validates_and_preserves_empty_result():
+    result = analyze_filtration_follow_up_trends(
+        [_decision_sample("missing filtration", 0.20, [])]
+    )
+    assert result.points == ()
+    assert "At least 3 valid samples" in result.z_average.message
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        analyze_filtration_follow_up_trends([])
+    with raises(TypeError, match="require parsed DLS samples"):
+        analyze_filtration_follow_up_trends([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1287,6 +1345,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "summarize_dls_health",
         "analyze_dls_trend_diagnostics",
         "analyze_dls_forward_scatter_trends",
+        "analyze_filtration_follow_up_trends",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1326,6 +1385,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     forward_trends = get_capability("analyze_dls_forward_scatter_trends")
     assert forward_trends.handler is analyze_dls_forward_scatter_trends
     assert forward_trends.caller_types == ("Human UI", "CLI", "Future API")
+    filtration_trends = get_capability("analyze_filtration_follow_up_trends")
+    assert filtration_trends.handler is analyze_filtration_follow_up_trends
+    assert filtration_trends.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

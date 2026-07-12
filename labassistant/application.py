@@ -59,6 +59,7 @@ from labassistant.models import (
 from labassistant.observations import observations_from_samples
 from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
 from labassistant.trend_analysis import (
+    build_filtration_trend_analysis,
     build_forward_scatter_trend_analysis_from_measurements,
     build_data_story,
     control_chart_table,
@@ -420,6 +421,58 @@ class DLSForwardScatterTrendRead:
             "points": [point.to_dict() for point in self.points],
             "z_average": self.z_average.to_dict(),
             "pdi": self.pdi.to_dict(),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class FiltrationTrendPointRead:
+    """Immutable filtration difficulty and related DLS evidence."""
+
+    sample_name: str
+    difficulty_score: float
+    forward_z_average_nm: float | None
+    forward_pdi: float | None
+    circulation_time_minutes: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class FiltrationRelationshipSummary:
+    """Immutable qualified filtration relationship statistics."""
+
+    metric: str
+    unit: str
+    valid_count: int
+    distinct_values: int
+    method: str
+    pearson_r: float | None
+    correlation: float | None
+    relationship: str | None
+    message: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class FiltrationTrendRead:
+    """Versioned filtration follow-up trend analysis without mutable models."""
+
+    points: tuple[FiltrationTrendPointRead, ...]
+    z_average: FiltrationRelationshipSummary
+    pdi: FiltrationRelationshipSummary
+    circulation_time: FiltrationRelationshipSummary
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "points": [point.to_dict() for point in self.points],
+            "z_average": self.z_average.to_dict(),
+            "pdi": self.pdi.to_dict(),
+            "circulation_time": self.circulation_time.to_dict(),
             "api_version": self.api_version,
         }
 
@@ -1912,6 +1965,60 @@ def analyze_dls_forward_scatter_trends(
     )
 
 
+def analyze_filtration_follow_up_trends(
+    samples: list[Any],
+) -> FiltrationTrendRead:
+    """Analyze reviewed filtration evidence against DLS and circulation values."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for filtration trends")
+    if any(
+        not hasattr(sample, "name") or not hasattr(sample, "measurement")
+        for sample in samples
+    ):
+        raise TypeError("Filtration follow-up trends require parsed DLS samples")
+
+    analysis = build_filtration_trend_analysis(samples)
+    points = tuple(
+        FiltrationTrendPointRead(
+            sample_name=point.sample,
+            difficulty_score=float(point.difficulty_score),
+            forward_z_average_nm=(
+                float(point.forward_z_average)
+                if point.forward_z_average is not None
+                else None
+            ),
+            forward_pdi=float(point.forward_pdi) if point.forward_pdi is not None else None,
+            circulation_time_minutes=(
+                float(point.circulation_time_minutes)
+                if point.circulation_time_minutes is not None
+                else None
+            ),
+        )
+        for point in analysis.points
+    )
+
+    def relationship(value: Any) -> FiltrationRelationshipSummary:
+        return FiltrationRelationshipSummary(
+            metric=value.metric,
+            unit=value.unit,
+            valid_count=value.valid_count,
+            distinct_values=value.distinct_circulation_times,
+            method=value.method,
+            pearson_r=value.pearson_r,
+            correlation=value.correlation,
+            relationship=value.relationship,
+            message=value.message,
+        )
+
+    return FiltrationTrendRead(
+        points=points,
+        z_average=relationship(analysis.z_average),
+        pdi=relationship(analysis.pdi),
+        circulation_time=relationship(analysis.circulation_time),
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2419,6 +2526,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="analyze_dls_forward_scatter_trends",
         purpose="Analyze reviewed circulation time against forward-angle DLS metrics.",
         handler=analyze_dls_forward_scatter_trends,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="analyze_filtration_follow_up_trends",
+        purpose="Analyze reviewed filtration follow-up evidence against DLS metrics.",
+        handler=analyze_filtration_follow_up_trends,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

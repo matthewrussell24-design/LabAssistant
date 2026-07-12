@@ -35,11 +35,12 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates filtration follow-up trend analysis.
+- `app.py` still coordinates dual-angle DLS aggregation assessment directly.
 
 Established DLS narrative, health, control-chart, and replicate diagnostics now
-cross application contracts, including forward-scatter/circulation reads. The
-remaining visible trend bypass is the orthogonal filtration workflow.
+cross application contracts, including forward-scatter/circulation and
+orthogonal filtration reads. The remaining visible assessment bypass is
+dual-angle aggregation review.
 
 ## Implemented Capability Catalog
 
@@ -55,6 +56,7 @@ remaining visible trend bypass is the orthogonal filtration workflow.
 | `summarize_dls_health` | `summarize_dls_health` | Available; used by Streamlit DLS health strip |
 | `analyze_dls_trend_diagnostics` | `analyze_dls_trend_diagnostics` | Available; used by Streamlit control and replicate diagnostics |
 | `analyze_dls_forward_scatter_trends` | `analyze_dls_forward_scatter_trends` | Available; used by Streamlit circulation explorer |
+| `analyze_filtration_follow_up_trends` | `analyze_filtration_follow_up_trends` | Available; used by Streamlit filtration follow-up |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -361,6 +363,31 @@ angle evidence produces empty points and qualified messages rather than errors.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's circulation explorer is
 the first caller. Agent use remains excluded pending broader review of user-
 entered experimental-variable provenance.
+
+## Analyze Filtration Follow-Up Trends
+
+**Name:** `analyze_filtration_follow_up_trends`
+
+**Purpose:** Analyze reviewed filtration difficulty evidence against forward-
+angle DLS size, PDI, and circulation time without exposing mutable trend-domain
+results.
+
+**Inputs:** A non-empty list of parsed DLS samples whose measurements may carry
+reviewed filtration follow-up and circulation-time provenance. Input parsing and
+evidence attachment remain outside this read capability.
+
+**Outputs:** A frozen, versioned `FiltrationTrendRead` containing ordered
+`FiltrationTrendPointRead` evidence and three qualified
+`FiltrationRelationshipSummary` values. Summaries preserve Spearman method,
+insufficient-data constraints, and correlation-only language.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-DLS-sample contract. Missing filtration
+evidence produces empty points and qualified messages rather than errors.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's filtration follow-up is
+the first caller. Agent use remains excluded pending broader review of ordinal,
+operator-assessed evidence.
 
 ## Import Chromatography Experiment
 
