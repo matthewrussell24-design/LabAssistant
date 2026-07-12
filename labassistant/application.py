@@ -43,6 +43,7 @@ from labassistant.importers.filtration import parse_filtration_csv
 from labassistant.filtration import observations_from_filtration_measurement
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.investigator import investigate as investigate_domain_experiment
+from labassistant.interpretation import build_decision_brief
 from labassistant.models import (
     ChromatographyMeasurement,
     Experiment,
@@ -52,7 +53,8 @@ from labassistant.models import (
     Observation,
 )
 from labassistant.observations import observations_from_samples
-from labassistant.view_models import sample_from_measurement, sample_status
+from labassistant.quality import STATUS_NORMAL
+from labassistant.view_models import build_metrics_table, sample_from_measurement, sample_status
 
 
 APP_NAME = "LabAssistant"
@@ -212,6 +214,52 @@ class DLSUploadImportResult:
             "measurements": [measurement.to_dict() for measurement in self.measurements],
             "source_files": list(self.source_files),
             "import_errors": list(self.import_errors),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class DLSAttentionRow:
+    """Immutable DLS screening rank for one parsed sample."""
+
+    sample_name: str
+    status: str
+    attention_score: float
+    reason: str
+    warnings: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSDecisionRanking:
+    """Versioned DLS-specific decision summary without pandas output."""
+
+    best_candidate: str
+    attention_candidate: str
+    flagged_count: int
+    sample_count: int
+    review_samples: str
+    next_check: str
+    unusual_changes: tuple[str, ...]
+    attention_rows: tuple[DLSAttentionRow, ...]
+    api_version: str = AGENT_API_VERSION
+
+    @property
+    def flagged_label(self) -> str:
+        return f"{self.flagged_count} of {self.sample_count}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "best_candidate": self.best_candidate,
+            "attention_candidate": self.attention_candidate,
+            "flagged_count": self.flagged_count,
+            "sample_count": self.sample_count,
+            "review_samples": self.review_samples,
+            "next_check": self.next_check,
+            "unusual_changes": list(self.unusual_changes),
+            "attention_rows": [row.to_dict() for row in self.attention_rows],
             "api_version": self.api_version,
         }
 
@@ -1498,6 +1546,42 @@ def analyze_dls_uploads(sources: list[object]) -> DLSUploadImportResult:
     )
 
 
+def rank_dls_decisions(samples: list[Any]) -> DLSDecisionRanking:
+    """Apply the established DLS screening rank and return immutable rows."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for decision ranking")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "metrics")
+        or not hasattr(sample, "warnings")
+        for sample in samples
+    ):
+        raise TypeError("DLS decision ranking requires parsed samples")
+
+    decision = build_decision_brief(samples, build_metrics_table(samples))
+    attention_rows = tuple(
+        DLSAttentionRow(
+            sample_name=str(row["Sample"]),
+            status=str(row["Status"]),
+            attention_score=float(row["Attention Score"]),
+            reason=str(row["Reason"]),
+            warnings=str(row["Warnings"]),
+        )
+        for row in decision["attention"].to_dict(orient="records")
+    )
+    return DLSDecisionRanking(
+        best_candidate=str(decision["best"]),
+        attention_candidate=str(decision["worst"]),
+        flagged_count=sum(row.status != STATUS_NORMAL for row in attention_rows),
+        sample_count=len(samples),
+        review_samples=str(decision["review"]),
+        next_check=str(decision["next_check"]),
+        unusual_changes=tuple(str(item) for item in decision["unusual"]),
+        attention_rows=attention_rows,
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -1975,6 +2059,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="analyze_dls_uploads",
         purpose="Preview and import uploaded DLS evidence into immutable summaries.",
         handler=analyze_dls_uploads,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="rank_dls_decisions",
+        purpose="Rank parsed DLS samples for deterministic screening attention.",
+        handler=rank_dls_decisions,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

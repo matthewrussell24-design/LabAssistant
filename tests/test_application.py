@@ -15,6 +15,7 @@ from labassistant.application import (
     ExperimentSaveReceipt,
     ObservationGenerationResult,
     DLSUploadImportResult,
+    DLSDecisionRanking,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -37,6 +38,7 @@ from labassistant.application import (
     generate_observations,
     investigate_experiment,
     produce_experiment_brief,
+    rank_dls_decisions,
     get_capability,
     list_capabilities,
     list_experiments,
@@ -870,6 +872,69 @@ def test_analyze_dls_uploads_validates_generic_seekable_sources():
         analyze_dls_uploads([type("Named", (), {"name": "sample.csv"})()])
 
 
+def _decision_sample(name: str, pdi: float, warnings: list[str]) -> ParsedSample:
+    return ParsedSample(
+        name=name,
+        file_name=f"{name}.csv",
+        data=None,
+        metadata={},
+        metrics={
+            "Data Type": "Distribution Curve",
+            "Z-Average": 100.0,
+            "PDI": pdi,
+            "Max Z-Average": None,
+            "Max PDI": None,
+            "Measurement Count": None,
+            "Scattering Angles": None,
+            "Primary Peak": 100.0,
+            "Secondary Peak": None,
+            "Count Rate": None,
+            "Tail Index": 0.0,
+            "Width Ratio": 3.0,
+            "D10": 50.0,
+            "D50": 100.0,
+            "D90": 150.0,
+            "Measurement Date": None,
+        },
+        warnings=warnings,
+        source_text="",
+        measurement=Measurement(metadata=MeasurementMetadata(sample_name=name)),
+    )
+
+
+def test_rank_dls_decisions_preserves_screening_order_and_returns_immutable_rows():
+    result = rank_dls_decisions(
+        [
+            _decision_sample("clean", 0.12, []),
+            _decision_sample("flagged", 0.35, ["Moderate PDI"]),
+        ]
+    )
+
+    assert isinstance(result, DLSDecisionRanking)
+    assert result.best_candidate == "clean (Normal)"
+    assert result.attention_candidate == "flagged (Watch)"
+    assert result.flagged_count == 1
+    assert result.flagged_label == "1 of 2"
+    assert result.attention_rows[0].sample_name == "flagged"
+    assert result.attention_rows[0].reason == "PDI 0.35"
+    assert result.next_check == "Inspect flagged first: PDI 0.35."
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+
+
+def test_rank_dls_decisions_preserves_alphabetical_tie_breaking_and_validation():
+    result = rank_dls_decisions(
+        [_decision_sample("beta", 0.12, []), _decision_sample("alpha", 0.12, [])]
+    )
+
+    assert [row.sample_name for row in result.attention_rows] == ["alpha", "beta"]
+    assert result.best_candidate == "alpha (Normal)"
+    assert result.attention_candidate == "alpha (Normal)"
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        rank_dls_decisions([])
+    with raises(TypeError, match="requires parsed samples"):
+        rank_dls_decisions([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -990,6 +1055,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "import_dls_experiment",
         "analyze_dls_dataset",
         "analyze_dls_uploads",
+        "rank_dls_decisions",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1060,6 +1126,10 @@ def test_capability_registry_resolves_existing_entry_points_without_wrapping_the
     dls_uploads = get_capability("analyze_dls_uploads")
     assert dls_uploads.handler is analyze_dls_uploads
     assert "Agent" not in dls_uploads.caller_types
+
+    dls_ranking = get_capability("rank_dls_decisions")
+    assert dls_ranking.handler is rank_dls_decisions
+    assert "Agent" not in dls_ranking.caller_types
 
 
 def test_capability_registry_rejects_unknown_names():

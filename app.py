@@ -25,6 +25,7 @@ from labassistant.application import (
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
+    rank_dls_decisions,
     list_experiments,
     retrieve_experiment,
     retrieve_history_overview,
@@ -36,7 +37,6 @@ from labassistant.application import (
 from labassistant.interpretation import (
     build_ai_summary,
     build_data_analysis,
-    build_decision_brief,
     format_metric,
     review_evidence,
 )
@@ -189,18 +189,17 @@ def render_data_story(samples: list[ParsedSample], metrics: pd.DataFrame) -> Non
             )
 
 
-def render_decision_brief(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
-    decision = build_decision_brief(samples, metrics)
-    attention = decision["attention"]
-    flagged = attention[attention["Status"] != STATUS_NORMAL]
+def render_decision_brief(samples: list[ParsedSample]) -> None:
+    decision = rank_dls_decisions(samples)
+    flagged = [row for row in decision.attention_rows if row.status != STATUS_NORMAL]
 
     st.subheader("Decision Brief")
 
     decision_cols = st.columns([1.1, 1.1, 0.8, 2.2])
     for column, label, value in [
-        (decision_cols[0], "Best Sample", str(decision["best"])),
-        (decision_cols[1], "Needs Attention", str(decision["worst"])),
-        (decision_cols[2], "Flagged", str(decision["flagged"])),
+        (decision_cols[0], "Best Sample", decision.best_candidate),
+        (decision_cols[1], "Needs Attention", decision.attention_candidate),
+        (decision_cols[2], "Flagged", decision.flagged_label),
     ]:
         column.markdown(
             f"""
@@ -215,19 +214,27 @@ def render_decision_brief(samples: list[ParsedSample], metrics: pd.DataFrame) ->
         f"""
         <div class="decision-card">
             <div class="decision-label">Next Check</div>
-            <div class="decision-text">{html.escape(str(decision["next_check"]))}</div>
+            <div class="decision-text">{html.escape(decision.next_check)}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    if flagged.empty:
+    if not flagged:
         st.success("Current read: the parsed samples look okay by the active DLS warning rules.")
     else:
-        st.warning(f"Current read: inspect {flagged.iloc[0]['Sample']} first; {flagged.iloc[0]['Reason']}.")
+        st.warning(f"Current read: inspect {flagged[0].sample_name} first; {flagged[0].reason}.")
 
-    with st.expander("Attention ranking", expanded=not flagged.empty):
-        display = attention.copy()
+    with st.expander("Attention ranking", expanded=bool(flagged)):
+        display = pd.DataFrame(row.to_dict() for row in decision.attention_rows).rename(
+            columns={
+                "sample_name": "Sample",
+                "status": "Status",
+                "attention_score": "Attention Score",
+                "reason": "Reason",
+                "warnings": "Warnings",
+            }
+        )
         display["Attention Score"] = display["Attention Score"].round(1)
         st.dataframe(display[["Sample", "Status", "Attention Score", "Reason", "Warnings"]], use_container_width=True, hide_index=True)
 
@@ -448,7 +455,7 @@ def render_research_journal_panel() -> None:
 def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
     render_experiment_brief(samples)
     render_health_strip(samples, metrics)
-    render_decision_brief(samples, metrics)
+    render_decision_brief(samples)
     render_data_story(samples, metrics)
 
     finding_col, review_col = st.columns([1.45, 1])

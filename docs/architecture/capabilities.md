@@ -35,9 +35,9 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates DLS-specific decision-brief helpers directly.
+- `app.py` still coordinates DLS-specific data-story and summary helpers directly.
 
-The remaining visible bypass is DLS-specific decision ranking.
+The remaining visible bypass is DLS-specific narrative composition.
 
 ## Implemented Capability Catalog
 
@@ -48,6 +48,7 @@ The remaining visible bypass is DLS-specific decision ranking.
 | `import_dls_experiment` | `dls_experiment_from_samples` | Available, transitional input |
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `analyze_dls_uploads` | `analyze_dls_uploads` | Available; used by Streamlit DLS upload workflow |
+| `rank_dls_decisions` | `rank_dls_decisions` | Available; used by Streamlit DLS Decision Brief |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -238,6 +239,29 @@ preserve the resilient human upload workflow.
 
 **Caller Types:** Human UI, CLI, Future API. Streamlit is the first caller.
 Agent use is excluded pending reviewed file and provenance handling.
+
+## Rank DLS Decisions
+
+**Name:** `rank_dls_decisions`
+
+**Purpose:** Rank parsed DLS samples for deterministic screening attention while
+keeping this technique-specific heuristic separate from the Investigator.
+
+**Inputs:** A non-empty list of parsed DLS samples. The capability builds the
+established metrics table internally, so callers do not pass pandas objects.
+
+**Outputs:** A frozen, versioned `DLSDecisionRanking` containing best and
+attention candidates, flagged and total counts, review sample labels, next-check
+guidance, unusual changes, and ordered immutable `DLSAttentionRow` values. No
+DataFrame crosses the application boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Established metric validation
+errors remain unchanged.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's DLS Decision Brief is
+the first caller. Agent use is excluded because this rank is a human screening
+heuristic rather than an instrument-independent reasoning contract.
 
 ## Import Chromatography Experiment
 
