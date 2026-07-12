@@ -35,10 +35,10 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates the detailed DLS data-analysis helper directly.
+- `app.py` still computes the DLS health-strip score, counts, and medians.
 
-The main findings and trend-story narrative now cross one application contract;
-the remaining visible interpretation bypass is the larger diagnostic analysis.
+All established DLS narrative builders now cross one application contract. The
+remaining visible summary bypass is the compact health overview.
 
 ## Implemented Capability Catalog
 
@@ -269,16 +269,17 @@ heuristic rather than an instrument-independent reasoning contract.
 
 **Name:** `compose_dls_narrative`
 
-**Purpose:** Compose the established rule-based DLS findings and trend story
-once, without presenting deterministic text as language-model output.
+**Purpose:** Compose the established rule-based DLS findings, detailed analysis,
+and trend story once, without presenting deterministic text as language-model
+output.
 
 **Inputs:** A non-empty list of parsed DLS samples. The capability builds its
 metrics table internally, so callers do not pass pandas objects.
 
 **Outputs:** A frozen, versioned `DLSNarrative` containing ordered automated-
-finding and data-story sections. Each `DLSNarrativeSection` contains an
-immutable heading and bullet tuple. No DataFrame or card-layout detail crosses
-the application boundary.
+finding, detailed-analysis, and data-story sections. Each
+`DLSNarrativeSection` contains an immutable heading and bullet tuple. No
+DataFrame or card-layout detail crosses the application boundary.
 
 **Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
 that does not satisfy the parsed-sample contract. Established narrative and

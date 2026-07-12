@@ -37,7 +37,6 @@ from labassistant.application import (
     save_experiment_history,
 )
 from labassistant.interpretation import (
-    build_data_analysis,
     format_metric,
     review_evidence,
 )
@@ -122,21 +121,19 @@ def render_health_strip(samples: list[ParsedSample], metrics: pd.DataFrame) -> N
     top_cols[4].metric("Median tail >1,000 nm", format_metric(median_tail, "%") if pd.notna(median_tail) else "Not found")
 
 
-def render_data_analysis(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
-    analysis = build_data_analysis(samples, metrics)
-
+def render_data_analysis(narrative: DLSNarrative) -> None:
     st.subheader("Data Analysis")
     st.caption("Dataset-specific interpretation of which samples and metrics are shaping the result.")
 
     analysis_columns = st.columns(3)
-    for column, (title, items) in zip(analysis_columns, analysis.items()):
+    for column, section in zip(analysis_columns, narrative.detailed_analysis):
         with column:
             st.markdown(
                 f"""
                 <div class="analysis-card">
-                    <div class="summary-title">{html.escape(title)}</div>
+                    <div class="summary-title">{html.escape(section.heading)}</div>
                     <ul>
-                        {''.join(f'<li>{html.escape(item)}</li>' for item in items)}
+                        {''.join(f'<li>{html.escape(item)}</li>' for item in section.bullets)}
                     </ul>
                 </div>
                 """,
@@ -2456,7 +2453,7 @@ def main() -> None:
     with st.expander("Secondary charts and diagnostics"):
         render_angle_breakdown(samples)
 
-        render_data_analysis(samples, metrics)
+        render_data_analysis(narrative)
         render_ai_summary(narrative)
 
         replicate_stats = replicate_statistics_table(samples)

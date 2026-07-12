@@ -71,7 +71,7 @@ from labassistant.history import (
     save_experiment,
 )
 from labassistant.context_engine import KnowledgeStore
-from labassistant.interpretation import build_ai_summary
+from labassistant.interpretation import build_ai_summary, build_data_analysis
 from labassistant.trend_analysis import build_data_story
 from labassistant.view_models import ParsedSample, build_metrics_table
 
@@ -899,6 +899,8 @@ def _decision_sample(name: str, pdi: float, warnings: list[str]) -> ParsedSample
             "D10": 50.0,
             "D50": 100.0,
             "D90": 150.0,
+            "Diameter Column": "Diameter",
+            "Preferred Distribution": "Intensity",
             "Measurement Date": None,
         },
         warnings=warnings,
@@ -969,6 +971,15 @@ def test_compose_dls_narrative_preserves_findings_and_story_as_immutable_section
     assert {
         section.heading: list(section.bullets) for section in result.data_story
     } == build_data_story(samples, metrics)
+    assert [section.heading for section in result.detailed_analysis] == [
+        "Main Finding",
+        "What Is Driving It",
+        "How To Judge It",
+    ]
+    assert {
+        section.heading: list(section.bullets)
+        for section in result.detailed_analysis
+    } == build_data_analysis(samples, metrics)
     assert result.to_dict()["automated_findings"][0]["heading"] == "Main Finding"
     assert result.to_dict()["api_version"] == AGENT_API_VERSION
     with raises(FrozenInstanceError):

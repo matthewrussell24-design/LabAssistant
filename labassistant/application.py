@@ -43,7 +43,11 @@ from labassistant.importers.filtration import parse_filtration_csv
 from labassistant.filtration import observations_from_filtration_measurement
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.investigator import investigate as investigate_domain_experiment
-from labassistant.interpretation import build_ai_summary, build_decision_brief
+from labassistant.interpretation import (
+    build_ai_summary,
+    build_data_analysis,
+    build_decision_brief,
+)
 from labassistant.models import (
     ChromatographyMeasurement,
     Experiment,
@@ -278,16 +282,18 @@ class DLSNarrativeSection:
 
 @dataclass(frozen=True)
 class DLSNarrative:
-    """Versioned DLS findings and trend story without pandas output."""
+    """Versioned DLS findings, analysis, and trend story without pandas output."""
 
     automated_findings: tuple[DLSNarrativeSection, ...]
     data_story: tuple[DLSNarrativeSection, ...]
+    detailed_analysis: tuple[DLSNarrativeSection, ...]
     api_version: str = AGENT_API_VERSION
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "automated_findings": [section.to_dict() for section in self.automated_findings],
             "data_story": [section.to_dict() for section in self.data_story],
+            "detailed_analysis": [section.to_dict() for section in self.detailed_analysis],
             "api_version": self.api_version,
         }
 
@@ -1637,6 +1643,7 @@ def compose_dls_narrative(samples: list[Any]) -> DLSNarrative:
     return DLSNarrative(
         automated_findings=freeze(build_ai_summary(samples, metrics)),
         data_story=freeze(build_data_story(samples, metrics)),
+        detailed_analysis=freeze(build_data_analysis(samples, metrics)),
     )
 
 

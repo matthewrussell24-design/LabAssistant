@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted DLS findings and trend-story composition
-  into one immutable application workflow and migrated Streamlit (task 027).
-- Working Tree: Task 027 is committed locally; inspect `git status --short`
+- Latest Completed Change: Added detailed DLS analysis to the immutable
+  narrative workflow and migrated Streamlit (task 028).
+- Working Tree: Task 028 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `179 passed in 2.57s` from `scripts/test -q` on
+- Last Successful Test: `179 passed in 2.48s` from `scripts/test -q` on
   2026-07-12.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-12 for task 027.
+- Last Updated: 2026-07-12 for task 028.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 177 passing.
+- Tests: 🟢 Healthy — 179 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -298,6 +298,8 @@ architecture rationale.
 - Promoted DLS automated findings and trend-story composition into ordered,
   immutable narrative sections and routed both Streamlit views through one
   application result (task 027).
+- Added detailed DLS diagnostic analysis to the same immutable narrative result
+  and removed Streamlit's final direct narrative-builder call (task 028).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -313,8 +315,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS narrative-composition task 027 is complete.
-- The working tree was clean when task 027 began.
+- DLS data-analysis task 028 is complete.
+- The working tree was clean when task 028 began.
 
 ## Known Risks
 
@@ -349,8 +351,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `179 passed in 2.57s` from `scripts/test -q` on 2026-07-12.
-- The Streamlit shell completed a headless startup smoke after task 027.
+- Latest result: `179 passed in 2.48s` from `scripts/test -q` on 2026-07-12.
+- The Streamlit shell completed a headless startup smoke after task 028.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -367,17 +369,17 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote detailed DLS data-analysis composition into an immutable
-  application workflow.
-- Why this is next: Streamlit's main findings and trend story now cross the
-  application boundary, but the diagnostics expander still calls
-  `build_data_analysis` directly.
-- Expected scope: Medium; preserve the established diagnostic sections and
-  wording while returning immutable headings and bullets without pandas.
-- Risks: Overlapping the concise narrative contract, duplicating metric
-  calculations, or coupling the application output to the three-card layout.
-- Success criteria: Streamlit renders detailed DLS analysis through one
-  registered application capability and no longer imports the analysis builder.
+- Objective: Promote the DLS health overview into an immutable application
+  read model.
+- Why this is next: All narrative builders now cross the application boundary,
+  but Streamlit still computes the health score, flagged/review counts, and
+  metric medians directly.
+- Expected scope: Small to medium; preserve current status weights and display
+  values while returning typed, pandas-free health metrics.
+- Risks: Treating a UI screening score as a universal scientific quality score
+  or duplicating warning-status logic already used by decision ranking.
+- Success criteria: Streamlit renders the health strip from one registered
+  application workflow and owns only labels and card layout.
 
 ## AI Context Window
 
