@@ -24,6 +24,7 @@ from labassistant.application import (
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
+    DLSHealthOverview,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -35,6 +36,7 @@ from labassistant.application import (
     retrieve_research_journal,
     save_experiment_to_memory,
     save_experiment_history,
+    summarize_dls_health,
 )
 from labassistant.interpretation import (
     format_metric,
@@ -94,31 +96,23 @@ def render_metric_row(label: str, value: str) -> str:
     )
 
 
-def dashboard_health_score(samples: list[ParsedSample]) -> int:
-    if not samples:
-        return 0
-
-    status_weights = {
-        STATUS_NORMAL: 100,
-        STATUS_WATCH: 65,
-        STATUS_REVIEW: 25,
-    }
-    score = sum(status_weights.get(sample_status(sample), 50) for sample in samples) / len(samples)
-    return int(round(score))
-
-
-def render_health_strip(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
-    flagged_count = sum(sample_status(sample) != STATUS_NORMAL for sample in samples)
-    review_count = sum(sample_status(sample) == STATUS_REVIEW for sample in samples)
-    median_z = metrics["Z-Average"].dropna().median() if "Z-Average" in metrics else None
-    median_tail = metrics["Tail Index"].dropna().median() if "Tail Index" in metrics else None
-
+def render_health_strip(health: DLSHealthOverview) -> None:
     top_cols = st.columns(5)
-    top_cols[0].metric("Health Score", f"{dashboard_health_score(samples)}/100")
-    top_cols[1].metric("Samples", len(samples))
-    top_cols[2].metric("Flagged", flagged_count, delta=f"{review_count} review" if review_count else None)
-    top_cols[3].metric("Median Z-Average", format_metric(median_z, "nm") if pd.notna(median_z) else "Not found")
-    top_cols[4].metric("Median tail >1,000 nm", format_metric(median_tail, "%") if pd.notna(median_tail) else "Not found")
+    top_cols[0].metric("Health Score", f"{health.screening_score}/100")
+    top_cols[1].metric("Samples", health.sample_count)
+    top_cols[2].metric(
+        "Flagged",
+        health.flagged_count,
+        delta=f"{health.review_count} review" if health.review_count else None,
+    )
+    top_cols[3].metric(
+        "Median Z-Average",
+        format_metric(health.median_z_average_nm, "nm"),
+    )
+    top_cols[4].metric(
+        "Median tail >1,000 nm",
+        format_metric(health.median_tail_percent, "%"),
+    )
 
 
 def render_data_analysis(narrative: DLSNarrative) -> None:
@@ -447,7 +441,7 @@ def render_research_journal_panel() -> None:
 
 def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame, narrative: DLSNarrative) -> None:
     render_experiment_brief(samples)
-    render_health_strip(samples, metrics)
+    render_health_strip(summarize_dls_health(samples))
     render_decision_brief(samples)
     render_data_story(narrative)
 

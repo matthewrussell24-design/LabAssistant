@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Added detailed DLS analysis to the immutable
-  narrative workflow and migrated Streamlit (task 028).
-- Working Tree: Task 028 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted the DLS health overview into an immutable
+  application workflow and migrated Streamlit (task 029).
+- Working Tree: Task 029 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `179 passed in 2.48s` from `scripts/test -q` on
+- Last Successful Test: `181 passed in 2.41s` from `scripts/test -q` on
   2026-07-12.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-12 for task 028.
+- Last Updated: 2026-07-12 for task 029.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 179 passing.
+- Tests: 🟢 Healthy — 181 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of twenty-four stable capability names, including explicit
+  registry of twenty-five stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -300,6 +300,8 @@ architecture rationale.
   application result (task 027).
 - Added detailed DLS diagnostic analysis to the same immutable narrative result
   and removed Streamlit's final direct narrative-builder call (task 028).
+- Promoted the DLS screening score, warning counts, and medians into an
+  immutable, pandas-free health overview and routed Streamlit through it (task 029).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -315,8 +317,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS data-analysis task 028 is complete.
-- The working tree was clean when task 028 began.
+- DLS health-overview task 029 is complete.
+- The working tree was clean when task 029 began.
 
 ## Known Risks
 
@@ -351,8 +353,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `179 passed in 2.48s` from `scripts/test -q` on 2026-07-12.
-- The Streamlit shell completed a headless startup smoke after task 028.
+- Latest result: `181 passed in 2.41s` from `scripts/test -q` on 2026-07-12.
+- The Streamlit shell completed a headless startup smoke after task 029.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -369,17 +371,18 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote the DLS health overview into an immutable application
-  read model.
-- Why this is next: All narrative builders now cross the application boundary,
-  but Streamlit still computes the health score, flagged/review counts, and
-  metric medians directly.
-- Expected scope: Small to medium; preserve current status weights and display
-  values while returning typed, pandas-free health metrics.
-- Risks: Treating a UI screening score as a universal scientific quality score
-  or duplicating warning-status logic already used by decision ranking.
-- Success criteria: Streamlit renders the health strip from one registered
-  application workflow and owns only labels and card layout.
+- Objective: Promote DLS trend diagnostic tables into immutable application
+  read models.
+- Why this is next: Summary and narrative composition now cross the application
+  boundary, but Streamlit still calls `control_chart_table` and
+  `replicate_statistics_table` directly.
+- Expected scope: Medium; preserve established values, ordering, and zones while
+  returning typed tuples without pandas.
+- Risks: Coupling contracts to current table column labels or changing
+  control-limit behavior while converting rows.
+- Success criteria: Streamlit renders control-chart and replicate diagnostics
+  through one registered application workflow and constructs DataFrames only
+  from immutable row values for display.
 
 ## AI Context Window
 

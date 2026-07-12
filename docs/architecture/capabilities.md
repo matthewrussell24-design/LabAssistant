@@ -35,10 +35,10 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still computes the DLS health-strip score, counts, and medians.
+- `app.py` still coordinates DLS control-chart and replicate-statistics tables.
 
-All established DLS narrative builders now cross one application contract. The
-remaining visible summary bypass is the compact health overview.
+Established DLS narrative and health summaries now cross application contracts.
+The remaining visible diagnostic bypass is tabular trend composition.
 
 ## Implemented Capability Catalog
 
@@ -51,6 +51,7 @@ remaining visible summary bypass is the compact health overview.
 | `analyze_dls_uploads` | `analyze_dls_uploads` | Available; used by Streamlit DLS upload workflow |
 | `rank_dls_decisions` | `rank_dls_decisions` | Available; used by Streamlit DLS Decision Brief |
 | `compose_dls_narrative` | `compose_dls_narrative` | Available; used by Streamlit DLS findings and Data Story |
+| `summarize_dls_health` | `summarize_dls_health` | Available; used by Streamlit DLS health strip |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -288,6 +289,28 @@ trend validation errors remain unchanged.
 **Caller Types:** Human UI, CLI, Future API. Streamlit is the first caller and
 composes the result once per imported dataset. Agent use remains excluded while
 this DLS-specific presentation contract matures.
+
+## Summarize DLS Health
+
+**Name:** `summarize_dls_health`
+
+**Purpose:** Summarize the existing DLS screening score, warning-status counts,
+and central metric values without treating the score as a universal scientific
+quality assessment.
+
+**Inputs:** A non-empty list of parsed DLS samples. The capability builds its
+metrics table internally, so callers do not pass pandas objects.
+
+**Outputs:** A frozen, versioned `DLSHealthOverview` containing the integer
+screening score, sample/flagged/review counts, median Z-average, and median
+large-particle-tail percentage. Missing medians are `None`; no formatted labels
+or DataFrame crosses the boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's health strip is the
+first caller. Agent use is excluded while this human screening heuristic matures.
 
 ## Import Chromatography Experiment
 

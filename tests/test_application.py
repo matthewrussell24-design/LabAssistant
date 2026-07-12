@@ -18,6 +18,7 @@ from labassistant.application import (
     DLSUploadImportResult,
     DLSDecisionRanking,
     DLSNarrative,
+    DLSHealthOverview,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -53,6 +54,7 @@ from labassistant.application import (
     retrieve_experiment,
     save_experiment_history,
     save_experiment_to_memory,
+    summarize_dls_health,
 )
 from labassistant.models import (
     ChromatogramTrace,
@@ -993,6 +995,41 @@ def test_compose_dls_narrative_validates_parsed_samples():
         compose_dls_narrative([object()])
 
 
+def test_summarize_dls_health_preserves_screening_weights_counts_and_medians():
+    result = summarize_dls_health(
+        [
+            _decision_sample("clean", 0.12, []),
+            _decision_sample("watch", 0.35, ["Moderate PDI"]),
+            _decision_sample("review", 0.50, ["High PDI"]),
+        ]
+    )
+
+    assert isinstance(result, DLSHealthOverview)
+    assert result.screening_score == 63
+    assert result.sample_count == 3
+    assert result.flagged_count == 2
+    assert result.review_count == 1
+    assert result.median_z_average_nm == 100.0
+    assert result.median_tail_percent == 0.0
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.screening_score = 100
+
+
+def test_summarize_dls_health_validates_parsed_samples():
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        summarize_dls_health([])
+    with raises(TypeError, match="requires parsed samples"):
+        summarize_dls_health([object()])
+
+    missing = _decision_sample("missing", 0.12, [])
+    missing.metrics["Z-Average"] = None
+    missing.metrics["Tail Index"] = None
+    result = summarize_dls_health([missing])
+    assert result.median_z_average_nm is None
+    assert result.median_tail_percent is None
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1115,6 +1152,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "analyze_dls_uploads",
         "rank_dls_decisions",
         "compose_dls_narrative",
+        "summarize_dls_health",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1145,6 +1183,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     narrative = get_capability("compose_dls_narrative")
     assert narrative.handler is compose_dls_narrative
     assert narrative.caller_types == ("Human UI", "CLI", "Future API")
+    health = get_capability("summarize_dls_health")
+    assert health.handler is summarize_dls_health
+    assert health.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

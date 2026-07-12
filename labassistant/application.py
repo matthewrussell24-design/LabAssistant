@@ -57,7 +57,7 @@ from labassistant.models import (
     Observation,
 )
 from labassistant.observations import observations_from_samples
-from labassistant.quality import STATUS_NORMAL
+from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
 from labassistant.trend_analysis import build_data_story
 from labassistant.view_models import build_metrics_table, sample_from_measurement, sample_status
 
@@ -296,6 +296,22 @@ class DLSNarrative:
             "detailed_analysis": [section.to_dict() for section in self.detailed_analysis],
             "api_version": self.api_version,
         }
+
+
+@dataclass(frozen=True)
+class DLSHealthOverview:
+    """Versioned DLS screening overview without pandas output."""
+
+    screening_score: int
+    sample_count: int
+    flagged_count: int
+    review_count: int
+    median_z_average_nm: float | None
+    median_tail_percent: float | None
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -1647,6 +1663,41 @@ def compose_dls_narrative(samples: list[Any]) -> DLSNarrative:
     )
 
 
+def summarize_dls_health(samples: list[Any]) -> DLSHealthOverview:
+    """Return the established DLS screening score, counts, and medians."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for health summary")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "metrics")
+        or not hasattr(sample, "warnings")
+        for sample in samples
+    ):
+        raise TypeError("DLS health summary requires parsed samples")
+
+    statuses = tuple(sample_status(sample) for sample in samples)
+    status_weights = {
+        STATUS_NORMAL: 100,
+        STATUS_WATCH: 65,
+        STATUS_REVIEW: 25,
+    }
+    metrics = build_metrics_table(samples)
+    z_values = metrics["Z-Average"].dropna()
+    tail_values = metrics["Tail Index"].dropna()
+
+    return DLSHealthOverview(
+        screening_score=int(
+            round(sum(status_weights.get(status, 50) for status in statuses) / len(statuses))
+        ),
+        sample_count=len(samples),
+        flagged_count=sum(status != STATUS_NORMAL for status in statuses),
+        review_count=sum(status == STATUS_REVIEW for status in statuses),
+        median_z_average_nm=float(z_values.median()) if not z_values.empty else None,
+        median_tail_percent=float(tail_values.median()) if not tail_values.empty else None,
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2136,6 +2187,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="compose_dls_narrative",
         purpose="Compose deterministic DLS findings and trend narrative.",
         handler=compose_dls_narrative,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="summarize_dls_health",
+        purpose="Summarize DLS screening health, status counts, and metric medians.",
+        handler=summarize_dls_health,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(
