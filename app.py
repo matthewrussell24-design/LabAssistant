@@ -22,11 +22,14 @@ from labassistant.application import (
     analyze_filtration_csv,
     analyze_dls_uploads,
     analyze_dls_trend_diagnostics,
+    analyze_dls_forward_scatter_trends,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
     DLSHealthOverview,
     DLSTrendDiagnostics,
+    DLSForwardScatterPoint,
+    DLSRelationshipSummary,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -59,13 +62,11 @@ from labassistant.filtration import (
 from labassistant.models import Experiment
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
-    ForwardScatterPoint,
     FiltrationTrendPoint,
     RelationshipAnalysis,
     apply_circulation_time,
     apply_filtration_measurement,
     build_filtration_trend_analysis,
-    build_forward_scatter_trend_analysis_from_measurements,
     circulation_time_from_measurement,
     filtration_measurement_from_provenance,
 )
@@ -1713,7 +1714,7 @@ def render_forward_scatter_trend_explorer(samples: list[ParsedSample]) -> None:
         st.warning("Enter numeric circulation times for: " + ", ".join(invalid_time_samples))
 
     apply_session_experimental_variables(samples)
-    analysis = build_forward_scatter_trend_analysis_from_measurements(samples)
+    analysis = analyze_dls_forward_scatter_trends(samples)
     if not analysis.points:
         st.info("Enter circulation times for samples with forward-angle summaries to begin direct relationship analysis.")
         render_filtration_follow_up(samples)
@@ -1721,11 +1722,11 @@ def render_forward_scatter_trend_explorer(samples: list[ParsedSample]) -> None:
 
     trend_table = pd.DataFrame(
         {
-            "Sample": [point.sample for point in analysis.points],
-            "Entered Circulation Time": [point.circulation_time_value for point in analysis.points],
+            "Sample": [point.sample_name for point in analysis.points],
+            "Entered Circulation Time": [point.entered_circulation_time for point in analysis.points],
             "Unit": [point.circulation_time_unit for point in analysis.points],
-            "Circulation Time (min)": [point.circulation_time for point in analysis.points],
-            "Forward Z-Average": [point.forward_z_average for point in analysis.points],
+            "Circulation Time (min)": [point.circulation_time_minutes for point in analysis.points],
+            "Forward Z-Average": [point.forward_z_average_nm for point in analysis.points],
             "Forward PDI": [point.forward_pdi for point in analysis.points],
         }
     )
@@ -1741,7 +1742,7 @@ def render_forward_scatter_trend_explorer(samples: list[ParsedSample]) -> None:
         st.plotly_chart(
             _forward_scatter_trend_chart(
                 analysis.points,
-                "forward_z_average",
+                "forward_z_average_nm",
                 "Forward Z-Average vs Total Circulation Time",
                 "Forward Z-Average (nm)",
             ),
@@ -1784,7 +1785,7 @@ def parse_filtration_score(value: str | float | int | None) -> int | None:
 
 
 def _forward_scatter_trend_chart(
-    points: list[ForwardScatterPoint],
+    points: tuple[DLSForwardScatterPoint, ...],
     value_attribute: str,
     title: str,
     y_title: str,
@@ -1797,10 +1798,10 @@ def _forward_scatter_trend_chart(
     figure = go.Figure()
     figure.add_trace(
         go.Scatter(
-            x=[point.circulation_time for point in chart_points],
+            x=[point.circulation_time_minutes for point in chart_points],
             y=[getattr(point, value_attribute) for point in chart_points],
             mode="markers+text",
-            text=[point.sample for point in chart_points],
+            text=[point.sample_name for point in chart_points],
             textposition="top center",
             marker={"size": 11, "color": "#2563eb", "line": {"width": 1, "color": "#1e3a8a"}},
             hovertemplate="<b>%{text}</b><br>Circulation time: %{x:.3g}<br>%{y:.3g}<extra></extra>",
@@ -1817,7 +1818,9 @@ def _forward_scatter_trend_chart(
     return figure
 
 
-def render_relationship_summary(analysis: RelationshipAnalysis) -> None:
+def render_relationship_summary(
+    analysis: DLSRelationshipSummary | RelationshipAnalysis,
+) -> None:
     if analysis.correlation is None:
         st.info(analysis.message)
     else:

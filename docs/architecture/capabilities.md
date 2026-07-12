@@ -35,11 +35,11 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates DLS forward-scatter/circulation trend analysis.
+- `app.py` still coordinates filtration follow-up trend analysis.
 
 Established DLS narrative, health, control-chart, and replicate diagnostics now
-cross application contracts. The remaining visible trend bypass is the
-interactive forward-scatter workflow.
+cross application contracts, including forward-scatter/circulation reads. The
+remaining visible trend bypass is the orthogonal filtration workflow.
 
 ## Implemented Capability Catalog
 
@@ -54,6 +54,7 @@ interactive forward-scatter workflow.
 | `compose_dls_narrative` | `compose_dls_narrative` | Available; used by Streamlit DLS findings and Data Story |
 | `summarize_dls_health` | `summarize_dls_health` | Available; used by Streamlit DLS health strip |
 | `analyze_dls_trend_diagnostics` | `analyze_dls_trend_diagnostics` | Available; used by Streamlit control and replicate diagnostics |
+| `analyze_dls_forward_scatter_trends` | `analyze_dls_forward_scatter_trends` | Available; used by Streamlit circulation explorer |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -336,6 +337,30 @@ valid result with empty row tuples.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's control chart and
 replicate table are the first callers. Agent use is excluded while these DLS-
 specific diagnostics mature.
+
+## Analyze DLS Forward-Scatter Trends
+
+**Name:** `analyze_dls_forward_scatter_trends`
+
+**Purpose:** Analyze explicitly reviewed circulation-time evidence against
+forward-angle DLS size and PDI without exposing mutable trend-domain results.
+
+**Inputs:** A non-empty list of parsed DLS samples whose measurements may carry
+reviewed circulation-time value/unit provenance. Session state and input parsing
+remain outside the capability.
+
+**Outputs:** A frozen, versioned `DLSForwardScatterTrendRead` containing ordered
+`DLSForwardScatterPoint` evidence and qualified `DLSRelationshipSummary` values
+for forward Z-average and PDI. Messages preserve insufficient-data constraints
+and explicitly describe correlations as non-causal.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Missing circulation or forward-
+angle evidence produces empty points and qualified messages rather than errors.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's circulation explorer is
+the first caller. Agent use remains excluded pending broader review of user-
+entered experimental-variable provenance.
 
 ## Import Chromatography Experiment
 

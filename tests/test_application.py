@@ -20,6 +20,7 @@ from labassistant.application import (
     DLSNarrative,
     DLSHealthOverview,
     DLSTrendDiagnostics,
+    DLSForwardScatterTrendRead,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -31,6 +32,7 @@ from labassistant.application import (
     add_scientific_note,
     analyze_dls_dataset,
     analyze_dls_trend_diagnostics,
+    analyze_dls_forward_scatter_trends,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -67,6 +69,7 @@ from labassistant.models import (
     MassBalanceAssessment,
     Measurement,
     MeasurementMetadata,
+    AngleSummary,
     Observation,
 )
 from labassistant.history import (
@@ -77,6 +80,8 @@ from labassistant.history import (
 from labassistant.context_engine import KnowledgeStore
 from labassistant.interpretation import build_ai_summary, build_data_analysis
 from labassistant.trend_analysis import (
+    apply_circulation_time,
+    build_forward_scatter_trend_analysis_from_measurements,
     build_data_story,
     control_chart_table,
     replicate_statistics_table,
@@ -1106,6 +1111,57 @@ def test_analyze_dls_trend_diagnostics_validates_samples_and_allows_empty_rows()
         analyze_dls_trend_diagnostics([object()])
 
 
+def test_analyze_dls_forward_scatter_trends_preserves_points_and_relationships():
+    samples = [
+        _decision_sample("A", 0.20, []),
+        _decision_sample("B", 0.21, []),
+        _decision_sample("C", 0.22, []),
+    ]
+    for sample, time, z_average, pdi in zip(
+        samples,
+        (10.0, 20.0, 30.0),
+        (100.0, 160.0, 220.0),
+        (0.20, 0.30, 0.40),
+    ):
+        sample.measurement.angle_summaries = [
+            AngleSummary(
+                label="Forward 12.8°",
+                angle_degrees=12.8,
+                position="forward",
+                z_average=z_average,
+                pdi=pdi,
+            )
+        ]
+        apply_circulation_time(sample.measurement, time, "minutes")
+
+    result = analyze_dls_forward_scatter_trends(samples)
+    expected = build_forward_scatter_trend_analysis_from_measurements(samples)
+
+    assert isinstance(result, DLSForwardScatterTrendRead)
+    assert [point.sample_name for point in result.points] == ["A", "B", "C"]
+    assert [point.circulation_time_minutes for point in result.points] == [10.0, 20.0, 30.0]
+    assert result.z_average.pearson_r == expected.z_average.pearson_r
+    assert result.z_average.relationship == "strong"
+    assert result.z_average.message == expected.z_average.message
+    assert "correlation only" in result.z_average.message
+    assert result.pdi.correlation == expected.pdi.correlation
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.points[0].sample_name = "Changed"
+
+
+def test_analyze_dls_forward_scatter_trends_validates_and_preserves_empty_result():
+    result = analyze_dls_forward_scatter_trends(
+        [_decision_sample("missing time", 0.20, [])]
+    )
+    assert result.points == ()
+    assert "At least 3 valid samples" in result.z_average.message
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        analyze_dls_forward_scatter_trends([])
+    with raises(TypeError, match="require parsed samples"):
+        analyze_dls_forward_scatter_trends([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1230,6 +1286,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "compose_dls_narrative",
         "summarize_dls_health",
         "analyze_dls_trend_diagnostics",
+        "analyze_dls_forward_scatter_trends",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1266,6 +1323,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     diagnostics = get_capability("analyze_dls_trend_diagnostics")
     assert diagnostics.handler is analyze_dls_trend_diagnostics
     assert diagnostics.caller_types == ("Human UI", "CLI", "Future API")
+    forward_trends = get_capability("analyze_dls_forward_scatter_trends")
+    assert forward_trends.handler is analyze_dls_forward_scatter_trends
+    assert forward_trends.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

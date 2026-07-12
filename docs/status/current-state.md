@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted DLS trend diagnostic tables into immutable
-  application rows and migrated Streamlit (task 030).
-- Working Tree: Task 030 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted DLS forward-scatter/circulation trends into
+  an immutable application workflow and migrated Streamlit (task 031).
+- Working Tree: Task 031 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `183 passed in 2.31s` from `scripts/test -q` on
+- Last Successful Test: `185 passed in 2.78s` from `scripts/test -q` on
   2026-07-12.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-12 for task 030.
+- Last Updated: 2026-07-12 for task 031.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 183 passing.
+- Tests: 🟢 Healthy — 185 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of twenty-six stable capability names, including explicit
+  registry of twenty-seven stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -304,6 +304,8 @@ architecture rationale.
   immutable, pandas-free health overview and routed Streamlit through it (task 029).
 - Promoted DLS control-chart and replicate-statistics tables into typed,
   immutable rows and routed both Streamlit diagnostics through one result (task 030).
+- Promoted reviewed circulation-time versus forward-angle DLS analysis into
+  immutable points and qualified relationship summaries (task 031).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -319,8 +321,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS trend-diagnostics task 030 is complete.
-- The working tree was clean when task 030 began.
+- DLS forward-scatter-trends task 031 is complete.
+- The working tree was clean when task 031 began.
 
 ## Known Risks
 
@@ -355,8 +357,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `183 passed in 2.31s` from `scripts/test -q` on 2026-07-12.
-- The Streamlit shell completed a headless startup smoke after task 030.
+- Latest result: `185 passed in 2.78s` from `scripts/test -q` on 2026-07-12.
+- The Streamlit shell completed a headless startup smoke after task 031.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -373,18 +375,17 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote DLS forward-scatter/circulation trend analysis into an
-  immutable application workflow.
-- Why this is next: Static trend diagnostics now cross the application boundary,
-  but Streamlit still applies circulation inputs and calls
-  `build_forward_scatter_trend_analysis_from_measurements` directly.
-- Expected scope: Medium; preserve explicit user-entered time mapping,
-  relationship statistics, and insufficient-data behavior.
-- Risks: Moving mutable session-state concerns into the application layer or
-  implying causal conclusions from correlation-only trends.
-- Success criteria: Streamlit requests a typed forward-scatter trend result
-  from one registered application workflow and retains only input widgets and
-  visualization.
+- Objective: Promote filtration follow-up trend analysis into an immutable
+  application workflow.
+- Why this is next: Forward-scatter/circulation analysis now crosses the
+  application boundary, but Streamlit still calls `build_filtration_trend_analysis`
+  directly for the orthogonal follow-up.
+- Expected scope: Medium; preserve filtration points, three relationship
+  summaries, and qualified correlation language.
+- Risks: Blurring reviewed filtration evidence attachment with read-only
+  analysis or implying causal confirmation from a small follow-up series.
+- Success criteria: Streamlit renders filtration trend tables, plots, and
+  summaries from one registered immutable application result.
 
 ## AI Context Window
 
