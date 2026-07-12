@@ -25,6 +25,7 @@ from labassistant.application import (
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
     summarize_dls_samples,
+    retrieve_dls_angle_details,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -37,6 +38,7 @@ from labassistant.application import (
     DLSAggregationAssessment,
     DLSSampleSummary,
     DLSSampleSummaries,
+    DLSAngleDetails,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -82,7 +84,6 @@ from labassistant.quality import (
 )
 from labassistant.view_models import (
     ParsedSample,
-    build_angle_table,
     build_metrics_table,
     sample_from_measurement,
     sample_status,
@@ -2271,7 +2272,7 @@ def _paired_angle_overlay(sample: ParsedSample) -> go.Figure | None:
     return figure
 
 
-def render_angle_breakdown(samples: list[ParsedSample]) -> None:
+def render_angle_breakdown(details: DLSAngleDetails) -> None:
     """Per-angle detail table for dual-angle runs (secondary diagnostic).
 
     The forward vs backscatter comparison and paired overlay live in the
@@ -2279,7 +2280,20 @@ def render_angle_breakdown(samples: list[ParsedSample]) -> None:
     counts, replicates, PDI, and per-angle peak/D50. Renders only when a
     dual-angle run is present.
     """
-    angle_table = build_angle_table(samples)
+    angle_table = pd.DataFrame(row.to_dict() for row in details.rows).rename(
+        columns={
+            "sample_name": "Sample",
+            "angle_label": "Angle",
+            "position": "Position",
+            "measurement_count": "Measurements",
+            "replicate_count": "Replicates",
+            "z_average_nm": "Z-Average",
+            "pdi": "PDI",
+            "max_z_average_nm": "Max Z-Average",
+            "primary_peak_nm": "Primary Peak",
+            "d50_nm": "D50",
+        }
+    )
     if angle_table.empty:
         return
 
@@ -2445,6 +2459,7 @@ def main() -> None:
     narrative = compose_dls_narrative(samples)
     diagnostics = analyze_dls_trend_diagnostics(samples)
     sample_summaries = summarize_dls_samples(samples)
+    angle_details = retrieve_dls_angle_details(samples)
     render_decision_workbench(samples, narrative, diagnostics, sample_summaries)
     if chromatography_error:
         st.error(f"Chromatography preview failed: {chromatography_error}")
@@ -2479,7 +2494,7 @@ def main() -> None:
             render_sample_card(sample)
 
     with st.expander("Secondary charts and diagnostics"):
-        render_angle_breakdown(samples)
+        render_angle_breakdown(angle_details)
 
         render_data_analysis(narrative)
         render_ai_summary(narrative)

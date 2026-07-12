@@ -607,6 +607,39 @@ class DLSSampleSummaries:
 
 
 @dataclass(frozen=True)
+class DLSAngleDetailRow:
+    """Immutable detail for one sample and scattering-angle summary."""
+
+    sample_name: str
+    angle_label: str
+    position: str | None
+    measurement_count: int | None
+    replicate_count: int | None
+    z_average_nm: float | None
+    pdi: float | None
+    max_z_average_nm: float | None
+    primary_peak_nm: float | None
+    d50_nm: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSAngleDetails:
+    """Versioned ordered per-angle DLS details without pandas output."""
+
+    rows: tuple[DLSAngleDetailRow, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "rows": [row.to_dict() for row in self.rows],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class ChromatographyMeasurementSummary:
     """Concise immutable summary of one persisted chromatography injection."""
 
@@ -2277,6 +2310,36 @@ def summarize_dls_samples(samples: list[Any]) -> DLSSampleSummaries:
     return DLSSampleSummaries(samples=tuple(summaries))
 
 
+def retrieve_dls_angle_details(samples: list[Any]) -> DLSAngleDetails:
+    """Return typed per-angle detail rows in established sample/angle order."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for angle details")
+    if any(
+        not hasattr(sample, "name") or not hasattr(sample, "measurement")
+        for sample in samples
+    ):
+        raise TypeError("DLS angle details require parsed samples")
+
+    rows = tuple(
+        DLSAngleDetailRow(
+            sample_name=sample.name,
+            angle_label=angle.label,
+            position=angle.position,
+            measurement_count=angle.count,
+            replicate_count=angle.replicate_count,
+            z_average_nm=angle.z_average,
+            pdi=angle.pdi,
+            max_z_average_nm=angle.max_z_average,
+            primary_peak_nm=angle.primary_peak_nm,
+            d50_nm=angle.d50_nm,
+        )
+        for sample in samples
+        for angle in sample.measurement.angle_summaries
+    )
+    return DLSAngleDetails(rows=rows)
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2802,6 +2865,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="summarize_dls_samples",
         purpose="Return immutable DLS sample status, evidence, and metric rows.",
         handler=summarize_dls_samples,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_angle_details",
+        purpose="Return immutable per-angle DLS detail rows.",
+        handler=retrieve_dls_angle_details,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

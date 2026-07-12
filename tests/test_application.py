@@ -24,6 +24,7 @@ from labassistant.application import (
     FiltrationTrendRead,
     DLSAggregationRead,
     DLSSampleSummaries,
+    DLSAngleDetails,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -39,6 +40,7 @@ from labassistant.application import (
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
     summarize_dls_samples,
+    retrieve_dls_angle_details,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -95,7 +97,7 @@ from labassistant.trend_analysis import (
     control_chart_table,
     replicate_statistics_table,
 )
-from labassistant.view_models import ParsedSample, build_metrics_table
+from labassistant.view_models import ParsedSample, build_angle_table, build_metrics_table
 
 
 class RecordingStore:
@@ -1337,6 +1339,65 @@ def test_summarize_dls_samples_preserves_missing_optional_rows_and_validates():
         summarize_dls_samples([object()])
 
 
+def test_retrieve_dls_angle_details_preserves_rows_values_and_order():
+    first = _decision_sample("first", 0.12, [])
+    first.measurement.angle_summaries = [
+        AngleSummary(
+            label="Forward 12.8°",
+            angle_degrees=12.8,
+            position="forward",
+            count=9,
+            replicate_count=3,
+            z_average=453.0,
+            pdi=0.31,
+            max_z_average=470.0,
+            primary_peak_nm=420.0,
+            d50_nm=415.0,
+        ),
+        AngleSummary(
+            label="Back 173°",
+            angle_degrees=173.0,
+            position="back",
+            count=9,
+            replicate_count=3,
+            z_average=265.0,
+            pdi=0.22,
+            primary_peak_nm=267.0,
+            d50_nm=260.0,
+        ),
+    ]
+    second = _decision_sample("second", 0.15, [])
+    second.measurement.angle_summaries = [
+        AngleSummary(label="Back 173°", angle_degrees=173.0, z_average=275.0)
+    ]
+
+    result = retrieve_dls_angle_details([first, second])
+    expected = build_angle_table([first, second])
+
+    assert isinstance(result, DLSAngleDetails)
+    assert [(row.sample_name, row.angle_label) for row in result.rows] == [
+        ("first", "Forward 12.8°"),
+        ("first", "Back 173°"),
+        ("second", "Back 173°"),
+    ]
+    assert [row.z_average_nm for row in result.rows] == [453.0, 265.0, 275.0]
+    assert result.rows[0].replicate_count == 3
+    assert result.rows[0].d50_nm == 415.0
+    assert len(result.rows) == len(expected)
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.rows[0].angle_label = "Changed"
+
+
+def test_retrieve_dls_angle_details_validates_and_allows_empty_rows():
+    result = retrieve_dls_angle_details([_decision_sample("no angles", 0.12, [])])
+    assert result.rows == ()
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        retrieve_dls_angle_details([])
+    with raises(TypeError, match="require parsed samples"):
+        retrieve_dls_angle_details([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1465,6 +1526,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "analyze_filtration_follow_up_trends",
         "assess_dls_aggregation",
         "summarize_dls_samples",
+        "retrieve_dls_angle_details",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1513,6 +1575,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     sample_summaries = get_capability("summarize_dls_samples")
     assert sample_summaries.handler is summarize_dls_samples
     assert sample_summaries.caller_types == ("Human UI", "CLI", "Future API")
+    angle_details = get_capability("retrieve_dls_angle_details")
+    assert angle_details.handler is retrieve_dls_angle_details
+    assert angle_details.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

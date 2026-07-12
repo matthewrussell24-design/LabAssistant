@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted per-sample DLS inspection summaries into an
-  immutable application workflow and migrated Streamlit (task 034).
-- Working Tree: Task 034 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted per-angle DLS detail rows into an immutable
+  application workflow and migrated Streamlit (task 035).
+- Working Tree: Task 035 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `191 passed in 2.34s` from `scripts/test -q` on
+- Last Successful Test: `193 passed in 2.57s` from `scripts/test -q` on
   2026-07-12.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-12 for task 034.
+- Last Updated: 2026-07-12 for task 035.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 191 passing.
+- Tests: 🟢 Healthy — 193 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of thirty stable capability names, including explicit
+  registry of thirty-one stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -312,6 +312,8 @@ architecture rationale.
   checklist items, and available/unavailable sample assessments (task 033).
 - Promoted per-sample status, warning evidence, and ordered scientific display
   values into immutable presentation-neutral summaries (task 034).
+- Promoted per-angle DLS detail into immutable typed rows with preserved sample
+  and angle ordering plus empty-angle behavior (task 035).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -327,8 +329,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS sample-summaries task 034 is complete.
-- The working tree was clean when task 034 began.
+- DLS angle-details task 035 is complete.
+- The working tree was clean when task 035 began.
 
 ## Known Risks
 
@@ -363,8 +365,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `191 passed in 2.34s` from `scripts/test -q` on 2026-07-12.
-- The Streamlit shell completed a headless startup smoke after task 034.
+- Latest result: `193 passed in 2.57s` from `scripts/test -q` on 2026-07-12.
+- The Streamlit shell completed a headless startup smoke after task 035.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -381,17 +383,17 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote per-angle DLS detail rows into an immutable application
-  workflow.
-- Why this is next: Sample and aggregation summaries now cross application
-  contracts, but Streamlit still calls `build_angle_table` and receives a
-  pandas DataFrame directly from the view-model layer.
-- Expected scope: Small to medium; preserve sample/angle ordering, counts,
-  replicate values, Z-average, PDI, peak, and D50 fields.
-- Risks: Coupling the contract to current table column names or changing missing-
-  angle behavior during row conversion.
-- Success criteria: Streamlit renders its per-angle detail table from immutable
-  typed rows and only constructs a DataFrame for display.
+- Objective: Promote the shared DLS metrics projection into immutable application
+  rows.
+- Why this is next: Per-angle detail now crosses the application boundary, but
+  Streamlit still calls `build_metrics_table` directly and shares its DataFrame
+  across comparison and diagnostic visualizations.
+- Expected scope: Medium; preserve the established schema, numeric values,
+  statuses, warnings, ordering, and optional metrics.
+- Risks: Creating an overly UI-shaped contract or changing chart behavior when
+  reconstructing the display DataFrame.
+- Success criteria: Streamlit obtains typed DLS metric rows through one
+  registered application workflow and constructs pandas only in the shell.
 
 ## AI Context Window
 

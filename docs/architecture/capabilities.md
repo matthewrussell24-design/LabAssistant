@@ -35,12 +35,13 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still calls the pandas-returning DLS per-angle detail builder directly.
+- `app.py` still calls the pandas-returning DLS metrics-table builder directly.
 
 Established DLS narrative, health, control-chart, and replicate diagnostics now
 cross application contracts, including forward-scatter/circulation and
 orthogonal filtration reads, dual-angle aggregation assessment, and per-sample
-summaries. The remaining visible tabular bypass is per-angle detail composition.
+and per-angle summaries. The remaining visible tabular bypass is the shared
+metrics projection used by visualizations.
 
 ## Implemented Capability Catalog
 
@@ -59,6 +60,7 @@ summaries. The remaining visible tabular bypass is per-angle detail composition.
 | `analyze_filtration_follow_up_trends` | `analyze_filtration_follow_up_trends` | Available; used by Streamlit filtration follow-up |
 | `assess_dls_aggregation` | `assess_dls_aggregation` | Available; used by Streamlit dual-angle comparison |
 | `summarize_dls_samples` | `summarize_dls_samples` | Available; used by Streamlit sample cards and inspection list |
+| `retrieve_dls_angle_details` | `retrieve_dls_angle_details` | Available; used by Streamlit per-angle detail table |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -436,6 +438,28 @@ that does not satisfy the parsed-sample contract.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's sample cards and
 “Samples To Inspect” panel are the first callers. Agent use remains excluded
 while these presentation-oriented DLS summaries mature.
+
+## Retrieve DLS Angle Details
+
+**Name:** `retrieve_dls_angle_details`
+
+**Purpose:** Project measurement angle summaries into stable typed rows without
+exposing the pandas-returning view-model helper.
+
+**Inputs:** A non-empty list of parsed DLS samples.
+
+**Outputs:** A frozen, versioned `DLSAngleDetails` containing sample-major,
+angle-minor `DLSAngleDetailRow` values with semantic field names for position,
+counts, replicates, Z-average, PDI, maximum Z-average, primary peak, and D50.
+No DataFrame or display rounding crosses the boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Samples without angle
+summaries produce an empty row tuple rather than an error.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's per-angle detail table
+is the first caller. Agent use remains excluded while this DLS-specific read
+contract matures.
 
 ## Import Chromatography Experiment
 
