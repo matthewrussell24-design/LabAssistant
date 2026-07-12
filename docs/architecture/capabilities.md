@@ -35,9 +35,10 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates DLS-specific data-story and summary helpers directly.
+- `app.py` still coordinates the detailed DLS data-analysis helper directly.
 
-The remaining visible bypass is DLS-specific narrative composition.
+The main findings and trend-story narrative now cross one application contract;
+the remaining visible interpretation bypass is the larger diagnostic analysis.
 
 ## Implemented Capability Catalog
 
@@ -49,6 +50,7 @@ The remaining visible bypass is DLS-specific narrative composition.
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `analyze_dls_uploads` | `analyze_dls_uploads` | Available; used by Streamlit DLS upload workflow |
 | `rank_dls_decisions` | `rank_dls_decisions` | Available; used by Streamlit DLS Decision Brief |
+| `compose_dls_narrative` | `compose_dls_narrative` | Available; used by Streamlit DLS findings and Data Story |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -262,6 +264,29 @@ errors remain unchanged.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's DLS Decision Brief is
 the first caller. Agent use is excluded because this rank is a human screening
 heuristic rather than an instrument-independent reasoning contract.
+
+## Compose DLS Narrative
+
+**Name:** `compose_dls_narrative`
+
+**Purpose:** Compose the established rule-based DLS findings and trend story
+once, without presenting deterministic text as language-model output.
+
+**Inputs:** A non-empty list of parsed DLS samples. The capability builds its
+metrics table internally, so callers do not pass pandas objects.
+
+**Outputs:** A frozen, versioned `DLSNarrative` containing ordered automated-
+finding and data-story sections. Each `DLSNarrativeSection` contains an
+immutable heading and bullet tuple. No DataFrame or card-layout detail crosses
+the application boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Established narrative and
+trend validation errors remain unchanged.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit is the first caller and
+composes the result once per imported dataset. Agent use remains excluded while
+this DLS-specific presentation contract matures.
 
 ## Import Chromatography Experiment
 

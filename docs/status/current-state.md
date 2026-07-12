@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted DLS-specific decision ranking into an
-  immutable application workflow and migrated Streamlit (task 026).
-- Working Tree: Task 026 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted DLS findings and trend-story composition
+  into one immutable application workflow and migrated Streamlit (task 027).
+- Working Tree: Task 027 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `177 passed in 2.36s` from `scripts/test -q` on
+- Last Successful Test: `179 passed in 2.57s` from `scripts/test -q` on
   2026-07-12.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-12 for task 026.
+- Last Updated: 2026-07-12 for task 027.
 
 ## North Star
 
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of twenty-three stable capability names, including explicit
+  registry of twenty-four stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -295,6 +295,9 @@ architecture rationale.
   immutable application result and routed Streamlit through it (task 025).
 - Promoted DLS-specific decision ranking into immutable attention rows and
   routed Streamlit's Decision Brief through it (task 026).
+- Promoted DLS automated findings and trend-story composition into ordered,
+  immutable narrative sections and routed both Streamlit views through one
+  application result (task 027).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -310,8 +313,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS decision-ranking task 026 is complete.
-- The working tree was clean when task 026 began.
+- DLS narrative-composition task 027 is complete.
+- The working tree was clean when task 027 began.
 
 ## Known Risks
 
@@ -346,8 +349,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `177 passed in 2.36s` from `scripts/test -q` on 2026-07-12.
-- The Streamlit shell completed a headless startup smoke after task 026.
+- Latest result: `179 passed in 2.57s` from `scripts/test -q` on 2026-07-12.
+- The Streamlit shell completed a headless startup smoke after task 027.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -364,15 +367,17 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote DLS data-story and summary composition into an immutable application workflow.
-- Why this is next: DLS ranking now crosses the application boundary, but Streamlit
-  still calls `build_ai_summary` and related narrative helpers directly.
-- Expected scope: Medium; preserve the existing story sections and deterministic text
-  while returning immutable headings and bullet lists without pandas.
-- Risks: Duplicating decision-ranking logic, presenting deterministic text as AI-generated,
-  or coupling an application contract to current card layout.
-- Success criteria: Streamlit renders its DLS summary/story through one registered
-  application capability and no longer imports the narrative builder.
+- Objective: Promote detailed DLS data-analysis composition into an immutable
+  application workflow.
+- Why this is next: Streamlit's main findings and trend story now cross the
+  application boundary, but the diagnostics expander still calls
+  `build_data_analysis` directly.
+- Expected scope: Medium; preserve the established diagnostic sections and
+  wording while returning immutable headings and bullets without pandas.
+- Risks: Overlapping the concise narrative contract, duplicating metric
+  calculations, or coupling the application output to the three-card layout.
+- Success criteria: Streamlit renders detailed DLS analysis through one
+  registered application capability and no longer imports the analysis builder.
 
 ## AI Context Window
 

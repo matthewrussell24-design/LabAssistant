@@ -43,7 +43,7 @@ from labassistant.importers.filtration import parse_filtration_csv
 from labassistant.filtration import observations_from_filtration_measurement
 from labassistant.importers.measurement_importer import build_import_preview, import_measurement_groups
 from labassistant.investigator import investigate as investigate_domain_experiment
-from labassistant.interpretation import build_decision_brief
+from labassistant.interpretation import build_ai_summary, build_decision_brief
 from labassistant.models import (
     ChromatographyMeasurement,
     Experiment,
@@ -54,6 +54,7 @@ from labassistant.models import (
 )
 from labassistant.observations import observations_from_samples
 from labassistant.quality import STATUS_NORMAL
+from labassistant.trend_analysis import build_data_story
 from labassistant.view_models import build_metrics_table, sample_from_measurement, sample_status
 
 
@@ -260,6 +261,33 @@ class DLSDecisionRanking:
             "next_check": self.next_check,
             "unusual_changes": list(self.unusual_changes),
             "attention_rows": [row.to_dict() for row in self.attention_rows],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class DLSNarrativeSection:
+    """One ordered, presentation-neutral section of deterministic DLS text."""
+
+    heading: str
+    bullets: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"heading": self.heading, "bullets": list(self.bullets)}
+
+
+@dataclass(frozen=True)
+class DLSNarrative:
+    """Versioned DLS findings and trend story without pandas output."""
+
+    automated_findings: tuple[DLSNarrativeSection, ...]
+    data_story: tuple[DLSNarrativeSection, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "automated_findings": [section.to_dict() for section in self.automated_findings],
+            "data_story": [section.to_dict() for section in self.data_story],
             "api_version": self.api_version,
         }
 
@@ -1582,6 +1610,36 @@ def rank_dls_decisions(samples: list[Any]) -> DLSDecisionRanking:
     )
 
 
+def compose_dls_narrative(samples: list[Any]) -> DLSNarrative:
+    """Compose established rule-based DLS findings and trend text once."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for narrative composition")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "metrics")
+        or not hasattr(sample, "warnings")
+        for sample in samples
+    ):
+        raise TypeError("DLS narrative composition requires parsed samples")
+
+    metrics = build_metrics_table(samples)
+
+    def freeze(sections: dict[str, list[str]]) -> tuple[DLSNarrativeSection, ...]:
+        return tuple(
+            DLSNarrativeSection(
+                heading=str(heading),
+                bullets=tuple(str(item) for item in items),
+            )
+            for heading, items in sections.items()
+        )
+
+    return DLSNarrative(
+        automated_findings=freeze(build_ai_summary(samples, metrics)),
+        data_story=freeze(build_data_story(samples, metrics)),
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2065,6 +2123,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="rank_dls_decisions",
         purpose="Rank parsed DLS samples for deterministic screening attention.",
         handler=rank_dls_decisions,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="compose_dls_narrative",
+        purpose="Compose deterministic DLS findings and trend narrative.",
+        handler=compose_dls_narrative,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

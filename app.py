@@ -22,6 +22,8 @@ from labassistant.application import (
     analyze_filtration_csv,
     analyze_dls_uploads,
     compare_experiments,
+    compose_dls_narrative,
+    DLSNarrative,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -35,7 +37,6 @@ from labassistant.application import (
     save_experiment_history,
 )
 from labassistant.interpretation import (
-    build_ai_summary,
     build_data_analysis,
     format_metric,
     review_evidence,
@@ -60,7 +61,6 @@ from labassistant.trend_analysis import (
     RelationshipAnalysis,
     apply_circulation_time,
     apply_filtration_measurement,
-    build_data_story,
     build_filtration_trend_analysis,
     build_forward_scatter_trend_analysis_from_measurements,
     circulation_time_from_measurement,
@@ -144,22 +144,20 @@ def render_data_analysis(samples: list[ParsedSample], metrics: pd.DataFrame) -> 
             )
 
 
-def render_ai_summary(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
-    summary = build_ai_summary(samples, metrics)
-
+def render_ai_summary(narrative: DLSNarrative) -> None:
     st.subheader("Automated Findings")
     st.caption("Rule-based summary generated from the parsed metrics (not a language model).")
 
-    summary_columns = st.columns(min(3, len(summary)))
-    for index, (title, items) in enumerate(summary.items()):
+    summary_columns = st.columns(min(3, len(narrative.automated_findings)))
+    for index, section in enumerate(narrative.automated_findings):
         column = summary_columns[index % len(summary_columns)]
         with column:
             st.markdown(
                 f"""
                 <div class="summary-card">
-                    <div class="summary-title">{html.escape(title)}</div>
+                    <div class="summary-title">{html.escape(section.heading)}</div>
                     <ul>
-                        {''.join(f'<li>{html.escape(item)}</li>' for item in items)}
+                        {''.join(f'<li>{html.escape(item)}</li>' for item in section.bullets)}
                     </ul>
                 </div>
                 """,
@@ -167,21 +165,19 @@ def render_ai_summary(samples: list[ParsedSample], metrics: pd.DataFrame) -> Non
             )
 
 
-def render_data_story(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
-    story = build_data_story(samples, metrics)
-
+def render_data_story(narrative: DLSNarrative) -> None:
     st.subheader("Data Story")
     st.caption("Trend-aware summary of stability, variability, and signals worth checking first.")
 
     story_columns = st.columns(3)
-    for column, (title, items) in zip(story_columns, story.items()):
+    for column, section in zip(story_columns, narrative.data_story):
         with column:
             st.markdown(
                 f"""
                 <div class="summary-card">
-                    <div class="summary-title">{html.escape(title)}</div>
+                    <div class="summary-title">{html.escape(section.heading)}</div>
                     <ul>
-                        {''.join(f'<li>{html.escape(item)}</li>' for item in items)}
+                        {''.join(f'<li>{html.escape(item)}</li>' for item in section.bullets)}
                     </ul>
                 </div>
                 """,
@@ -452,11 +448,11 @@ def render_research_journal_panel() -> None:
         )
 
 
-def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
+def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame, narrative: DLSNarrative) -> None:
     render_experiment_brief(samples)
     render_health_strip(samples, metrics)
     render_decision_brief(samples)
-    render_data_story(samples, metrics)
+    render_data_story(narrative)
 
     finding_col, review_col = st.columns([1.45, 1])
     with finding_col:
@@ -2423,7 +2419,8 @@ def main() -> None:
         else None
     )
 
-    render_decision_workbench(samples, metrics)
+    narrative = compose_dls_narrative(samples)
+    render_decision_workbench(samples, metrics, narrative)
     if chromatography_error:
         st.error(f"Chromatography preview failed: {chromatography_error}")
     if chromatography_preview is not None:
@@ -2460,7 +2457,7 @@ def main() -> None:
         render_angle_breakdown(samples)
 
         render_data_analysis(samples, metrics)
-        render_ai_summary(samples, metrics)
+        render_ai_summary(narrative)
 
         replicate_stats = replicate_statistics_table(samples)
         if not replicate_stats.empty:

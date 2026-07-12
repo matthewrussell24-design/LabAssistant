@@ -1,4 +1,5 @@
 import json
+from dataclasses import FrozenInstanceError
 from io import BytesIO
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from labassistant.application import (
     ObservationGenerationResult,
     DLSUploadImportResult,
     DLSDecisionRanking,
+    DLSNarrative,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -30,6 +32,7 @@ from labassistant.application import (
     analyze_chromatography_source,
     analyze_filtration_csv,
     compare_experiments,
+    compose_dls_narrative,
     agent_access_policy,
     app_manifest,
     build_experiment_snapshot,
@@ -68,7 +71,9 @@ from labassistant.history import (
     save_experiment,
 )
 from labassistant.context_engine import KnowledgeStore
-from labassistant.view_models import ParsedSample
+from labassistant.interpretation import build_ai_summary
+from labassistant.trend_analysis import build_data_story
+from labassistant.view_models import ParsedSample, build_metrics_table
 
 
 class RecordingStore:
@@ -935,6 +940,48 @@ def test_rank_dls_decisions_preserves_alphabetical_tie_breaking_and_validation()
         rank_dls_decisions([object()])
 
 
+def test_compose_dls_narrative_preserves_findings_and_story_as_immutable_sections():
+    samples = [
+        _decision_sample("clean", 0.12, []),
+        _decision_sample("flagged", 0.35, ["Moderate PDI"]),
+    ]
+    result = compose_dls_narrative(samples)
+    metrics = build_metrics_table(samples)
+
+    assert isinstance(result, DLSNarrative)
+    assert [section.heading for section in result.automated_findings] == [
+        "Main Finding",
+        "Samples Needing Review",
+        "Why They Were Flagged",
+        "What Looks Normal",
+        "Suggested Next Check",
+    ]
+    assert "flagged: PDI 0.35" in result.automated_findings[1].bullets
+    assert [section.heading for section in result.data_story] == [
+        "What Changed",
+        "What Stayed Stable",
+        "Needs Attention",
+    ]
+    assert {
+        section.heading: list(section.bullets)
+        for section in result.automated_findings
+    } == build_ai_summary(samples, metrics)
+    assert {
+        section.heading: list(section.bullets) for section in result.data_story
+    } == build_data_story(samples, metrics)
+    assert result.to_dict()["automated_findings"][0]["heading"] == "Main Finding"
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.data_story[0].heading = "Changed"
+
+
+def test_compose_dls_narrative_validates_parsed_samples():
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        compose_dls_narrative([])
+    with raises(TypeError, match="requires parsed samples"):
+        compose_dls_narrative([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1056,6 +1103,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "analyze_dls_dataset",
         "analyze_dls_uploads",
         "rank_dls_decisions",
+        "compose_dls_narrative",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1083,6 +1131,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     )
     assert get_capability("add_scientific_note").caller_types == ("Human UI", "CLI")
     assert get_capability("save_experiment_history").caller_types == ("Human UI", "CLI")
+    narrative = get_capability("compose_dls_narrative")
+    assert narrative.handler is compose_dls_narrative
+    assert narrative.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():
