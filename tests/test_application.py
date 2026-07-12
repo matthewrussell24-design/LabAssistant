@@ -22,6 +22,7 @@ from labassistant.application import (
     DLSTrendDiagnostics,
     DLSForwardScatterTrendRead,
     FiltrationTrendRead,
+    DLSAggregationRead,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -35,6 +36,7 @@ from labassistant.application import (
     analyze_dls_trend_diagnostics,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
+    assess_dls_aggregation,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -80,6 +82,7 @@ from labassistant.history import (
     save_experiment,
 )
 from labassistant.context_engine import KnowledgeStore
+from labassistant.aggregation import assess_dual_angle_aggregation
 from labassistant.interpretation import build_ai_summary, build_data_analysis
 from labassistant.trend_analysis import (
     apply_circulation_time,
@@ -1220,6 +1223,70 @@ def test_analyze_filtration_follow_up_trends_validates_and_preserves_empty_resul
         analyze_filtration_follow_up_trends([object()])
 
 
+def test_assess_dls_aggregation_preserves_available_and_unavailable_evidence():
+    available = _decision_sample("available", 0.20, [])
+    available.measurement.angle_summaries = [
+        AngleSummary(
+            label="Forward 12.8°",
+            angle_degrees=12.8,
+            position="forward",
+            z_average=453.0,
+            primary_peak_nm=420.0,
+            replicate_count=3,
+        ),
+        AngleSummary(
+            label="Back 173°",
+            angle_degrees=173.0,
+            position="back",
+            z_average=265.0,
+            primary_peak_nm=267.0,
+            replicate_count=3,
+        ),
+    ]
+    unavailable = _decision_sample("unavailable", 0.20, [])
+    unavailable.measurement.angle_summaries = [
+        AngleSummary(label="Back 173°", angle_degrees=173.0, z_average=265.0)
+    ]
+
+    result = assess_dls_aggregation([available, unavailable])
+    expected = assess_dual_angle_aggregation(available.measurement)
+
+    assert isinstance(result, DLSAggregationRead)
+    assert [item.sample_name for item in result.assessments] == [
+        "available",
+        "unavailable",
+    ]
+    assessment = result.assessments[0]
+    assert assessment.available is True
+    assert assessment.aggregation_index == expected.aggregation_index
+    assert assessment.forward.z_average_nm == 453.0
+    assert assessment.backward.z_average_nm == 265.0
+    assert assessment.category == expected.category
+    assert assessment.confidence == expected.confidence
+    assert [check.to_dict() for check in assessment.checks] == [
+        {
+            "label": check.label,
+            "status": check.status,
+            "detail": check.detail,
+            "corroborating": check.corroborating,
+            "independent_evidence": check.independent_evidence,
+        }
+        for check in expected.checks
+    ]
+    assert result.assessments[1].available is False
+    assert "needs a forward" in result.assessments[1].summary
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        assessment.category = "Changed"
+
+
+def test_assess_dls_aggregation_validates_parsed_samples():
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        assess_dls_aggregation([])
+    with raises(TypeError, match="requires parsed samples"):
+        assess_dls_aggregation([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1346,6 +1413,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "analyze_dls_trend_diagnostics",
         "analyze_dls_forward_scatter_trends",
         "analyze_filtration_follow_up_trends",
+        "assess_dls_aggregation",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1388,6 +1456,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     filtration_trends = get_capability("analyze_filtration_follow_up_trends")
     assert filtration_trends.handler is analyze_filtration_follow_up_trends
     assert filtration_trends.caller_types == ("Human UI", "CLI", "Future API")
+    aggregation = get_capability("assess_dls_aggregation")
+    assert aggregation.handler is assess_dls_aggregation
+    assert aggregation.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

@@ -35,12 +35,12 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates dual-angle DLS aggregation assessment directly.
+- `app.py` still composes DLS sample-card and inspection summaries directly.
 
 Established DLS narrative, health, control-chart, and replicate diagnostics now
 cross application contracts, including forward-scatter/circulation and
-orthogonal filtration reads. The remaining visible assessment bypass is
-dual-angle aggregation review.
+orthogonal filtration reads and dual-angle aggregation assessment. The remaining
+visible summary bypass is per-sample presentation composition.
 
 ## Implemented Capability Catalog
 
@@ -57,6 +57,7 @@ dual-angle aggregation review.
 | `analyze_dls_trend_diagnostics` | `analyze_dls_trend_diagnostics` | Available; used by Streamlit control and replicate diagnostics |
 | `analyze_dls_forward_scatter_trends` | `analyze_dls_forward_scatter_trends` | Available; used by Streamlit circulation explorer |
 | `analyze_filtration_follow_up_trends` | `analyze_filtration_follow_up_trends` | Available; used by Streamlit filtration follow-up |
+| `assess_dls_aggregation` | `assess_dls_aggregation` | Available; used by Streamlit dual-angle comparison |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -388,6 +389,30 @@ evidence produces empty points and qualified messages rather than errors.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's filtration follow-up is
 the first caller. Agent use remains excluded pending broader review of ordinal,
 operator-assessed evidence.
+
+## Assess DLS Aggregation
+
+**Name:** `assess_dls_aggregation`
+
+**Purpose:** Apply the established dual-angle DLS aggregation screening model to
+every requested sample without exposing mutable assessment-domain objects.
+
+**Inputs:** A non-empty list of parsed DLS samples carrying angle summaries and
+optional distribution, correlogram, replicate, and peak evidence.
+
+**Outputs:** A frozen, versioned `DLSAggregationRead` containing one ordered
+`DLSAggregationAssessment` per input sample, including unavailable results.
+Each assessment preserves nested `DLSAngleEvidence`, immutable checklist items,
+flags, index/category thresholds, confidence, corroboration counts, headline,
+recommendation, and qualified summary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Missing angle pairs produce an
+unavailable assessment with explanatory summary rather than an error.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's dual-angle comparison
+is the first caller. Agent use remains excluded because this is a technique-
+specific screening model with transferability caveats.
 
 ## Import Chromatography Experiment
 

@@ -18,6 +18,7 @@ from labassistant.chromatography import (
     mass_balance_hypotheses,
     observations_from_mass_balance_assessment,
 )
+from labassistant.aggregation import assess_dual_angle_aggregation
 from labassistant.history import (
     DEFAULT_HISTORY_PATH,
     compare_experiments as compare_history_experiments,
@@ -473,6 +474,87 @@ class FiltrationTrendRead:
             "z_average": self.z_average.to_dict(),
             "pdi": self.pdi.to_dict(),
             "circulation_time": self.circulation_time.to_dict(),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class DLSAngleEvidence:
+    """Immutable evidence from one scattering-angle summary."""
+
+    label: str
+    angle_degrees: float | None
+    position: str | None
+    z_average_nm: float | None
+    primary_peak_nm: float | None
+    replicate_count: int | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSAggregationCheck:
+    """Immutable corroboration checklist item."""
+
+    label: str
+    status: str
+    detail: str
+    corroborating: bool
+    independent_evidence: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSAggregationAssessment:
+    """Immutable dual-angle aggregation screening assessment for one sample."""
+
+    sample_name: str
+    available: bool
+    aggregation_index: float | None
+    forward: DLSAngleEvidence | None
+    backward: DLSAngleEvidence | None
+    forward_larger: bool
+    elevated: bool
+    level: str
+    category: str
+    forward_tail_index: float | None
+    forward_secondary_peak_nm: float | None
+    peak_shift_ratio: float | None
+    correlogram_noise: float | None
+    decay_quality: str | None
+    replicate_consistency: str | None
+    confidence: str
+    checks: tuple[DLSAggregationCheck, ...]
+    corroboration_score: int
+    corroboration_max: int
+    flags: tuple[str, ...]
+    headline: str
+    recommendation: str
+    summary: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **asdict(self),
+            "forward": self.forward.to_dict() if self.forward else None,
+            "backward": self.backward.to_dict() if self.backward else None,
+            "checks": [check.to_dict() for check in self.checks],
+            "flags": list(self.flags),
+        }
+
+
+@dataclass(frozen=True)
+class DLSAggregationRead:
+    """Versioned aggregation assessments for all requested DLS samples."""
+
+    assessments: tuple[DLSAggregationAssessment, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "assessments": [assessment.to_dict() for assessment in self.assessments],
             "api_version": self.api_version,
         }
 
@@ -2019,6 +2101,71 @@ def analyze_filtration_follow_up_trends(
     )
 
 
+def assess_dls_aggregation(samples: list[Any]) -> DLSAggregationRead:
+    """Assess dual-angle aggregation evidence for every parsed DLS sample."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for aggregation assessment")
+    if any(
+        not hasattr(sample, "name") or not hasattr(sample, "measurement")
+        for sample in samples
+    ):
+        raise TypeError("DLS aggregation assessment requires parsed samples")
+
+    def angle(value: Any) -> DLSAngleEvidence | None:
+        if value is None:
+            return None
+        return DLSAngleEvidence(
+            label=value.label,
+            angle_degrees=value.angle_degrees,
+            position=value.position,
+            z_average_nm=value.z_average,
+            primary_peak_nm=value.primary_peak_nm,
+            replicate_count=value.replicate_count,
+        )
+
+    assessments = []
+    for sample in samples:
+        result = assess_dual_angle_aggregation(sample.measurement)
+        assessments.append(
+            DLSAggregationAssessment(
+                sample_name=sample.name,
+                available=result.available,
+                aggregation_index=result.aggregation_index,
+                forward=angle(result.forward),
+                backward=angle(result.backward),
+                forward_larger=result.forward_larger,
+                elevated=result.elevated,
+                level=result.level,
+                category=result.category,
+                forward_tail_index=result.forward_tail_index,
+                forward_secondary_peak_nm=result.forward_secondary_peak_nm,
+                peak_shift_ratio=result.peak_shift_ratio,
+                correlogram_noise=result.correlogram_noise,
+                decay_quality=result.decay_quality,
+                replicate_consistency=result.replicate_consistency,
+                confidence=result.confidence,
+                checks=tuple(
+                    DLSAggregationCheck(
+                        label=check.label,
+                        status=check.status,
+                        detail=check.detail,
+                        corroborating=check.corroborating,
+                        independent_evidence=check.independent_evidence,
+                    )
+                    for check in result.checks
+                ),
+                corroboration_score=result.corroboration_score,
+                corroboration_max=result.corroboration_max,
+                flags=tuple(result.flags),
+                headline=result.headline,
+                recommendation=result.recommendation,
+                summary=result.summary,
+            )
+        )
+    return DLSAggregationRead(assessments=tuple(assessments))
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2532,6 +2679,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="analyze_filtration_follow_up_trends",
         purpose="Analyze reviewed filtration follow-up evidence against DLS metrics.",
         handler=analyze_filtration_follow_up_trends,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="assess_dls_aggregation",
+        purpose="Assess immutable dual-angle DLS aggregation evidence by sample.",
+        handler=assess_dls_aggregation,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

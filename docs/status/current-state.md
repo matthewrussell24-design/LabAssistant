@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted filtration follow-up trends into an
-  immutable application workflow and migrated Streamlit (task 032).
-- Working Tree: Task 032 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted dual-angle DLS aggregation assessment into
+  an immutable application workflow and migrated Streamlit (task 033).
+- Working Tree: Task 033 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `187 passed in 2.56s` from `scripts/test -q` on
+- Last Successful Test: `189 passed in 2.52s` from `scripts/test -q` on
   2026-07-12.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-12 for task 032.
+- Last Updated: 2026-07-12 for task 033.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 187 passing.
+- Tests: 🟢 Healthy — 189 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of twenty-eight stable capability names, including explicit
+  registry of twenty-nine stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -308,6 +308,8 @@ architecture rationale.
   immutable points and qualified relationship summaries (task 031).
 - Promoted filtration difficulty versus DLS/circulation trend analysis into
   immutable points and three qualified Spearman summaries (task 032).
+- Promoted dual-angle aggregation screening into nested immutable angle evidence,
+  checklist items, and available/unavailable sample assessments (task 033).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -323,8 +325,8 @@ architecture rationale.
 
 ## Active Work
 
-- Filtration follow-up-trends task 032 is complete.
-- The working tree was clean when task 032 began.
+- DLS aggregation-assessment task 033 is complete.
+- The working tree was clean when task 033 began.
 
 ## Known Risks
 
@@ -359,8 +361,8 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `187 passed in 2.56s` from `scripts/test -q` on 2026-07-12.
-- The Streamlit shell completed a headless startup smoke after task 032.
+- Latest result: `189 passed in 2.52s` from `scripts/test -q` on 2026-07-12.
+- The Streamlit shell completed a headless startup smoke after task 033.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -377,17 +379,18 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote dual-angle DLS aggregation assessment into an immutable
+- Objective: Promote per-sample DLS inspection summaries into an immutable
   application workflow.
-- Why this is next: Trend reads now cross the application boundary, but
-  Streamlit still calls `assess_dual_angle_aggregation` directly for each sample
-  and coordinates assessment presentation.
-- Expected scope: Medium; preserve evidence pairing, risk/category thresholds,
-  confidence, checklist details, and unavailable behavior.
-- Risks: Flattening provenance-rich assessment evidence or coupling the result
-  to current expander/card layout.
-- Success criteria: Streamlit renders aggregation detection and review through
-  one registered immutable application result.
+- Why this is next: Dataset-level reasoning and assessments now cross application
+  contracts, but Streamlit still composes sample status, warning evidence, and
+  sample-card/inspection text directly.
+- Expected scope: Medium; preserve current status labels, warning evidence,
+  formatted scientific values, and missing-value behavior without coupling to
+  card markup.
+- Risks: Duplicating decision-ranking rows or moving HTML/display layout into
+  the application contract.
+- Success criteria: Streamlit renders sample cards and “Samples To Inspect”
+  content from immutable presentation-neutral sample summaries.
 
 ## AI Context Window
 

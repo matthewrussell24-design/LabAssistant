@@ -10,7 +10,6 @@ import streamlit as st
 from labassistant.aggregation import (
     INDEX_ELEVATED,
     INDEX_WATCH,
-    assess_dual_angle_aggregation,
 )
 from labassistant.application import (
     ChromatographyAnalysisResult,
@@ -24,6 +23,7 @@ from labassistant.application import (
     analyze_dls_trend_diagnostics,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
+    assess_dls_aggregation,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -33,6 +33,7 @@ from labassistant.application import (
     DLSRelationshipSummary,
     FiltrationRelationshipSummary,
     FiltrationTrendPointRead,
+    DLSAggregationAssessment,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -2123,8 +2124,8 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
 
     Renders only when at least one sample has a forward + backscatter angle pair.
     """
-    assessments = [(sample, assess_dual_angle_aggregation(sample.measurement)) for sample in samples]
-    available = [(sample, assessment) for sample, assessment in assessments if assessment.available]
+    result = assess_dls_aggregation(samples)
+    available = [assessment for assessment in result.assessments if assessment.available]
     if not available:
         return
 
@@ -2142,13 +2143,13 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
     )
 
     cards = st.columns(len(available))
-    for column, (sample, assessment) in zip(cards, available):
+    for column, assessment in zip(cards, available):
         color = AGGREGATION_CATEGORY_COLORS.get(assessment.category, "#7f8c8d")
         with column:
             st.markdown(
                 f"""
                 <div style="border:1px solid #e2e8f0;border-left:6px solid {color};border-radius:10px;padding:14px 16px;">
-                    <div style="font-size:0.85rem;color:#475569;">{html.escape(sample.name)}</div>
+                    <div style="font-size:0.85rem;color:#475569;">{html.escape(assessment.sample_name)}</div>
                     <div style="font-size:2.0rem;font-weight:700;color:{color};line-height:1.2;">{assessment.aggregation_index:.2f}</div>
                     <div style="font-size:0.9rem;font-weight:600;color:{color};">{html.escape(assessment.category)}</div>
                     <div style="font-size:0.8rem;color:#64748b;margin-top:6px;">Corroboration {assessment.corroboration_score}/{assessment.corroboration_max}<br>Confidence: {assessment.confidence}</div>
@@ -2164,8 +2165,12 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
         st.plotly_chart(_aggregation_index_chart(available), use_container_width=True, config={"displaylogo": False})
 
     st.markdown("**Paired intensity distribution by angle**")
-    overlay_name = st.selectbox("Sample", [sample.name for sample, _ in available], key="aggregation_overlay_sample")
-    overlay_sample = next(sample for sample, _ in available if sample.name == overlay_name)
+    overlay_name = st.selectbox(
+        "Sample",
+        [assessment.sample_name for assessment in available],
+        key="aggregation_overlay_sample",
+    )
+    overlay_sample = next(sample for sample in samples if sample.name == overlay_name)
     paired = _paired_angle_overlay(overlay_sample)
     if paired is None:
         st.caption("Per-angle distribution curves are not available for this sample.")
@@ -2173,8 +2178,14 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
         st.plotly_chart(paired, use_container_width=True, config={"displaylogo": False})
 
     st.markdown("**Corroboration checklist** — supporting evidence for the dual-angle comparison")
-    checklist_name = st.selectbox("Sample", [sample.name for sample, _ in available], key="aggregation_checklist_sample")
-    _, checklist_assessment = next((sample, assessment) for sample, assessment in available if sample.name == checklist_name)
+    checklist_name = st.selectbox(
+        "Sample",
+        [assessment.sample_name for assessment in available],
+        key="aggregation_checklist_sample",
+    )
+    checklist_assessment = next(
+        assessment for assessment in available if assessment.sample_name == checklist_name
+    )
     color = AGGREGATION_CATEGORY_COLORS.get(checklist_assessment.category, "#7f8c8d")
     st.markdown(
         f"<div style='font-size:1.05rem;font-weight:700;color:{color};'>{html.escape(checklist_assessment.category)} "
@@ -2189,18 +2200,18 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
     st.caption(checklist_assessment.summary)
 
     with st.expander("All samples: interpretation summary", expanded=False):
-        for sample, assessment in available:
+        for assessment in available:
             st.markdown(
-                f"**{sample.name}** — {assessment.category} "
+                f"**{assessment.sample_name}** — {assessment.category} "
                 f"(index {assessment.aggregation_index:.2f}, corroboration {assessment.corroboration_score}/{assessment.corroboration_max})"
             )
             st.caption(assessment.recommendation)
 
 
-def _forward_back_z_chart(available) -> go.Figure:
-    names = [sample.name for sample, _ in available]
-    forward_values = [assessment.forward.z_average for _, assessment in available]
-    backward_values = [assessment.backward.z_average for _, assessment in available]
+def _forward_back_z_chart(available: list[DLSAggregationAssessment]) -> go.Figure:
+    names = [assessment.sample_name for assessment in available]
+    forward_values = [assessment.forward.z_average_nm for assessment in available]
+    backward_values = [assessment.backward.z_average_nm for assessment in available]
     figure = go.Figure()
     figure.add_trace(go.Bar(x=names, y=forward_values, name="Forward ~12.8°", marker_color="#2c7fb8", hovertemplate="<b>%{x}</b><br>Forward: %{y:.3g} nm<extra></extra>"))
     figure.add_trace(go.Bar(x=names, y=backward_values, name="Backscatter ~173°", marker_color="#d95f0e", hovertemplate="<b>%{x}</b><br>Backscatter: %{y:.3g} nm<extra></extra>"))
@@ -2216,10 +2227,13 @@ def _forward_back_z_chart(available) -> go.Figure:
     return figure
 
 
-def _aggregation_index_chart(available) -> go.Figure:
-    names = [sample.name for sample, _ in available]
-    indices = [assessment.aggregation_index for _, assessment in available]
-    colors = [AGGREGATION_LEVEL_COLORS.get(assessment.level, "#7f8c8d") for _, assessment in available]
+def _aggregation_index_chart(available: list[DLSAggregationAssessment]) -> go.Figure:
+    names = [assessment.sample_name for assessment in available]
+    indices = [assessment.aggregation_index for assessment in available]
+    colors = [
+        AGGREGATION_LEVEL_COLORS.get(assessment.level, "#7f8c8d")
+        for assessment in available
+    ]
     figure = go.Figure()
     figure.add_trace(go.Bar(x=names, y=indices, marker_color=colors, hovertemplate="<b>%{x}</b><br>Aggregation Index: %{y:.3g}<extra></extra>"))
     figure.add_hline(y=INDEX_ELEVATED, line_dash="dash", line_color="#c0392b", annotation_text="elevated (0.10)", annotation_position="top left")
