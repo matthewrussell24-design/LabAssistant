@@ -23,6 +23,7 @@ from labassistant.application import (
     DLSForwardScatterTrendRead,
     FiltrationTrendRead,
     DLSAggregationRead,
+    DLSSampleSummaries,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -37,6 +38,7 @@ from labassistant.application import (
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
+    summarize_dls_samples,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -1287,6 +1289,54 @@ def test_assess_dls_aggregation_validates_parsed_samples():
         assess_dls_aggregation([object()])
 
 
+def test_summarize_dls_samples_preserves_status_evidence_and_display_rows():
+    clean = _decision_sample("clean", 0.12, [])
+    flagged = _decision_sample("flagged", 0.35, ["Moderate PDI"])
+
+    result = summarize_dls_samples([clean, flagged])
+
+    assert isinstance(result, DLSSampleSummaries)
+    assert [sample.sample_name for sample in result.samples] == ["clean", "flagged"]
+    assert result.samples[0].status == "Normal"
+    assert result.samples[1].status == "Watch"
+    assert result.samples[1].warnings == ("Moderate PDI",)
+    assert result.samples[1].review_evidence == "PDI 0.35"
+    assert [row.to_dict() for row in result.samples[1].metric_rows] == [
+        {"label": "Type", "value": "Distribution Curve"},
+        {"label": "Z-Average", "value": "100 nm"},
+        {"label": "PDI", "value": "0.35"},
+        {"label": "Measurements", "value": "Not found"},
+        {"label": "Angles", "value": "Not found"},
+        {"label": "Primary Peak", "value": "100 nm"},
+        {"label": "Tail >1,000 nm", "value": "0 %"},
+        {"label": "Review signals", "value": "Moderate PDI"},
+    ]
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.samples[0].status = "Changed"
+
+
+def test_summarize_dls_samples_preserves_missing_optional_rows_and_validates():
+    sample = _decision_sample("missing", 0.12, [])
+    sample.metrics["Primary Peak"] = None
+    sample.metrics["Tail Index"] = None
+    result = summarize_dls_samples([sample])
+
+    assert [row.label for row in result.samples[0].metric_rows] == [
+        "Type",
+        "Z-Average",
+        "PDI",
+        "Measurements",
+        "Angles",
+        "Review signals",
+    ]
+    assert result.samples[0].metric_rows[-1].value == "No flags"
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        summarize_dls_samples([])
+    with raises(TypeError, match="require parsed samples"):
+        summarize_dls_samples([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1414,6 +1464,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "analyze_dls_forward_scatter_trends",
         "analyze_filtration_follow_up_trends",
         "assess_dls_aggregation",
+        "summarize_dls_samples",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1459,6 +1510,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     aggregation = get_capability("assess_dls_aggregation")
     assert aggregation.handler is assess_dls_aggregation
     assert aggregation.caller_types == ("Human UI", "CLI", "Future API")
+    sample_summaries = get_capability("summarize_dls_samples")
+    assert sample_summaries.handler is summarize_dls_samples
+    assert sample_summaries.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

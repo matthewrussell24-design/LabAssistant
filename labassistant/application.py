@@ -48,6 +48,8 @@ from labassistant.interpretation import (
     build_ai_summary,
     build_data_analysis,
     build_decision_brief,
+    format_metric,
+    review_evidence,
 )
 from labassistant.models import (
     ChromatographyMeasurement,
@@ -555,6 +557,51 @@ class DLSAggregationRead:
     def to_dict(self) -> dict[str, Any]:
         return {
             "assessments": [assessment.to_dict() for assessment in self.assessments],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class DLSMetricDisplayRow:
+    """One ordered, presentation-neutral DLS metric label and value."""
+
+    label: str
+    value: str
+
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSSampleSummary:
+    """Immutable status, warning evidence, and display values for one sample."""
+
+    sample_name: str
+    status: str
+    warnings: tuple[str, ...]
+    review_evidence: str
+    metric_rows: tuple[DLSMetricDisplayRow, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sample_name": self.sample_name,
+            "status": self.status,
+            "warnings": list(self.warnings),
+            "review_evidence": self.review_evidence,
+            "metric_rows": [row.to_dict() for row in self.metric_rows],
+        }
+
+
+@dataclass(frozen=True)
+class DLSSampleSummaries:
+    """Versioned ordered DLS sample summaries without UI layout details."""
+
+    samples: tuple[DLSSampleSummary, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "samples": [sample.to_dict() for sample in self.samples],
             "api_version": self.api_version,
         }
 
@@ -2166,6 +2213,70 @@ def assess_dls_aggregation(samples: list[Any]) -> DLSAggregationRead:
     return DLSAggregationRead(assessments=tuple(assessments))
 
 
+def summarize_dls_samples(samples: list[Any]) -> DLSSampleSummaries:
+    """Return ordered immutable status, evidence, and metric rows by sample."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for sample summaries")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "metrics")
+        or not hasattr(sample, "warnings")
+        for sample in samples
+    ):
+        raise TypeError("DLS sample summaries require parsed samples")
+
+    def present(value: Any) -> bool:
+        return value is not None and value == value
+
+    summaries = []
+    for sample in samples:
+        rows = [
+            DLSMetricDisplayRow("Type", str(sample.metrics["Data Type"])),
+            DLSMetricDisplayRow(
+                "Z-Average", format_metric(sample.metrics["Z-Average"], "nm")
+            ),
+            DLSMetricDisplayRow("PDI", format_metric(sample.metrics["PDI"], digits=3)),
+            DLSMetricDisplayRow(
+                "Measurements",
+                format_metric(sample.metrics["Measurement Count"], digits=0),
+            ),
+            DLSMetricDisplayRow(
+                "Angles", str(sample.metrics["Scattering Angles"] or "Not found")
+            ),
+        ]
+        if present(sample.metrics.get("Primary Peak")):
+            rows.append(
+                DLSMetricDisplayRow(
+                    "Primary Peak", format_metric(sample.metrics["Primary Peak"], "nm")
+                )
+            )
+        if present(sample.metrics.get("Tail Index")):
+            rows.append(
+                DLSMetricDisplayRow(
+                    "Tail >1,000 nm", format_metric(sample.metrics["Tail Index"], "%")
+                )
+            )
+        rows.append(
+            DLSMetricDisplayRow(
+                "Review signals",
+                ", ".join(str(warning) for warning in sample.warnings)
+                if sample.warnings
+                else "No flags",
+            )
+        )
+        summaries.append(
+            DLSSampleSummary(
+                sample_name=sample.name,
+                status=sample_status(sample),
+                warnings=tuple(str(warning) for warning in sample.warnings),
+                review_evidence=review_evidence(sample),
+                metric_rows=tuple(rows),
+            )
+        )
+    return DLSSampleSummaries(samples=tuple(summaries))
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2685,6 +2796,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="assess_dls_aggregation",
         purpose="Assess immutable dual-angle DLS aggregation evidence by sample.",
         handler=assess_dls_aggregation,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="summarize_dls_samples",
+        purpose="Return immutable DLS sample status, evidence, and metric rows.",
+        handler=summarize_dls_samples,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

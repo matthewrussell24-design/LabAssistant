@@ -35,12 +35,12 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still composes DLS sample-card and inspection summaries directly.
+- `app.py` still calls the pandas-returning DLS per-angle detail builder directly.
 
 Established DLS narrative, health, control-chart, and replicate diagnostics now
 cross application contracts, including forward-scatter/circulation and
-orthogonal filtration reads and dual-angle aggregation assessment. The remaining
-visible summary bypass is per-sample presentation composition.
+orthogonal filtration reads, dual-angle aggregation assessment, and per-sample
+summaries. The remaining visible tabular bypass is per-angle detail composition.
 
 ## Implemented Capability Catalog
 
@@ -58,6 +58,7 @@ visible summary bypass is per-sample presentation composition.
 | `analyze_dls_forward_scatter_trends` | `analyze_dls_forward_scatter_trends` | Available; used by Streamlit circulation explorer |
 | `analyze_filtration_follow_up_trends` | `analyze_filtration_follow_up_trends` | Available; used by Streamlit filtration follow-up |
 | `assess_dls_aggregation` | `assess_dls_aggregation` | Available; used by Streamlit dual-angle comparison |
+| `summarize_dls_samples` | `summarize_dls_samples` | Available; used by Streamlit sample cards and inspection list |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -413,6 +414,28 @@ unavailable assessment with explanatory summary rather than an error.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's dual-angle comparison
 is the first caller. Agent use remains excluded because this is a technique-
 specific screening model with transferability caveats.
+
+## Summarize DLS Samples
+
+**Name:** `summarize_dls_samples`
+
+**Purpose:** Compose ordered per-sample DLS status, warning evidence, and
+scientifically formatted inspection values without coupling them to card markup.
+
+**Inputs:** A non-empty list of parsed DLS samples.
+
+**Outputs:** A frozen, versioned `DLSSampleSummaries` containing ordered
+`DLSSampleSummary` values. Each summary preserves status, warning tuple, review-
+evidence sentence, and ordered `DLSMetricDisplayRow` values, including
+conditional peak/tail rows and explicit missing-value strings. No HTML, CSS,
+column count, or card class crosses the boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's sample cards and
+“Samples To Inspect” panel are the first callers. Agent use remains excluded
+while these presentation-oriented DLS summaries mature.
 
 ## Import Chromatography Experiment
 

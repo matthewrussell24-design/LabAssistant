@@ -24,6 +24,7 @@ from labassistant.application import (
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
+    summarize_dls_samples,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -34,6 +35,8 @@ from labassistant.application import (
     FiltrationRelationshipSummary,
     FiltrationTrendPointRead,
     DLSAggregationAssessment,
+    DLSSampleSummary,
+    DLSSampleSummaries,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -49,7 +52,6 @@ from labassistant.application import (
 )
 from labassistant.interpretation import (
     format_metric,
-    review_evidence,
 )
 from labassistant.metrics import (
     find_local_peaks,
@@ -446,6 +448,7 @@ def render_decision_workbench(
     samples: list[ParsedSample],
     narrative: DLSNarrative,
     diagnostics: DLSTrendDiagnostics,
+    sample_summaries: DLSSampleSummaries,
 ) -> None:
     render_experiment_brief(samples)
     render_health_strip(summarize_dls_health(samples))
@@ -457,7 +460,7 @@ def render_decision_workbench(
         render_control_charts(diagnostics)
     with review_col:
         st.subheader("Samples To Inspect")
-        render_aggregation_review(samples)
+        render_aggregation_review(sample_summaries)
 
 
 def render_chromatography_preview(result: ChromatographyAnalysisResult) -> None:
@@ -776,25 +779,14 @@ def add_page_style() -> None:
     )
 
 
-def render_sample_card(sample: ParsedSample) -> None:
-    status = sample_status(sample)
+def render_sample_card(sample: DLSSampleSummary) -> None:
+    status = sample.status
     status_class = status.lower()
-    sample_name = html.escape(sample.name)
-    warnings = ", ".join(sample.warnings) if sample.warnings else "No flags"
+    sample_name = html.escape(sample.sample_name)
     card_class = "normal" if status == STATUS_NORMAL else "watch" if status == STATUS_WATCH else "review"
-    rows = [
-        ("Type", sample.metrics["Data Type"]),
-        ("Z-Average", format_metric(sample.metrics["Z-Average"], "nm")),
-        ("PDI", format_metric(sample.metrics["PDI"], digits=3)),
-        ("Measurements", format_metric(sample.metrics["Measurement Count"], digits=0)),
-        ("Angles", str(sample.metrics["Scattering Angles"] or "Not found")),
-    ]
-    if sample.metrics.get("Primary Peak") is not None and pd.notna(sample.metrics.get("Primary Peak")):
-        rows.append(("Primary Peak", format_metric(sample.metrics["Primary Peak"], "nm")))
-    if sample.metrics.get("Tail Index") is not None and pd.notna(sample.metrics.get("Tail Index")):
-        rows.append(("Tail >1,000 nm", format_metric(sample.metrics["Tail Index"], "%")))
-    rows.append(("Review signals", warnings))
-    metric_rows = "\n".join(render_metric_row(label, value) for label, value in rows)
+    metric_rows = "\n".join(
+        render_metric_row(row.label, row.value) for row in sample.metric_rows
+    )
 
     st.markdown(
         f"""
@@ -1284,23 +1276,23 @@ def render_control_charts(diagnostics: DLSTrendDiagnostics) -> None:
     st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
 
 
-def render_aggregation_review(samples: list[ParsedSample]) -> None:
-    flagged = [sample for sample in samples if sample_status(sample) != STATUS_NORMAL]
+def render_aggregation_review(summaries: DLSSampleSummaries) -> None:
+    flagged = [sample for sample in summaries.samples if sample.status != STATUS_NORMAL]
 
     if not flagged:
         st.success("No warning-level signals from the parsed metrics.")
         return
 
     for sample in flagged:
-        sample_name = html.escape(sample.name)
+        sample_name = html.escape(sample.sample_name)
         signal_text = html.escape(", ".join(sample.warnings))
         st.markdown(
             f"""
             <div class="review-card">
-                <div class="review-title">{sample_name} - {sample_status(sample)}</div>
+                <div class="review-title">{sample_name} - {sample.status}</div>
                 <div class="review-signals">
                     Signals: {signal_text}<br>
-                    Evidence: {html.escape(review_evidence(sample))}
+                    Evidence: {html.escape(sample.review_evidence)}
                 </div>
             </div>
             """,
@@ -2452,7 +2444,8 @@ def main() -> None:
 
     narrative = compose_dls_narrative(samples)
     diagnostics = analyze_dls_trend_diagnostics(samples)
-    render_decision_workbench(samples, narrative, diagnostics)
+    sample_summaries = summarize_dls_samples(samples)
+    render_decision_workbench(samples, narrative, diagnostics, sample_summaries)
     if chromatography_error:
         st.error(f"Chromatography preview failed: {chromatography_error}")
     if chromatography_preview is not None:
@@ -2480,8 +2473,8 @@ def main() -> None:
         render_metric_dot_plot(metrics, "PDI", "PDI", threshold=0.30)
 
     st.subheader("Sample Summary")
-    card_columns = st.columns(min(4, len(samples)))
-    for index, sample in enumerate(samples):
+    card_columns = st.columns(min(4, len(sample_summaries.samples)))
+    for index, sample in enumerate(sample_summaries.samples):
         with card_columns[index % len(card_columns)]:
             render_sample_card(sample)
 
