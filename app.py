@@ -21,10 +21,12 @@ from labassistant.application import (
     analyze_chromatography_source,
     analyze_filtration_csv,
     analyze_dls_uploads,
+    analyze_dls_trend_diagnostics,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
     DLSHealthOverview,
+    DLSTrendDiagnostics,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -65,9 +67,7 @@ from labassistant.trend_analysis import (
     build_filtration_trend_analysis,
     build_forward_scatter_trend_analysis_from_measurements,
     circulation_time_from_measurement,
-    control_chart_table,
     filtration_measurement_from_provenance,
-    replicate_statistics_table,
 )
 from labassistant.quality import (
     SIGNAL_WARNINGS,
@@ -439,7 +439,11 @@ def render_research_journal_panel() -> None:
         )
 
 
-def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame, narrative: DLSNarrative) -> None:
+def render_decision_workbench(
+    samples: list[ParsedSample],
+    narrative: DLSNarrative,
+    diagnostics: DLSTrendDiagnostics,
+) -> None:
     render_experiment_brief(samples)
     render_health_strip(summarize_dls_health(samples))
     render_decision_brief(samples)
@@ -447,7 +451,7 @@ def render_decision_workbench(samples: list[ParsedSample], metrics: pd.DataFrame
 
     finding_col, review_col = st.columns([1.45, 1])
     with finding_col:
-        render_control_charts(samples, metrics)
+        render_control_charts(diagnostics)
     with review_col:
         st.subheader("Samples To Inspect")
         render_aggregation_review(samples)
@@ -1223,8 +1227,22 @@ def render_correlogram_quality_chart(samples: list[ParsedSample]) -> None:
     st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
 
 
-def render_control_charts(samples: list[ParsedSample], metrics: pd.DataFrame) -> None:
-    chart_data = control_chart_table(samples, metrics)
+def render_control_charts(diagnostics: DLSTrendDiagnostics) -> None:
+    chart_data = pd.DataFrame(
+        row.to_dict() for row in diagnostics.control_chart_rows
+    ).rename(
+        columns={
+            "sample_name": "Sample",
+            "metric": "Metric",
+            "value": "Value",
+            "mean": "Mean",
+            "warning_low": "Warning Low",
+            "warning_high": "Warning High",
+            "action_low": "Action Low",
+            "action_high": "Action High",
+            "zone": "Zone",
+        }
+    )
     st.subheader("Control Chart Signals")
     if chart_data.empty:
         st.info("At least two parsed values are needed to calculate warning and action limits.")
@@ -2411,7 +2429,8 @@ def main() -> None:
     )
 
     narrative = compose_dls_narrative(samples)
-    render_decision_workbench(samples, metrics, narrative)
+    diagnostics = analyze_dls_trend_diagnostics(samples)
+    render_decision_workbench(samples, narrative, diagnostics)
     if chromatography_error:
         st.error(f"Chromatography preview failed: {chromatography_error}")
     if chromatography_preview is not None:
@@ -2450,7 +2469,21 @@ def main() -> None:
         render_data_analysis(narrative)
         render_ai_summary(narrative)
 
-        replicate_stats = replicate_statistics_table(samples)
+        replicate_stats = pd.DataFrame(
+            row.to_dict() for row in diagnostics.replicate_statistics_rows
+        ).rename(
+            columns={
+                "sample_name": "Sample",
+                "metric": "Metric",
+                "count": "N",
+                "mean": "Mean",
+                "standard_deviation": "SD",
+                "relative_standard_deviation_percent": "%RSD",
+                "drift": "Drift",
+                "outliers": "Outliers",
+                "change_point": "Change Point",
+            }
+        )
         if not replicate_stats.empty:
             st.subheader("Replicate Trend Statistics")
             display = replicate_stats.copy()

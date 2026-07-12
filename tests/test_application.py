@@ -19,6 +19,7 @@ from labassistant.application import (
     DLSDecisionRanking,
     DLSNarrative,
     DLSHealthOverview,
+    DLSTrendDiagnostics,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -29,6 +30,7 @@ from labassistant.application import (
     ScientificNoteReceipt,
     add_scientific_note,
     analyze_dls_dataset,
+    analyze_dls_trend_diagnostics,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -74,7 +76,11 @@ from labassistant.history import (
 )
 from labassistant.context_engine import KnowledgeStore
 from labassistant.interpretation import build_ai_summary, build_data_analysis
-from labassistant.trend_analysis import build_data_story
+from labassistant.trend_analysis import (
+    build_data_story,
+    control_chart_table,
+    replicate_statistics_table,
+)
 from labassistant.view_models import ParsedSample, build_metrics_table
 
 
@@ -1030,6 +1036,76 @@ def test_summarize_dls_health_validates_parsed_samples():
     assert result.median_tail_percent is None
 
 
+def test_analyze_dls_trend_diagnostics_preserves_rows_and_order_without_pandas():
+    samples = [
+        _decision_sample("A", 0.20, []),
+        _decision_sample("B", 0.21, []),
+        _decision_sample("C", 0.22, []),
+    ]
+    for sample, z_average, replicates in zip(
+        samples,
+        (100.0, 110.0, 125.0),
+        ([99, 100, 101], [106, 110, 121], [120, 126, 129]),
+    ):
+        sample.metrics["Z-Average"] = z_average
+        sample.measurement.provenance["replicate_metrics"] = {
+            "Z-Average": replicates
+        }
+
+    result = analyze_dls_trend_diagnostics(samples)
+    metrics = build_metrics_table(samples)
+
+    assert isinstance(result, DLSTrendDiagnostics)
+    assert [row.sample_name for row in result.control_chart_rows[:3]] == ["A", "B", "C"]
+    assert [row.sample_name for row in result.replicate_statistics_rows] == [
+        "A",
+        "B",
+        "C",
+    ]
+    assert [row.to_dict() for row in result.control_chart_rows] == [
+        {
+            "sample_name": str(row["Sample"]),
+            "metric": str(row["Metric"]),
+            "value": float(row["Value"]),
+            "mean": float(row["Mean"]),
+            "warning_low": float(row["Warning Low"]),
+            "warning_high": float(row["Warning High"]),
+            "action_low": float(row["Action Low"]),
+            "action_high": float(row["Action High"]),
+            "zone": str(row["Zone"]),
+        }
+        for row in control_chart_table(samples, metrics).to_dict(orient="records")
+    ]
+    expected_replicates = replicate_statistics_table(samples)
+    assert [row.to_dict() for row in result.replicate_statistics_rows] == [
+        {
+            "sample_name": str(row["Sample"]),
+            "metric": str(row["Metric"]),
+            "count": int(row["N"]),
+            "mean": float(row["Mean"]),
+            "standard_deviation": float(row["SD"]),
+            "relative_standard_deviation_percent": float(row["%RSD"]),
+            "drift": str(row["Drift"]),
+            "outliers": str(row["Outliers"]),
+            "change_point": str(row["Change Point"]),
+        }
+        for row in expected_replicates.to_dict(orient="records")
+    ]
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.control_chart_rows[0].zone = "Changed"
+
+
+def test_analyze_dls_trend_diagnostics_validates_samples_and_allows_empty_rows():
+    result = analyze_dls_trend_diagnostics([_decision_sample("single", 0.20, [])])
+    assert result.control_chart_rows == ()
+    assert result.replicate_statistics_rows == ()
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        analyze_dls_trend_diagnostics([])
+    with raises(TypeError, match="require parsed samples"):
+        analyze_dls_trend_diagnostics([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1153,6 +1229,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "rank_dls_decisions",
         "compose_dls_narrative",
         "summarize_dls_health",
+        "analyze_dls_trend_diagnostics",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1186,6 +1263,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     health = get_capability("summarize_dls_health")
     assert health.handler is summarize_dls_health
     assert health.caller_types == ("Human UI", "CLI", "Future API")
+    diagnostics = get_capability("analyze_dls_trend_diagnostics")
+    assert diagnostics.handler is analyze_dls_trend_diagnostics
+    assert diagnostics.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

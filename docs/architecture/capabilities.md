@@ -35,10 +35,11 @@ Existing application operations:
 
 Duplicated or bypassed workflows:
 
-- `app.py` still coordinates DLS control-chart and replicate-statistics tables.
+- `app.py` still coordinates DLS forward-scatter/circulation trend analysis.
 
-Established DLS narrative and health summaries now cross application contracts.
-The remaining visible diagnostic bypass is tabular trend composition.
+Established DLS narrative, health, control-chart, and replicate diagnostics now
+cross application contracts. The remaining visible trend bypass is the
+interactive forward-scatter workflow.
 
 ## Implemented Capability Catalog
 
@@ -52,6 +53,7 @@ The remaining visible diagnostic bypass is tabular trend composition.
 | `rank_dls_decisions` | `rank_dls_decisions` | Available; used by Streamlit DLS Decision Brief |
 | `compose_dls_narrative` | `compose_dls_narrative` | Available; used by Streamlit DLS findings and Data Story |
 | `summarize_dls_health` | `summarize_dls_health` | Available; used by Streamlit DLS health strip |
+| `analyze_dls_trend_diagnostics` | `analyze_dls_trend_diagnostics` | Available; used by Streamlit control and replicate diagnostics |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -311,6 +313,29 @@ that does not satisfy the parsed-sample contract.
 
 **Caller Types:** Human UI, CLI, Future API. Streamlit's health strip is the
 first caller. Agent use is excluded while this human screening heuristic matures.
+
+## Analyze DLS Trend Diagnostics
+
+**Name:** `analyze_dls_trend_diagnostics`
+
+**Purpose:** Produce the established DLS control-limit signals and replicate-
+series statistics without exposing pandas-returning trend helpers to callers.
+
+**Inputs:** A non-empty list of parsed DLS samples. The capability builds its
+metrics table internally and reads replicate evidence from each measurement.
+
+**Outputs:** A frozen, versioned `DLSTrendDiagnostics` containing ordered tuples
+of `DLSControlChartRow` and `DLSReplicateStatisticsRow`. Fields use semantic
+snake-case names rather than current UI column labels; no DataFrame crosses the
+application boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Insufficient series data is a
+valid result with empty row tuples.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's control chart and
+replicate table are the first callers. Agent use is excluded while these DLS-
+specific diagnostics mature.
 
 ## Import Chromatography Experiment
 

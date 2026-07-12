@@ -58,7 +58,11 @@ from labassistant.models import (
 )
 from labassistant.observations import observations_from_samples
 from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
-from labassistant.trend_analysis import build_data_story
+from labassistant.trend_analysis import (
+    build_data_story,
+    control_chart_table,
+    replicate_statistics_table,
+)
 from labassistant.view_models import build_metrics_table, sample_from_measurement, sample_status
 
 
@@ -312,6 +316,60 @@ class DLSHealthOverview:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSControlChartRow:
+    """Immutable control-limit assessment for one DLS metric value."""
+
+    sample_name: str
+    metric: str
+    value: float
+    mean: float
+    warning_low: float
+    warning_high: float
+    action_low: float
+    action_high: float
+    zone: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSReplicateStatisticsRow:
+    """Immutable replicate-series statistics for one sample metric."""
+
+    sample_name: str
+    metric: str
+    count: int
+    mean: float | None
+    standard_deviation: float | None
+    relative_standard_deviation_percent: float | None
+    drift: str
+    outliers: str
+    change_point: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSTrendDiagnostics:
+    """Versioned DLS control-chart and replicate diagnostics without pandas."""
+
+    control_chart_rows: tuple[DLSControlChartRow, ...]
+    replicate_statistics_rows: tuple[DLSReplicateStatisticsRow, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "control_chart_rows": [row.to_dict() for row in self.control_chart_rows],
+            "replicate_statistics_rows": [
+                row.to_dict() for row in self.replicate_statistics_rows
+            ],
+            "api_version": self.api_version,
+        }
 
 
 @dataclass(frozen=True)
@@ -1698,6 +1756,56 @@ def summarize_dls_health(samples: list[Any]) -> DLSHealthOverview:
     )
 
 
+def analyze_dls_trend_diagnostics(samples: list[Any]) -> DLSTrendDiagnostics:
+    """Return established DLS control-chart and replicate statistics as rows."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for trend diagnostics")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "metrics")
+        or not hasattr(sample, "measurement")
+        for sample in samples
+    ):
+        raise TypeError("DLS trend diagnostics require parsed samples")
+
+    metrics = build_metrics_table(samples)
+    control_rows = tuple(
+        DLSControlChartRow(
+            sample_name=str(row["Sample"]),
+            metric=str(row["Metric"]),
+            value=float(row["Value"]),
+            mean=float(row["Mean"]),
+            warning_low=float(row["Warning Low"]),
+            warning_high=float(row["Warning High"]),
+            action_low=float(row["Action Low"]),
+            action_high=float(row["Action High"]),
+            zone=str(row["Zone"]),
+        )
+        for row in control_chart_table(samples, metrics).to_dict(orient="records")
+    )
+    replicate_rows = tuple(
+        DLSReplicateStatisticsRow(
+            sample_name=str(row["Sample"]),
+            metric=str(row["Metric"]),
+            count=int(row["N"]),
+            mean=float(row["Mean"]) if row["Mean"] is not None else None,
+            standard_deviation=float(row["SD"]) if row["SD"] is not None else None,
+            relative_standard_deviation_percent=(
+                float(row["%RSD"]) if row["%RSD"] is not None else None
+            ),
+            drift=str(row["Drift"]),
+            outliers=str(row["Outliers"]),
+            change_point=str(row["Change Point"]),
+        )
+        for row in replicate_statistics_table(samples).to_dict(orient="records")
+    )
+    return DLSTrendDiagnostics(
+        control_chart_rows=control_rows,
+        replicate_statistics_rows=replicate_rows,
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2193,6 +2301,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="summarize_dls_health",
         purpose="Summarize DLS screening health, status counts, and metric medians.",
         handler=summarize_dls_health,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="analyze_dls_trend_diagnostics",
+        purpose="Return immutable DLS control-chart and replicate diagnostics.",
+        handler=analyze_dls_trend_diagnostics,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(
