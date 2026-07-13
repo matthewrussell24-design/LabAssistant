@@ -45,6 +45,8 @@ metadata fields, and source diagnostics; pandas display, downloads, selection,
 and source-preview truncation remain in the shell. Correlogram visualization
 and paired-angle distribution overlays are now also driven by immutable series.
 Streamlit retains sample selection, angle labels, colors, and chart composition.
+History comparison and related-run capabilities now also accept parsed DLS
+samples directly while retaining established measurement callers.
 
 ## Implemented Capability Catalog
 
@@ -714,15 +716,17 @@ and malformed chromatography records are rejected with
 **Purpose:** Explain sample-level Z-average and PDI changes between current DLS
 evidence and a selected or latest persisted experiment.
 
-**Inputs:** Current `Measurement` objects, an optional baseline record ID, an
-optional record ID to exclude from latest selection, and an injectable history
-path.
+**Inputs:** Current parsed DLS samples or established `Measurement` objects, an
+optional baseline record ID, an optional record ID to exclude from latest
+selection, and an injectable history path. Mixed compatible inputs retain caller
+order.
 
 **Outputs:** A versioned, frozen `ExperimentComparison` containing immutable
 sample rows, baseline metadata, drift labels, and a drifted-sample count. Empty
 history produces no baseline and labels current rows as new samples.
 
-**Expected Errors:** Explicit lookup preserves existing not-found and malformed
+**Expected Errors:** `TypeError` for inputs that are neither parsed DLS samples
+nor DLS measurements. Explicit lookup preserves existing not-found and malformed
 record errors. Automatic latest selection tolerates absent history.
 
 **Caller Types:** Human UI, Agent, CLI, Future API. Threshold crossings do not
@@ -735,15 +739,16 @@ claim scientific causality.
 **Purpose:** Rank saved DLS samples by proximity to one query measurement using
 the established size and PDI feature distance.
 
-**Inputs:** A query `Measurement`, optional top-N limit, optional record ID to
-exclude, and an injectable history path.
+**Inputs:** A query parsed DLS sample or established `Measurement`, optional
+top-N limit, optional record ID to exclude, and an injectable history path.
 
 **Outputs:** A versioned, frozen `RelatedExperiments` envelope containing
 immutable ranked matches. Similarity is a readability score derived from
 distance, not a probability.
 
-**Expected Errors:** `ValueError` when `top_n` is less than one. Missing or empty
-history returns an empty match tuple.
+**Expected Errors:** `ValueError` when `top_n` is less than one and `TypeError`
+for an input that is neither a parsed DLS sample nor DLS measurement. Missing or
+empty history returns an empty match tuple.
 
 **Caller Types:** Human UI, Agent, CLI, Future API. Relatedness indicates feature
 proximity and must not be presented as causal evidence.

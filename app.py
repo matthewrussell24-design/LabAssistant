@@ -1557,7 +1557,7 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
         previous = history.summaries[-1]
         if samples:
             comparison_result = compare_experiments(
-                [sample.measurement for sample in samples],
+                samples,
                 baseline_record_id=previous.record_id,
             )
             comparison = pd.DataFrame(
@@ -1598,7 +1598,7 @@ def render_history_panel(samples: list[ParsedSample] | None = None) -> None:
             st.markdown("**Find similar past runs**")
             query_name = st.selectbox("Match this sample", [sample.name for sample in samples], key="similar_query_sample")
             query_sample = next(sample for sample in samples if sample.name == query_name)
-            related = find_related_experiments(query_sample.measurement, top_n=5)
+            related = find_related_experiments(query_sample, top_n=5)
             if not related.matches:
                 st.caption("No comparable samples in saved history yet.")
             else:

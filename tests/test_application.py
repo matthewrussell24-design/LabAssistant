@@ -595,6 +595,36 @@ def test_compare_experiments_handles_absent_history_and_new_samples(tmp_path):
     assert result.drifted_sample_count == 0
 
 
+def test_compare_experiments_accepts_parsed_samples_and_preserves_order(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    baseline_first = Measurement(metadata=MeasurementMetadata(sample_name="First"))
+    baseline_first.summary_metrics.z_average = 100.0
+    baseline_first.summary_metrics.pdi = 0.20
+    baseline_second = Measurement(metadata=MeasurementMetadata(sample_name="Second"))
+    baseline_second.summary_metrics.z_average = 200.0
+    baseline_second.summary_metrics.pdi = 0.25
+    baseline = save_experiment(
+        [baseline_first, baseline_second],
+        label="Baseline",
+        history_path=history_path,
+    )
+    second = _decision_sample("Second", 0.25, [])
+    second.measurement.summary_metrics.z_average = 200.0
+    second.measurement.summary_metrics.pdi = 0.25
+    first = _decision_sample("First", 0.21, [])
+    first.measurement.summary_metrics.z_average = 130.0
+    first.measurement.summary_metrics.pdi = 0.21
+
+    result = compare_experiments(
+        [second, first], baseline_record_id=baseline.id, history_path=history_path
+    )
+
+    assert [row.sample_name for row in result.rows] == ["Second", "First"]
+    assert [row.drift for row in result.rows] == ["Stable", "Z-average drift"]
+    with raises(TypeError, match="measurements or parsed samples"):
+        compare_experiments([object()], history_path=history_path)
+
+
 def test_find_related_experiments_returns_ranked_versioned_matches(tmp_path):
     history_path = tmp_path / "experiments.jsonl"
     near = Measurement(metadata=MeasurementMetadata(sample_name="Near"))
@@ -629,6 +659,27 @@ def test_find_related_experiments_handles_empty_history_exclusion_and_limit(tmp_
     assert excluded.matches == ()
     with raises(ValueError, match="top_n"):
         find_related_experiments(query, top_n=0, history_path=history_path)
+    with raises(TypeError, match="measurements or parsed samples"):
+        find_related_experiments(object(), history_path=history_path)
+
+
+def test_find_related_experiments_accepts_parsed_sample_and_preserves_ranking(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    near = Measurement(metadata=MeasurementMetadata(sample_name="Near"))
+    near.summary_metrics.z_average = 100.0
+    near.summary_metrics.pdi = 0.20
+    far = Measurement(metadata=MeasurementMetadata(sample_name="Far"))
+    far.summary_metrics.z_average = 400.0
+    far.summary_metrics.pdi = 0.40
+    save_experiment([far, near], label="Baseline", history_path=history_path)
+    query = _decision_sample("Query", 0.21, [])
+    query.measurement.summary_metrics.z_average = 105.0
+    query.measurement.summary_metrics.pdi = 0.21
+
+    result = find_related_experiments(query, top_n=2, history_path=history_path)
+
+    assert result.query_sample_name == "Query"
+    assert [match.sample_name for match in result.matches] == ["Near", "Far"]
 
 
 def test_retrieve_history_overview_returns_immutable_summary_and_trends(tmp_path):

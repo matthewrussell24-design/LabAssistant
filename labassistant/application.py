@@ -1969,8 +1969,17 @@ def list_experiments(
     )
 
 
+def _dls_measurement_input(value: Any) -> Measurement:
+    """Resolve an established measurement or parsed-sample application input."""
+
+    measurement = getattr(value, "measurement", value)
+    if not isinstance(measurement, Measurement):
+        raise TypeError("DLS history workflows require measurements or parsed samples")
+    return measurement
+
+
 def compare_experiments(
-    current: list[Measurement],
+    current: list[Any],
     *,
     baseline_record_id: str | None = None,
     exclude_record_id: str | None = None,
@@ -1988,7 +1997,8 @@ def compare_experiments(
     else:
         baseline = latest_experiment(load_history(history_path), exclude_id=exclude_record_id)
 
-    table = compare_history_experiments(current, baseline)
+    measurements = [_dls_measurement_input(item) for item in current]
+    table = compare_history_experiments(measurements, baseline)
     rows = tuple(
         ExperimentComparisonRow(
             sample_name=row["Sample"],
@@ -2045,7 +2055,7 @@ def retrieve_history_overview(
 
 
 def find_related_experiments(
-    measurement: Measurement,
+    measurement: Any,
     *,
     top_n: int = 5,
     exclude_record_id: str | None = None,
@@ -2060,8 +2070,9 @@ def find_related_experiments(
 
     if top_n < 1:
         raise ValueError("top_n must be at least 1")
+    resolved_measurement = _dls_measurement_input(measurement)
     table = find_similar_samples(
-        measurement,
+        resolved_measurement,
         load_history(history_path),
         top_n=top_n,
         exclude_id=exclude_record_id,
@@ -2080,7 +2091,7 @@ def find_related_experiments(
         for row in table.to_dict(orient="records")
     )
     return RelatedExperiments(
-        query_sample_name=measurement.metadata.sample_name,
+        query_sample_name=resolved_measurement.metadata.sample_name,
         matches=matches,
     )
 

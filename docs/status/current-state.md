@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted paired-angle DLS distribution evidence into
-  an immutable application workflow and migrated Streamlit (task 040).
-- Working Tree: Task 040 is committed locally; inspect `git status --short`
+- Latest Completed Change: Extended DLS history comparison and related-run
+  workflows to accept parsed samples directly and migrated Streamlit (task 041).
+- Working Tree: Task 041 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `204 passed in 2.33s` from `scripts/test -q` on
+- Last Successful Test: `206 passed in 2.52s` from `scripts/test -q` on
   2026-07-13.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-13 for task 040.
+- Last Updated: 2026-07-13 for task 041.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 202 passing.
+- Tests: 🟢 Healthy — 206 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -325,6 +325,9 @@ architecture rationale.
 - Promoted paired-angle forward/back distribution curves into immutable
   application evidence while keeping selection and Plotly composition in
   Streamlit (task 040).
+- Extended immutable history comparison and related-run capabilities to accept
+  parsed DLS samples directly while retaining measurement compatibility and UI
+  selection state (task 041).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -340,8 +343,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS paired-angle overlay task 040 is complete.
-- The working tree was clean when task 040 began.
+- DLS history-input task 041 is complete.
+- The working tree was clean when task 041 began.
 
 ## Known Risks
 
@@ -376,9 +379,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `204 passed in 2.33s` from `scripts/test -q` on 2026-07-13.
+- Latest result: `206 passed in 2.52s` from `scripts/test -q` on 2026-07-13.
 - The Streamlit shell completed a headless startup and health smoke after task
-  040.
+  041.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -395,17 +398,17 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote the DLS history panel's comparison and similar-run inputs
-  behind parsed-sample application workflows.
-- Why this is next: Presentation reads now cross immutable contracts, but the
-  history panel still unwraps mutable measurements before calling comparison
-  and similarity capabilities.
-- Expected scope: Small to medium; preserve baseline selection, sample order,
-  drift labels, similarity ranking, empty states, and display formatting.
-- Risks: Duplicating established history capabilities or moving session and
-  sample-selection state into the application layer.
-- Success criteria: Streamlit requests comparison and similar-run results from
-  parsed DLS samples without directly extracting measurement models.
+- Objective: Let the experiment-history save command accept parsed DLS samples
+  directly.
+- Why this is next: History reads no longer require measurement extraction, but
+  Streamlit still unwraps every parsed sample before invoking the explicit save
+  command.
+- Expected scope: Small; preserve append-only writes, defensive copying,
+  loaded-record lineage, labels, receipts, validation, and explicit user action.
+- Risks: Mutating session samples while attaching lineage or broadening the save
+  command beyond DLS evidence.
+- Success criteria: Streamlit submits parsed DLS samples to the existing save
+  command without exposing mutable measurements across the UI boundary.
 
 ## AI Context Window
 
