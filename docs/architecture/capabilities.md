@@ -42,9 +42,9 @@ charting, and CSV export. Distribution-series evidence now also crosses the
 boundary while normalization, reference deltas, Plotly, and UI state remain in
 Streamlit. Raw evidence inspection and export now use typed point tables,
 metadata fields, and source diagnostics; pandas display, downloads, selection,
-and source-preview truncation remain in the shell. Correlogram visualization is
-now also driven by immutable series and noise evidence. The paired-angle
-distribution overlay is the next direct presentation read.
+and source-preview truncation remain in the shell. Correlogram visualization
+and paired-angle distribution overlays are now also driven by immutable series.
+Streamlit retains sample selection, angle labels, colors, and chart composition.
 
 ## Implemented Capability Catalog
 
@@ -68,6 +68,7 @@ distribution overlay is the next direct presentation read.
 | `retrieve_dls_distributions` | `retrieve_dls_distributions` | Available; used by Streamlit distribution visualizations |
 | `retrieve_dls_raw_evidence` | `retrieve_dls_raw_evidence` | Available; used by Streamlit raw evidence inspection and export |
 | `retrieve_dls_correlograms` | `retrieve_dls_correlograms` | Available; used by Streamlit correlogram diagnostics |
+| `retrieve_dls_paired_angle_overlays` | `retrieve_dls_paired_angle_overlays` | Available; used by Streamlit dual-angle distribution comparison |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -567,6 +568,31 @@ the established conversion error behavior.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's secondary correlogram-
 quality chart is the first caller. Agent use remains excluded while this DLS-
 specific visualization read matures.
+
+## Retrieve DLS Paired-Angle Overlays
+
+**Name:** `retrieve_dls_paired_angle_overlays`
+
+**Purpose:** Project forward and backscatter DLS distribution evidence into
+stable typed curves without exposing mutable measurements to visualization
+shells.
+
+**Inputs:** A non-empty list of parsed DLS samples.
+
+**Outputs:** A frozen, versioned `DLSPairedAngleOverlays` containing every
+sample in import order, identified curves in forward/back order, and diameter
+plus normalized-intensity points in measurement order. Missing or empty curves
+remain explicit through each sample's derived availability state. No sample
+selection, angle display label, color, hover template, or Plotly configuration
+crosses the boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Non-numeric curve values
+retain the established conversion error behavior.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's paired-angle
+distribution chart is the first caller. Agent use remains excluded while this
+DLS-specific visualization read matures.
 
 ## Import Chromatography Experiment
 

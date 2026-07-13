@@ -32,6 +32,7 @@ from labassistant.application import (
     DLSDistributionProjection,
     DLSRawEvidence,
     DLSCorrelograms,
+    DLSPairedAngleOverlays,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -52,6 +53,7 @@ from labassistant.application import (
     retrieve_dls_distributions,
     retrieve_dls_raw_evidence,
     retrieve_dls_correlograms,
+    retrieve_dls_paired_angle_overlays,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -83,6 +85,7 @@ from labassistant.models import (
     ChromatogramTrace,
     ChromatographyMeasurement,
     ChromatographyPeak,
+    DistributionData,
     Experiment,
     FiltrationMeasurement,
     MassBalanceAssessment,
@@ -110,6 +113,7 @@ from labassistant.trend_analysis import (
 )
 from labassistant.view_models import ParsedSample, build_angle_table, build_metrics_table
 from app import (
+    _paired_angle_overlay,
     distribution_difference_dataframe,
     distribution_series_dataframe,
     dls_metrics_dataframe,
@@ -1661,6 +1665,62 @@ def test_retrieve_dls_correlograms_allows_empty_result_and_validates_samples():
         retrieve_dls_correlograms([object()])
 
 
+def test_retrieve_dls_paired_angle_overlays_preserves_samples_curves_and_points():
+    first = _decision_sample("first", 0.12, [])
+    first.measurement.distributions = {
+        "angle_forward": DistributionData(
+            diameter_nm=[100.0, 10.0], intensity=[40.0, 100.0]
+        ),
+        "angle_back": DistributionData(
+            diameter_nm=[12.0, 120.0], intensity=[100.0, 30.0]
+        ),
+    }
+    missing = _decision_sample("missing", 0.12, [])
+    missing.measurement.distributions = {
+        "angle_forward": DistributionData(diameter_nm=[20.0], intensity=[80.0])
+    }
+
+    result = retrieve_dls_paired_angle_overlays([first, missing])
+
+    assert isinstance(result, DLSPairedAngleOverlays)
+    assert [sample.sample_name for sample in result.samples] == ["first", "missing"]
+    assert [curve.position for curve in result.samples[0].curves] == ["forward", "back"]
+    assert [point.to_dict() for point in result.samples[0].curves[0].points] == [
+        {"diameter_nm": 100.0, "normalized_intensity_percent": 40.0},
+        {"diameter_nm": 10.0, "normalized_intensity_percent": 100.0},
+    ]
+    assert result.samples[0].available is True
+    assert result.samples[1].available is False
+    assert result.sample_for("first") is result.samples[0]
+    assert result.sample_for("unknown") is None
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    figure = _paired_angle_overlay(result.samples[0])
+    assert figure is not None
+    assert [trace.name for trace in figure.data] == [
+        "Forward ~12.8°",
+        "Backscatter ~173°",
+    ]
+    assert list(figure.data[0].x) == [100.0, 10.0]
+    assert list(figure.data[0].y) == [40.0, 100.0]
+    assert figure.layout.title.text == "first: intensity distribution by angle"
+    assert _paired_angle_overlay(result.samples[1]) is None
+    with raises(FrozenInstanceError):
+        result.samples[0].sample_name = "changed"
+
+
+def test_retrieve_dls_paired_angle_overlays_preserves_empty_and_validates_samples():
+    empty = _decision_sample("empty", 0.12, [])
+
+    result = retrieve_dls_paired_angle_overlays([empty])
+
+    assert result.samples[0].curves == ()
+    assert result.samples[0].available is False
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        retrieve_dls_paired_angle_overlays([])
+    with raises(TypeError, match="require parsed samples"):
+        retrieve_dls_paired_angle_overlays([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1794,6 +1854,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_dls_distributions",
         "retrieve_dls_raw_evidence",
         "retrieve_dls_correlograms",
+        "retrieve_dls_paired_angle_overlays",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1857,6 +1918,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     correlograms = get_capability("retrieve_dls_correlograms")
     assert correlograms.handler is retrieve_dls_correlograms
     assert correlograms.caller_types == ("Human UI", "CLI", "Future API")
+    paired_overlays = get_capability("retrieve_dls_paired_angle_overlays")
+    assert paired_overlays.handler is retrieve_dls_paired_angle_overlays
+    assert paired_overlays.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

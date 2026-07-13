@@ -856,6 +856,75 @@ class DLSCorrelograms:
 
 
 @dataclass(frozen=True)
+class DLSPairedAnglePoint:
+    """One ordered diameter and normalized-intensity observation."""
+
+    diameter_nm: float
+    normalized_intensity_percent: float
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSPairedAngleCurve:
+    """Ordered distribution evidence for one identified scattering position."""
+
+    position: str
+    points: tuple[DLSPairedAnglePoint, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "position": self.position,
+            "points": [point.to_dict() for point in self.points],
+        }
+
+
+@dataclass(frozen=True)
+class DLSPairedAngleSample:
+    """Forward/back distribution evidence for one sample."""
+
+    sample_name: str
+    curves: tuple[DLSPairedAngleCurve, ...]
+
+    def curve_for(self, position: str) -> DLSPairedAngleCurve | None:
+        return next((curve for curve in self.curves if curve.position == position), None)
+
+    @property
+    def available(self) -> bool:
+        forward = self.curve_for("forward")
+        backward = self.curve_for("back")
+        return bool(forward and forward.points and backward and backward.points)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sample_name": self.sample_name,
+            "curves": [curve.to_dict() for curve in self.curves],
+            "available": self.available,
+        }
+
+
+@dataclass(frozen=True)
+class DLSPairedAngleOverlays:
+    """Versioned paired-angle evidence without selection or chart state."""
+
+    samples: tuple[DLSPairedAngleSample, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def sample_for(self, sample_name: str) -> DLSPairedAngleSample | None:
+        return next(
+            (sample for sample in self.samples if sample.sample_name == sample_name),
+            None,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "samples": [sample.to_dict() for sample in self.samples],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class DLSAngleDetailRow:
     """Immutable detail for one sample and scattering-angle summary."""
 
@@ -2827,6 +2896,50 @@ def retrieve_dls_correlograms(samples: list[Any]) -> DLSCorrelograms:
     return DLSCorrelograms(series=series)
 
 
+def retrieve_dls_paired_angle_overlays(
+    samples: list[Any],
+) -> DLSPairedAngleOverlays:
+    """Return ordered forward/back DLS distribution evidence by sample."""
+
+    if not samples:
+        raise ValueError(
+            "At least one parsed DLS sample is required for paired-angle overlays"
+        )
+    if any(
+        not hasattr(sample, "name") or not hasattr(sample, "measurement")
+        for sample in samples
+    ):
+        raise TypeError("DLS paired-angle overlays require parsed samples")
+
+    projected_samples = []
+    for sample in samples:
+        curves = []
+        for position, key in (("forward", "angle_forward"), ("back", "angle_back")):
+            distribution = sample.measurement.distributions.get(key)
+            if distribution is None:
+                continue
+            curves.append(
+                DLSPairedAngleCurve(
+                    position=position,
+                    points=tuple(
+                        DLSPairedAnglePoint(
+                            diameter_nm=float(diameter),
+                            normalized_intensity_percent=float(intensity),
+                        )
+                        for diameter, intensity in zip(
+                            distribution.diameter_nm,
+                            distribution.intensity,
+                        )
+                    ),
+                )
+            )
+        projected_samples.append(
+            DLSPairedAngleSample(sample_name=sample.name, curves=tuple(curves))
+        )
+
+    return DLSPairedAngleOverlays(samples=tuple(projected_samples))
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -3382,6 +3495,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_dls_correlograms",
         purpose="Return immutable DLS correlogram series and noise evidence.",
         handler=retrieve_dls_correlograms,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_paired_angle_overlays",
+        purpose="Return immutable paired-angle DLS distribution evidence.",
+        handler=retrieve_dls_paired_angle_overlays,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

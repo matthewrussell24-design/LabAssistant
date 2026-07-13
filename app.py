@@ -30,6 +30,7 @@ from labassistant.application import (
     retrieve_dls_distributions,
     retrieve_dls_raw_evidence,
     retrieve_dls_correlograms,
+    retrieve_dls_paired_angle_overlays,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -49,6 +50,7 @@ from labassistant.application import (
     DLSRawEvidence,
     DLSRawPointTable,
     DLSCorrelograms,
+    DLSPairedAngleSample,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -2183,6 +2185,7 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
     Renders only when at least one sample has a forward + backscatter angle pair.
     """
     result = assess_dls_aggregation(samples)
+    overlay_projection = retrieve_dls_paired_angle_overlays(samples)
     available = [assessment for assessment in result.assessments if assessment.available]
     if not available:
         return
@@ -2228,7 +2231,8 @@ def render_aggregation_detection(samples: list[ParsedSample]) -> None:
         [assessment.sample_name for assessment in available],
         key="aggregation_overlay_sample",
     )
-    overlay_sample = next(sample for sample in samples if sample.name == overlay_name)
+    overlay_sample = overlay_projection.sample_for(overlay_name)
+    assert overlay_sample is not None
     paired = _paired_angle_overlay(overlay_sample)
     if paired is None:
         st.caption("Per-angle distribution curves are not available for this sample.")
@@ -2306,19 +2310,18 @@ def _aggregation_index_chart(available: list[DLSAggregationAssessment]) -> go.Fi
     return figure
 
 
-def _paired_angle_overlay(sample: ParsedSample) -> go.Figure | None:
-    distributions = sample.measurement.distributions
-    forward = distributions.get("angle_forward")
-    backward = distributions.get("angle_back")
-    if not forward or not forward.diameter_nm or not backward or not backward.diameter_nm:
+def _paired_angle_overlay(sample: DLSPairedAngleSample) -> go.Figure | None:
+    if not sample.available:
         return None
 
     figure = go.Figure()
-    for distribution, name, color in [(forward, "Forward ~12.8°", "#2c7fb8"), (backward, "Backscatter ~173°", "#d95f0e")]:
+    for position, name, color in [("forward", "Forward ~12.8°", "#2c7fb8"), ("back", "Backscatter ~173°", "#d95f0e")]:
+        curve = sample.curve_for(position)
+        assert curve is not None
         figure.add_trace(
             go.Scatter(
-                x=distribution.diameter_nm,
-                y=distribution.intensity,
+                x=[point.diameter_nm for point in curve.points],
+                y=[point.normalized_intensity_percent for point in curve.points],
                 mode="lines",
                 name=name,
                 line={"color": color, "width": 2},
@@ -2328,7 +2331,7 @@ def _paired_angle_overlay(sample: ParsedSample) -> go.Figure | None:
     figure.update_layout(
         template="plotly_white",
         height=340,
-        title=f"{sample.name}: intensity distribution by angle",
+        title=f"{sample.sample_name}: intensity distribution by angle",
         margin={"l": 52, "r": 24, "t": 48, "b": 52},
         xaxis={"title": "Diameter (nm)", "type": "log", "gridcolor": "#e8eef5"},
         yaxis={"title": "Intensity (%)", "gridcolor": "#e8eef5"},
