@@ -43,7 +43,8 @@ boundary while normalization, reference deltas, Plotly, and UI state remain in
 Streamlit. Raw evidence inspection and export now use typed point tables,
 metadata fields, and source diagnostics; pandas display, downloads, selection,
 and source-preview truncation remain in the shell. Correlogram visualization is
-the next direct presentation read.
+now also driven by immutable series and noise evidence. The paired-angle
+distribution overlay is the next direct presentation read.
 
 ## Implemented Capability Catalog
 
@@ -66,6 +67,7 @@ the next direct presentation read.
 | `retrieve_dls_metrics` | `retrieve_dls_metrics` | Available; used by Streamlit charts, raw table, and CSV export |
 | `retrieve_dls_distributions` | `retrieve_dls_distributions` | Available; used by Streamlit distribution visualizations |
 | `retrieve_dls_raw_evidence` | `retrieve_dls_raw_evidence` | Available; used by Streamlit raw evidence inspection and export |
+| `retrieve_dls_correlograms` | `retrieve_dls_correlograms` | Available; used by Streamlit correlogram diagnostics |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -540,6 +542,31 @@ malformed-DataFrame errors remain unchanged.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's raw point, metadata,
 original-file, and CSV-download tabs are the first callers. Agent use remains
 excluded because this contract includes complete raw source content.
+
+## Retrieve DLS Correlograms
+
+**Name:** `retrieve_dls_correlograms`
+
+**Purpose:** Project DLS correlogram traces and sample-level baseline-noise
+evidence into stable typed series without exposing mutable measurements to
+visualization shells.
+
+**Inputs:** A non-empty list of parsed DLS samples.
+
+**Outputs:** A frozen, versioned `DLSCorrelograms` containing non-empty sample
+series in import order, trace points in measurement order, optional delay,
+correlation, and replicate values, and one optional noise score per sample. No
+DataFrame, Plotly configuration, hover template, or diagnostic label crosses
+the boundary. Samples without trace points are omitted; no traces is a valid
+empty result.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Non-numeric trace values retain
+the established conversion error behavior.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's secondary correlogram-
+quality chart is the first caller. Agent use remains excluded while this DLS-
+specific visualization read matures.
 
 ## Import Chromatography Experiment
 

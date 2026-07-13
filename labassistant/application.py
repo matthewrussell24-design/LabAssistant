@@ -814,6 +814,48 @@ class DLSRawEvidence:
 
 
 @dataclass(frozen=True)
+class DLSCorrelogramPoint:
+    """One immutable point from a DLS correlogram trace."""
+
+    delay_time: float | None
+    correlation: float | None
+    replicate: float | None
+
+    def to_dict(self) -> dict[str, float | None]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSCorrelogramSeries:
+    """Ordered correlogram points and noise evidence for one sample."""
+
+    sample_name: str
+    noise_score: float | None
+    points: tuple[DLSCorrelogramPoint, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sample_name": self.sample_name,
+            "noise_score": self.noise_score,
+            "points": [point.to_dict() for point in self.points],
+        }
+
+
+@dataclass(frozen=True)
+class DLSCorrelograms:
+    """Versioned ordered DLS correlogram evidence without chart details."""
+
+    series: tuple[DLSCorrelogramSeries, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "series": [series.to_dict() for series in self.series],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class DLSAngleDetailRow:
     """Immutable detail for one sample and scattering-angle summary."""
 
@@ -2750,6 +2792,41 @@ def retrieve_dls_raw_evidence(
     )
 
 
+def retrieve_dls_correlograms(samples: list[Any]) -> DLSCorrelograms:
+    """Return ordered correlogram traces and noise scores for DLS samples."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for correlograms")
+    if any(
+        not hasattr(sample, "name") or not hasattr(sample, "measurement")
+        for sample in samples
+    ):
+        raise TypeError("DLS correlograms require parsed samples")
+
+    def optional_float(value: Any) -> float | None:
+        return float(value) if value is not None else None
+
+    series = tuple(
+        DLSCorrelogramSeries(
+            sample_name=sample.name,
+            noise_score=optional_float(
+                sample.measurement.derived_metrics.correlogram_noise_score
+            ),
+            points=tuple(
+                DLSCorrelogramPoint(
+                    delay_time=optional_float(point.get("delay_time")),
+                    correlation=optional_float(point.get("correlation")),
+                    replicate=optional_float(point.get("replicate")),
+                )
+                for point in sample.measurement.correlogram
+            ),
+        )
+        for sample in samples
+        if sample.measurement.correlogram
+    )
+    return DLSCorrelograms(series=series)
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -3299,6 +3376,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_dls_raw_evidence",
         purpose="Return immutable DLS point tables, metadata, and source diagnostics.",
         handler=retrieve_dls_raw_evidence,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_correlograms",
+        purpose="Return immutable DLS correlogram series and noise evidence.",
+        handler=retrieve_dls_correlograms,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

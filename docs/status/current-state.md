@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted DLS raw-evidence inspection and export into
-  an immutable application workflow and migrated Streamlit (task 038).
-- Working Tree: Task 038 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted DLS correlogram visualization evidence into
+  an immutable application workflow and migrated Streamlit (task 039).
+- Working Tree: Task 039 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `200 passed in 2.31s` from `scripts/test -q` on
+- Last Successful Test: `202 passed in 2.17s` from `scripts/test -q` on
   2026-07-13.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-13 for task 038.
+- Last Updated: 2026-07-13 for task 039.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 200 passing.
+- Tests: 🟢 Healthy — 202 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of thirty-four stable capability names, including explicit
+  registry of thirty-five stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -320,6 +320,8 @@ architecture rationale.
   signals, points, and peaks while keeping chart state in Streamlit (task 037).
 - Promoted raw DLS point tables, metadata, and source diagnostics into immutable
   application reads while keeping display and export in Streamlit (task 038).
+- Promoted DLS correlogram traces and noise scores into immutable application
+  series while keeping diagnostic chart composition in Streamlit (task 039).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -335,8 +337,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS raw-evidence task 038 is complete.
-- The working tree was clean when task 038 began.
+- DLS correlogram task 039 is complete.
+- The working tree was clean when task 039 began.
 
 ## Known Risks
 
@@ -371,9 +373,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `200 passed in 2.31s` from `scripts/test -q` on 2026-07-13.
+- Latest result: `202 passed in 2.17s` from `scripts/test -q` on 2026-07-13.
 - The Streamlit shell completed a headless startup and health smoke after task
-  038.
+  039.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -390,18 +392,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote DLS correlogram visualization evidence into an immutable
-  application read.
-- Why this is next: Raw evidence now crosses the application boundary, but the
-  secondary correlogram-quality chart still reads measurement traces and noise
-  scores directly from parsed samples.
-- Expected scope: Small to medium; preserve sample order, delay/correlation
-  points, optional noise scores, empty-state behavior, and hover values.
-- Risks: Treating a visualization projection as a scientific assessment or
-  moving Plotly layout and presentation labels into the application layer.
-- Success criteria: Streamlit receives typed correlogram series through one
-  registered application workflow while retaining Plotly construction and
-  diagnostic layout in the shell.
+- Objective: Promote paired-angle DLS distribution overlay evidence into an
+  immutable application read.
+- Why this is next: Correlogram diagnostics now cross the application boundary,
+  but the dual-angle review still reads measurement distributions directly to
+  plot forward and backscatter intensity curves.
+- Expected scope: Small to medium; preserve sample selection, forward/back
+  identification, point order, normalized intensity, missing-curve behavior,
+  and chart labels.
+- Risks: Duplicating the general distribution contract or moving Plotly and
+  sample-selection state into the application layer.
+- Success criteria: Streamlit receives typed paired-angle overlay evidence
+  through one registered application workflow while retaining selection,
+  normalization display, and Plotly composition in the shell.
 
 ## AI Context Window
 

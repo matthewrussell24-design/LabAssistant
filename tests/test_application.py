@@ -31,6 +31,7 @@ from labassistant.application import (
     DLSMetricsProjection,
     DLSDistributionProjection,
     DLSRawEvidence,
+    DLSCorrelograms,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -50,6 +51,7 @@ from labassistant.application import (
     retrieve_dls_metrics,
     retrieve_dls_distributions,
     retrieve_dls_raw_evidence,
+    retrieve_dls_correlograms,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -1622,6 +1624,43 @@ def test_retrieve_dls_raw_evidence_preserves_fallback_and_validates_inputs():
         retrieve_dls_raw_evidence([sample], groups=(object(),))
 
 
+def test_retrieve_dls_correlograms_preserves_series_points_noise_and_order():
+    first = _decision_sample("first", 0.12, [])
+    first.measurement.correlogram = [
+        {"delay_time": 0.1, "correlation": 0.98, "replicate": 1.0},
+        {"delay_time": 1.0, "correlation": 0.75, "replicate": 1.0},
+    ]
+    first.measurement.derived_metrics.correlogram_noise_score = 0.025
+    empty = _decision_sample("empty", 0.12, [])
+    second = _decision_sample("second", 0.12, [])
+    second.measurement.correlogram = [
+        {"delay_time": 0.2, "correlation": 0.9, "replicate": 2.0}
+    ]
+
+    result = retrieve_dls_correlograms([first, empty, second])
+
+    assert isinstance(result, DLSCorrelograms)
+    assert [series.sample_name for series in result.series] == ["first", "second"]
+    assert result.series[0].noise_score == 0.025
+    assert [point.to_dict() for point in result.series[0].points] == [
+        {"delay_time": 0.1, "correlation": 0.98, "replicate": 1.0},
+        {"delay_time": 1.0, "correlation": 0.75, "replicate": 1.0},
+    ]
+    assert result.series[1].noise_score is None
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.series[0].noise_score = 1.0
+
+
+def test_retrieve_dls_correlograms_allows_empty_result_and_validates_samples():
+    result = retrieve_dls_correlograms([_decision_sample("empty", 0.12, [])])
+    assert result.series == ()
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        retrieve_dls_correlograms([])
+    with raises(TypeError, match="require parsed samples"):
+        retrieve_dls_correlograms([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1754,6 +1793,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_dls_metrics",
         "retrieve_dls_distributions",
         "retrieve_dls_raw_evidence",
+        "retrieve_dls_correlograms",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1814,6 +1854,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     raw_evidence = get_capability("retrieve_dls_raw_evidence")
     assert raw_evidence.handler is retrieve_dls_raw_evidence
     assert raw_evidence.caller_types == ("Human UI", "CLI", "Future API")
+    correlograms = get_capability("retrieve_dls_correlograms")
+    assert correlograms.handler is retrieve_dls_correlograms
+    assert correlograms.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

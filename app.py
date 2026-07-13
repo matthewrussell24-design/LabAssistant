@@ -29,6 +29,7 @@ from labassistant.application import (
     retrieve_dls_metrics,
     retrieve_dls_distributions,
     retrieve_dls_raw_evidence,
+    retrieve_dls_correlograms,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -47,6 +48,7 @@ from labassistant.application import (
     DLSDistributionSeries,
     DLSRawEvidence,
     DLSRawPointTable,
+    DLSCorrelograms,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -1225,34 +1227,22 @@ def render_signal_matrix(metrics: pd.DataFrame) -> None:
     st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
 
 
-def render_correlogram_quality_chart(samples: list[ParsedSample]) -> None:
-    rows = []
-    for sample in samples:
-        for point in sample.measurement.correlogram:
-            rows.append(
-                {
-                    "Sample": sample.name,
-                    "Delay Time": point.get("delay_time"),
-                    "Correlation": point.get("correlation"),
-                    "Replicate": point.get("replicate"),
-                    "Noise Score": sample.measurement.derived_metrics.correlogram_noise_score,
-                }
-            )
-
-    data = pd.DataFrame(rows)
-    if data.empty:
+def render_correlogram_quality_chart(correlograms: DLSCorrelograms) -> None:
+    if not correlograms.series:
         st.info("No correlogram data was found for signal-quality review.")
         return
 
     figure = go.Figure()
-    for sample_name, sample_data in data.groupby("Sample", sort=False):
+    for series in correlograms.series:
         figure.add_trace(
             go.Scatter(
-                x=sample_data["Delay Time"],
-                y=sample_data["Correlation"],
+                x=[point.delay_time for point in series.points],
+                y=[point.correlation for point in series.points],
                 mode="lines+markers",
-                name=sample_name,
-                customdata=sample_data[["Replicate", "Noise Score"]],
+                name=series.sample_name,
+                customdata=[
+                    [point.replicate, series.noise_score] for point in series.points
+                ],
                 hovertemplate=(
                     "<b>%{fullData.name}</b><br>"
                     "Delay: %{x:.3g}<br>"
@@ -2568,6 +2558,7 @@ def main() -> None:
         samples,
         groups=preview.groups if preview is not None else (),
     )
+    correlograms = retrieve_dls_correlograms(samples)
     render_decision_workbench(samples, narrative, diagnostics, sample_summaries)
     if chromatography_error:
         st.error(f"Chromatography preview failed: {chromatography_error}")
@@ -2643,7 +2634,7 @@ def main() -> None:
         with comparison_cols[1]:
             render_signal_matrix(metrics)
 
-        render_correlogram_quality_chart(samples)
+        render_correlogram_quality_chart(correlograms)
 
     with st.expander("Small multiples", expanded=False):
         render_small_multiples(distribution_projection, distribution_mode, normalize)
