@@ -24,6 +24,8 @@ from labassistant.application import (
     DLSHealthOverview,
     DLSTrendDiagnostics,
     DLSCirculationTimeRead,
+    DLSFiltrationRead,
+    DLSFiltrationAttachmentResult,
     DLSForwardScatterTrendRead,
     FiltrationTrendRead,
     DLSAggregationRead,
@@ -47,6 +49,9 @@ from labassistant.application import (
     analyze_dls_trend_diagnostics,
     retrieve_dls_circulation_time,
     set_dls_circulation_time,
+    retrieve_dls_filtration_measurement,
+    set_dls_filtration_measurement,
+    attach_dls_filtration_measurements,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
@@ -1342,6 +1347,98 @@ def test_analyze_dls_forward_scatter_trends_validates_and_preserves_empty_result
         analyze_dls_forward_scatter_trends([object()])
 
 
+def test_dls_filtration_contracts_preserve_fields_overwrite_and_clear():
+    sample = _decision_sample("Lot 1", 0.20, [])
+    filtration = FiltrationMeasurement(
+        sample_name="Lot 1",
+        difficulty_score=4.0,
+        filtration_time_minutes=12.5,
+        pressure=10.0,
+        pressure_unit="psi",
+        pressure_kpa=68.94757293168,
+        filter_type="PES",
+        clogging_observed=True,
+        notes="Slow filtration",
+        source="manual_entry",
+        source_file="review.csv",
+        warnings=["review pressure"],
+    )
+
+    assert retrieve_dls_filtration_measurement(sample) is None
+    result = set_dls_filtration_measurement(sample, filtration)
+
+    assert isinstance(result, DLSFiltrationRead)
+    assert result.sample_name == "Lot 1"
+    assert result.measurement.to_dict() == {
+        "sample_name": "Lot 1",
+        "difficulty_score": 4.0,
+        "filtration_time_minutes": 12.5,
+        "pressure": 10.0,
+        "pressure_unit": "psi",
+        "pressure_kpa": 68.94757293168,
+        "filter_type": "PES",
+        "clogging_observed": True,
+        "notes": "Slow filtration",
+        "source": "manual_entry",
+        "source_file": "review.csv",
+        "warnings": ["review pressure"],
+        "trace": None,
+    }
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.measurement.difficulty_score = 2.0
+    overwritten = set_dls_filtration_measurement(
+        sample,
+        FiltrationMeasurement(sample_name="Lot 1", difficulty_score=2.0),
+    )
+    assert overwritten is not None
+    assert overwritten.measurement.difficulty_score == 2.0
+    assert overwritten.measurement.pressure is None
+    assert set_dls_filtration_measurement(sample, None) is None
+    assert "filtration_follow_up" not in sample.measurement.provenance
+
+
+def test_dls_filtration_contracts_validate_inputs_and_malformed_provenance():
+    sample = _decision_sample("Lot 1", 0.20, [])
+    with raises(TypeError, match="requires a parsed sample"):
+        retrieve_dls_filtration_measurement(object())
+    with raises(TypeError, match="requires a filtration measurement"):
+        set_dls_filtration_measurement(sample, object())
+    sample.measurement.provenance["filtration_follow_up"] = "malformed"
+    assert retrieve_dls_filtration_measurement(sample) is None
+    cleared = FiltrationMeasurement(sample_name="Lot 1", difficulty_score=None)
+    assert set_dls_filtration_measurement(sample, cleared) is None
+
+
+def test_attach_dls_filtration_measurements_preserves_matching_and_order():
+    first = _decision_sample("First", 0.20, [])
+    second = _decision_sample("Second", 0.20, [])
+    measurements = [
+        FiltrationMeasurement(sample_name="Second", difficulty_score=2.0),
+        FiltrationMeasurement(sample_name="Missing", difficulty_score=5.0),
+        FiltrationMeasurement(sample_name="First", difficulty_score=3.0),
+    ]
+
+    result = attach_dls_filtration_measurements([first, second], measurements)
+
+    assert isinstance(result, DLSFiltrationAttachmentResult)
+    assert result.attached_count == 2
+    assert [item.sample_name for item in result.attached] == ["Second", "First"]
+    assert [item.measurement.difficulty_score for item in result.attached] == [
+        2.0,
+        3.0,
+    ]
+    assert result.unmatched_sample_names == ("Missing",)
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(TypeError, match="requires a parsed sample"):
+        attach_dls_filtration_measurements([object()], measurements)
+    with raises(TypeError, match="requires filtration measurements"):
+        attach_dls_filtration_measurements([first], [object()])
+    unmatched = attach_dls_filtration_measurements([], measurements[:1])
+    assert unmatched.attached_count == 0
+    assert unmatched.unmatched_sample_names == ("Second",)
+
+
 def test_analyze_filtration_follow_up_trends_preserves_points_and_relationships():
     samples = [
         _decision_sample("A", 0.20, []),
@@ -1996,6 +2093,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_dls_circulation_time",
         "set_dls_circulation_time",
         "analyze_dls_forward_scatter_trends",
+        "retrieve_dls_filtration_measurement",
+        "set_dls_filtration_measurement",
+        "attach_dls_filtration_measurements",
         "analyze_filtration_follow_up_trends",
         "assess_dls_aggregation",
         "summarize_dls_samples",
@@ -2033,11 +2133,21 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
             "add_scientific_note",
             "save_experiment_history",
             "set_dls_circulation_time",
+            "set_dls_filtration_measurement",
+            "attach_dls_filtration_measurements",
         }
     )
     assert get_capability("add_scientific_note").caller_types == ("Human UI", "CLI")
     assert get_capability("save_experiment_history").caller_types == ("Human UI", "CLI")
     assert get_capability("set_dls_circulation_time").caller_types == (
+        "Human UI",
+        "CLI",
+    )
+    assert get_capability("set_dls_filtration_measurement").caller_types == (
+        "Human UI",
+        "CLI",
+    )
+    assert get_capability("attach_dls_filtration_measurements").caller_types == (
         "Human UI",
         "CLI",
     )
@@ -2059,6 +2169,15 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     forward_trends = get_capability("analyze_dls_forward_scatter_trends")
     assert forward_trends.handler is analyze_dls_forward_scatter_trends
     assert forward_trends.caller_types == ("Human UI", "CLI", "Future API")
+    filtration_read = get_capability("retrieve_dls_filtration_measurement")
+    assert filtration_read.handler is retrieve_dls_filtration_measurement
+    assert filtration_read.caller_types == ("Human UI", "CLI", "Future API")
+    filtration_set = get_capability("set_dls_filtration_measurement")
+    assert filtration_set.handler is set_dls_filtration_measurement
+    assert filtration_set.caller_types == ("Human UI", "CLI")
+    filtration_attach = get_capability("attach_dls_filtration_measurements")
+    assert filtration_attach.handler is attach_dls_filtration_measurements
+    assert filtration_attach.caller_types == ("Human UI", "CLI")
     filtration_trends = get_capability("analyze_filtration_follow_up_trends")
     assert filtration_trends.handler is analyze_filtration_follow_up_trends
     assert filtration_trends.caller_types == ("Human UI", "CLI", "Future API")

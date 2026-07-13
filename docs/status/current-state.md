@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted reviewed DLS circulation-time retrieval and
-  mutation behind parsed-sample application contracts (task 043).
-- Working Tree: Task 043 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted reviewed filtration retrieval and attachment
+  behind parsed-sample application contracts (task 044).
+- Working Tree: Task 044 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `209 passed in 2.65s` from `scripts/test -q` on
+- Last Successful Test: `212 passed in 2.47s` from `scripts/test -q` on
   2026-07-13.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-13 for task 043.
+- Last Updated: 2026-07-13 for task 044.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 209 passing.
+- Tests: 🟢 Healthy — 212 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of thirty-eight stable capability names, including explicit
+  registry of forty-one stable capability names, including explicit
   human/CLI-only note, experiment-history, and reviewed-evidence commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -334,6 +334,9 @@ architecture rationale.
 - Promoted reviewed circulation-time reads and mutation into explicit
   parsed-sample contracts while keeping session state and blank-input decisions
   in Streamlit (task 043).
+- Promoted reviewed filtration retrieval, single-sample mutation, and ordered
+  CSV attachment into parsed-sample contracts while keeping widgets, pressure
+  normalization, prefill, and feedback in Streamlit (task 044).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -349,8 +352,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS circulation-time task 043 is complete.
-- The working tree was clean when task 043 began.
+- DLS filtration-evidence task 044 is complete.
+- The working tree was clean when task 044 began.
 
 ## Known Risks
 
@@ -385,9 +388,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `209 passed in 2.65s` from `scripts/test -q` on 2026-07-13.
+- Latest result: `212 passed in 2.47s` from `scripts/test -q` on 2026-07-13.
 - The Streamlit shell completed a headless startup and health smoke after task
-  043.
+  044.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -404,19 +407,18 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote reviewed filtration attachment and retrieval
-  behind parsed-sample application workflows.
-- Why this is next: Circulation time now crosses explicit contracts, but manual
-  and CSV filtration workflows still read and mutate filtration provenance
-  directly on parsed-sample measurements.
-- Expected scope: Medium; preserve all filtration fields, pressure
-  normalization, sample-name matching, overwrite and clear semantics, unmatched
-  reporting, session prefill, and explicit attachment actions.
-- Risks: Moving widget/session behavior into the application layer or weakening
-  the distinction between operator-reviewed and instrument-derived evidence.
-- Success criteria: Streamlit retrieves and attaches reviewed filtration
-  evidence through parsed-sample application contracts without direct
-  measurement access.
+- Objective: Migrate the saved DLS workspace loader to the technique-aware
+  restore workflow without Streamlit reconstructing parsed samples.
+- Why this is next: Streamlit no longer accesses DLS measurements for active
+  evidence workflows, but the saved-run loader still restores raw measurements
+  and calls `sample_from_measurement` in the shell.
+- Expected scope: Small to medium; preserve editable copy-on-access samples,
+  saved-record metadata, source files, history lineage, session keys, labels,
+  explicit load action, errors, and rerun behavior.
+- Risks: Expanding the native read-only `DLSAnalysisResult` with mutable restore
+  access or changing malformed/non-DLS record rejection.
+- Success criteria: Streamlit restores saved DLS workspace samples through the
+  technique-aware application workflow without importing the conversion helper.
 
 ## AI Context Window
 

@@ -64,11 +64,13 @@ from labassistant.observations import observations_from_samples
 from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
 from labassistant.trend_analysis import (
     apply_circulation_time,
+    apply_filtration_measurement,
     build_filtration_trend_analysis,
     build_forward_scatter_trend_analysis_from_measurements,
     build_data_story,
     control_chart_table,
     circulation_time_from_measurement,
+    filtration_measurement_from_provenance,
     replicate_statistics_table,
 )
 from labassistant.view_models import build_metrics_table, sample_from_measurement, sample_status
@@ -1158,6 +1160,40 @@ class FiltrationImportRead:
             "errors": list(self.errors),
             "missing_columns": list(self.missing_columns),
             "unsupported_columns": list(self.unsupported_columns),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class DLSFiltrationRead:
+    """Immutable reviewed filtration evidence attached to one DLS sample."""
+
+    sample_name: str
+    measurement: FiltrationMeasurementSummary
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sample_name": self.sample_name,
+            "measurement": self.measurement.to_dict(),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class DLSFiltrationAttachmentResult:
+    """Immutable ordered result of reviewed filtration batch attachment."""
+
+    attached_count: int
+    attached: tuple[DLSFiltrationRead, ...]
+    unmatched_sample_names: tuple[str, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "attached_count": self.attached_count,
+            "attached": [item.to_dict() for item in self.attached],
+            "unmatched_sample_names": list(self.unmatched_sample_names),
             "api_version": self.api_version,
         }
 
@@ -3391,6 +3427,64 @@ def _filtration_measurement_summary(
     )
 
 
+def retrieve_dls_filtration_measurement(sample: Any) -> DLSFiltrationRead | None:
+    """Return reviewed filtration evidence for one parsed DLS sample."""
+
+    sample_name, measurement = _parsed_dls_sample_measurement(sample)
+    filtration = filtration_measurement_from_provenance(measurement)
+    if filtration is None:
+        return None
+    return DLSFiltrationRead(
+        sample_name=sample_name,
+        measurement=_filtration_measurement_summary(filtration),
+    )
+
+
+def set_dls_filtration_measurement(
+    sample: Any,
+    filtration: FiltrationMeasurement | None,
+) -> DLSFiltrationRead | None:
+    """Attach, overwrite, or clear reviewed filtration evidence on one sample."""
+
+    _, measurement = _parsed_dls_sample_measurement(sample)
+    if filtration is not None and not isinstance(filtration, FiltrationMeasurement):
+        raise TypeError("DLS filtration evidence requires a filtration measurement")
+    apply_filtration_measurement(measurement, filtration)
+    return retrieve_dls_filtration_measurement(sample)
+
+
+def attach_dls_filtration_measurements(
+    samples: list[Any],
+    measurements: list[Any],
+) -> DLSFiltrationAttachmentResult:
+    """Attach reviewed filtration evidence by exact sample-name matching."""
+
+    by_name = {}
+    for sample in samples:
+        sample_name, _ = _parsed_dls_sample_measurement(sample)
+        by_name[sample_name] = sample
+    if any(not isinstance(item, FiltrationMeasurement) for item in measurements):
+        raise TypeError("DLS filtration attachment requires filtration measurements")
+
+    attached = []
+    unmatched = []
+    attached_count = 0
+    for measurement in measurements:
+        sample = by_name.get(measurement.sample_name)
+        if sample is None:
+            unmatched.append(measurement.sample_name)
+            continue
+        result = set_dls_filtration_measurement(sample, measurement)
+        attached_count += 1
+        if result is not None:
+            attached.append(result)
+    return DLSFiltrationAttachmentResult(
+        attached_count=attached_count,
+        attached=tuple(attached),
+        unmatched_sample_names=tuple(unmatched),
+    )
+
+
 def _chromatography_measurement_summaries(
     measurements: list[Any],
 ) -> tuple[ChromatographyMeasurementSummary, ...]:
@@ -3539,6 +3633,24 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         purpose="Analyze reviewed circulation time against forward-angle DLS metrics.",
         handler=analyze_dls_forward_scatter_trends,
         caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_filtration_measurement",
+        purpose="Return reviewed filtration evidence for one DLS sample.",
+        handler=retrieve_dls_filtration_measurement,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="set_dls_filtration_measurement",
+        purpose="Attach, overwrite, or clear reviewed filtration evidence.",
+        handler=set_dls_filtration_measurement,
+        caller_types=("Human UI", "CLI"),
+    ),
+    CapabilityContract(
+        name="attach_dls_filtration_measurements",
+        purpose="Attach reviewed filtration evidence by DLS sample name.",
+        handler=attach_dls_filtration_measurements,
+        caller_types=("Human UI", "CLI"),
     ),
     CapabilityContract(
         name="analyze_filtration_follow_up_trends",

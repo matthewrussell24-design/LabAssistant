@@ -23,6 +23,9 @@ from labassistant.application import (
     analyze_dls_trend_diagnostics,
     retrieve_dls_circulation_time,
     set_dls_circulation_time,
+    retrieve_dls_filtration_measurement,
+    set_dls_filtration_measurement,
+    attach_dls_filtration_measurements,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
@@ -74,7 +77,6 @@ from labassistant.filtration import (
     FiltrationMeasurement,
     PRESSURE_UNIT_LABELS,
     PRESSURE_UNITS_TO_KPA,
-    filtration_measurement_to_table_row,
     normalize_pressure,
     validate_difficulty_score,
 )
@@ -82,8 +84,6 @@ from labassistant.models import Experiment
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
     RelationshipAnalysis,
-    apply_filtration_measurement,
-    filtration_measurement_from_provenance,
 )
 from labassistant.quality import (
     SIGNAL_WARNINGS,
@@ -1721,8 +1721,8 @@ def apply_session_experimental_variables(samples: list[ParsedSample]) -> None:
         pressure_kpa = normalize_pressure(pressure, pressure_unit) if pressure is not None and pressure_unit in PRESSURE_UNITS_TO_KPA else None
         clogging_value = st.session_state.get(f"filtration_clogging::{sample.name}", "Not recorded")
         clogging_observed = {"Yes": True, "No": False}.get(str(clogging_value))
-        apply_filtration_measurement(
-            sample.measurement,
+        set_dls_filtration_measurement(
+            sample,
             FiltrationMeasurement(
                 sample_name=sample.name,
                 difficulty_score=float(ordinal_score),
@@ -1977,8 +1977,11 @@ def render_manual_filtration_entry(samples: list[ParsedSample]) -> None:
     columns = st.columns(min(3, len(samples)))
     invalid_pressure: list[str] = []
     for index, sample in enumerate(samples):
-        existing = filtration_measurement_from_provenance(sample.measurement)
-        _prefill_filtration_session(sample.name, existing)
+        existing = retrieve_dls_filtration_measurement(sample)
+        _prefill_filtration_session(
+            sample.name,
+            existing.measurement if existing else None,
+        )
         difficulty_key = f"filtration_difficulty::{sample.name}"
         time_key = f"filtration_time::{sample.name}"
         pressure_key = f"filtration_pressure::{sample.name}"
@@ -2024,7 +2027,7 @@ def render_manual_filtration_entry(samples: list[ParsedSample]) -> None:
         st.warning("Enter numeric pressure values for: " + ", ".join(invalid_pressure))
 
 
-def _prefill_filtration_session(sample_name: str, existing: FiltrationMeasurement | None, *, overwrite: bool = False) -> None:
+def _prefill_filtration_session(sample_name: str, existing: FiltrationMeasurementSummary | None, *, overwrite: bool = False) -> None:
     if existing is None:
         return
     difficulty_key = f"filtration_difficulty::{sample_name}"
@@ -2054,10 +2057,24 @@ def render_filtration_csv_import(samples: list[ParsedSample]) -> None:
     result = analyze_filtration_csv(filtration_file, source_name=filtration_file.name)
     render_filtration_import_preview(result)
     if result.measurements and st.button("Attach parsed filtration measurements", use_container_width=True):
-        attached, unmatched = attach_filtration_measurements(samples, result.restore_measurements())
-        st.success(f"Attached filtration measurements to {attached} sample(s).")
-        if unmatched:
-            st.warning("No matching current DLS sample for: " + ", ".join(unmatched))
+        attachment = attach_dls_filtration_measurements(
+            samples,
+            result.restore_measurements(),
+        )
+        for item in attachment.attached:
+            _prefill_filtration_session(
+                item.sample_name,
+                item.measurement,
+                overwrite=True,
+            )
+        st.success(
+            f"Attached filtration measurements to {attachment.attached_count} sample(s)."
+        )
+        if attachment.unmatched_sample_names:
+            st.warning(
+                "No matching current DLS sample for: "
+                + ", ".join(attachment.unmatched_sample_names)
+            )
 
 
 def render_filtration_import_preview(result: FiltrationImportRead) -> None:
@@ -2097,32 +2114,17 @@ def _filtration_summary_row(measurement: FiltrationMeasurementSummary) -> dict:
     }
 
 
-def attach_filtration_measurements(samples: list[ParsedSample], measurements: list[FiltrationMeasurement]) -> tuple[int, list[str]]:
-    by_name = {sample.name: sample for sample in samples}
-    attached = 0
-    unmatched = []
-    for measurement in measurements:
-        sample = by_name.get(measurement.sample_name)
-        if sample is None:
-            unmatched.append(measurement.sample_name)
-            continue
-        apply_filtration_measurement(sample.measurement, measurement)
-        _prefill_filtration_session(sample.name, measurement, overwrite=True)
-        attached += 1
-    return attached, unmatched
-
-
 def render_attached_filtration_measurements(samples: list[ParsedSample]) -> None:
     measurements = [
-        measurement
+        evidence.measurement
         for sample in samples
-        if (measurement := filtration_measurement_from_provenance(sample.measurement)) is not None
+        if (evidence := retrieve_dls_filtration_measurement(sample)) is not None
     ]
     if not measurements:
         return
     st.markdown("**Current attached filtration measurements**")
     st.dataframe(
-        pd.DataFrame([filtration_measurement_to_table_row(measurement) for measurement in measurements]),
+        pd.DataFrame([_filtration_summary_row(measurement) for measurement in measurements]),
         use_container_width=True,
         hide_index=True,
     )

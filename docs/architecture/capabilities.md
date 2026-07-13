@@ -51,6 +51,8 @@ The explicit history-save command resolves parsed samples inside the
 application boundary and still copies evidence before adding append lineage.
 Reviewed circulation-time retrieval and mutation now also cross explicit
 parsed-sample contracts while Streamlit retains session and widget state.
+Reviewed filtration reads, single-sample mutation, and CSV batch attachment now
+cross the same boundary with ordered matching results.
 
 ## Implemented Capability Catalog
 
@@ -68,6 +70,9 @@ parsed-sample contracts while Streamlit retains session and widget state.
 | `retrieve_dls_circulation_time` | `retrieve_dls_circulation_time` | Available; used by Streamlit circulation-time prefill |
 | `set_dls_circulation_time` | `set_dls_circulation_time` | Available; explicit reviewed Streamlit evidence mutation |
 | `analyze_dls_forward_scatter_trends` | `analyze_dls_forward_scatter_trends` | Available; used by Streamlit circulation explorer |
+| `retrieve_dls_filtration_measurement` | `retrieve_dls_filtration_measurement` | Available; used by Streamlit filtration prefill and current-evidence display |
+| `set_dls_filtration_measurement` | `set_dls_filtration_measurement` | Available; explicit reviewed Streamlit evidence mutation |
+| `attach_dls_filtration_measurements` | `attach_dls_filtration_measurements` | Available; explicit reviewed Streamlit CSV attachment |
 | `analyze_filtration_follow_up_trends` | `analyze_filtration_follow_up_trends` | Available; used by Streamlit filtration follow-up |
 | `assess_dls_aggregation` | `assess_dls_aggregation` | Available; used by Streamlit dual-angle comparison |
 | `summarize_dls_samples` | `summarize_dls_samples` | Available; used by Streamlit sample cards and inspection list |
@@ -427,6 +432,70 @@ angle evidence produces empty points and qualified messages rather than errors.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's circulation explorer is
 the first caller. Agent use remains excluded pending broader review of user-
 entered experimental-variable provenance.
+
+## Retrieve DLS Filtration Measurement
+
+**Name:** `retrieve_dls_filtration_measurement`
+
+**Purpose:** Return reviewed filtration evidence without exposing mutable DLS
+measurement provenance to interface shells.
+
+**Inputs:** One parsed DLS sample.
+
+**Outputs:** A frozen, versioned `DLSFiltrationRead` containing parsed-sample
+identity and the existing immutable `FiltrationMeasurementSummary`. The nested
+summary preserves difficulty, time, pressure and normalized pressure, filter,
+clogging, notes, source, warnings, and trace evidence. Missing or malformed
+stored provenance returns `None`.
+
+**Expected Errors:** `TypeError` when the input does not satisfy the parsed DLS
+sample contract.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit uses this read for manual
+prefill and the current attached-evidence table. Agent use remains excluded
+because this is reviewed operator evidence.
+
+## Set DLS Filtration Measurement
+
+**Name:** `set_dls_filtration_measurement`
+
+**Purpose:** Attach, overwrite, or clear one reviewed filtration measurement on
+a parsed DLS sample.
+
+**Inputs:** One parsed DLS sample and an optional `FiltrationMeasurement`.
+`None` or a measurement without a difficulty score retains the established
+clear semantics. Streamlit remains responsible for input parsing and pressure
+normalization before command invocation.
+
+**Outputs:** The resulting frozen `DLSFiltrationRead`, or `None` after a clear.
+
+**Expected Errors:** `TypeError` for malformed parsed-sample or filtration
+inputs. Established domain serialization behavior is unchanged.
+
+**Caller Types:** Human UI and CLI only. Agent and Future API callers are
+excluded because this mutates reviewed evidence.
+
+## Attach DLS Filtration Measurements
+
+**Name:** `attach_dls_filtration_measurements`
+
+**Purpose:** Attach reviewed filtration measurements to current DLS samples by
+the established exact sample-name matching rule.
+
+**Inputs:** Parsed DLS samples and filtration measurements in caller order.
+Empty current samples are valid and make every submitted measurement unmatched.
+
+**Outputs:** A frozen, versioned `DLSFiltrationAttachmentResult` containing the
+matched count, resulting attached reads in submitted-measurement order, and
+unmatched sample names in submitted order. Repeated matches retain established
+last-write-wins provenance behavior.
+
+**Expected Errors:** `TypeError` for malformed parsed-sample or filtration
+inputs.
+
+**Caller Types:** Human UI and CLI only. Streamlit's explicit CSV attachment
+button is the first caller; session prefill and user feedback remain in the
+shell.
 
 ## Analyze Filtration Follow-Up Trends
 
