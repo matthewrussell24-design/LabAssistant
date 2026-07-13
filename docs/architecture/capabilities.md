@@ -38,8 +38,9 @@ cross application contracts, including forward-scatter/circulation and
 orthogonal filtration reads, dual-angle aggregation assessment, and per-sample
 and per-angle summaries. The shared metrics projection used by visualizations
 now crosses the same boundary; Streamlit reconstructs pandas only for display,
-charting, and CSV export. Distribution-series visualization remains a direct
-parsed-sample read and is the next coherent extraction candidate.
+charting, and CSV export. Distribution-series evidence now also crosses the
+boundary while normalization, reference deltas, Plotly, and UI state remain in
+Streamlit. Raw evidence inspection and export remain direct parsed-sample reads.
 
 ## Implemented Capability Catalog
 
@@ -60,6 +61,7 @@ parsed-sample read and is the next coherent extraction candidate.
 | `summarize_dls_samples` | `summarize_dls_samples` | Available; used by Streamlit sample cards and inspection list |
 | `retrieve_dls_angle_details` | `retrieve_dls_angle_details` | Available; used by Streamlit per-angle detail table |
 | `retrieve_dls_metrics` | `retrieve_dls_metrics` | Available; used by Streamlit charts, raw table, and CSV export |
+| `retrieve_dls_distributions` | `retrieve_dls_distributions` | Available; used by Streamlit distribution visualizations |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -481,6 +483,32 @@ metric errors remain unchanged.
 
 **Caller Types:** Human UI, CLI, Future API. Streamlit's shared comparison,
 diagnostic, raw-data, and CSV-export projection is the first caller. Agent use
+remains excluded while this DLS-specific read contract matures.
+
+## Retrieve DLS Distributions
+
+**Name:** `retrieve_dls_distributions`
+
+**Purpose:** Project DLS intensity, volume, and number distribution evidence
+into stable typed series without exposing parsed-sample DataFrames or vendor
+column labels to visualization shells.
+
+**Inputs:** A non-empty list of parsed DLS samples.
+
+**Outputs:** A frozen, versioned `DLSDistributionProjection` containing samples
+in import order, sample status, signal-major `DLSDistributionSeries`, filtered
+positive-diameter/nonnegative-signal points, unnormalized local peaks, explicit
+diameter/signal column-identification flags, and ordered available signals.
+Identified signals with no usable points remain distinguishable from missing
+signals. No DataFrame, normalization choice, reference choice, or chart state
+crosses the boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Established missing-column and
+malformed-DataFrame errors remain unchanged.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's signal selector,
+overlay, delta chart, and small multiples are the first callers. Agent use
 remains excluded while this DLS-specific read contract matures.
 
 ## Import Chromatography Experiment

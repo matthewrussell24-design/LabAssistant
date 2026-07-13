@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted shared DLS metric rows into an immutable
-  application workflow and migrated Streamlit (task 036).
-- Working Tree: Task 036 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted DLS distribution-series evidence into an
+  immutable application workflow and migrated Streamlit (task 037).
+- Working Tree: Task 037 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `195 passed in 2.36s` from `scripts/test -q` on
+- Last Successful Test: `198 passed in 2.51s` from `scripts/test -q` on
   2026-07-13.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-13 for task 036.
+- Last Updated: 2026-07-13 for task 037.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 193 passing.
+- Tests: 🟢 Healthy — 198 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of thirty-two stable capability names, including explicit
+  registry of thirty-three stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -316,6 +316,8 @@ architecture rationale.
   and angle ordering plus empty-angle behavior (task 035).
 - Promoted the shared DLS metrics projection into immutable typed rows and kept
   pandas reconstruction in the Streamlit shell (task 036).
+- Promoted DLS distribution-series evidence into immutable typed samples,
+  signals, points, and peaks while keeping chart state in Streamlit (task 037).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -331,8 +333,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS metrics-projection task 036 is complete.
-- The working tree was clean when task 036 began.
+- DLS distribution-series task 037 is complete.
+- The working tree was clean when task 037 began.
 
 ## Known Risks
 
@@ -367,9 +369,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `195 passed in 2.36s` from `scripts/test -q` on 2026-07-13.
+- Latest result: `198 passed in 2.51s` from `scripts/test -q` on 2026-07-13.
 - The Streamlit shell completed a headless startup and health smoke after task
-  036.
+  037.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -386,18 +388,18 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote DLS distribution-series visualization data into immutable
-  application rows.
-- Why this is next: Shared metric tables now cross the application boundary,
-  but Streamlit still reads parsed-sample DataFrames and distribution-column
-  metadata directly to build overlays, deltas, and signal choices.
-- Expected scope: Medium; preserve available-signal selection, sample order,
-  diameter/value pairs, normalization, reference deltas, and peak annotations.
-- Risks: Moving Plotly or UI selection state into the application layer, or
-  changing handling of missing and uneven distribution series.
-- Success criteria: Streamlit receives typed distribution evidence through one
-  registered application read workflow while retaining chart composition and
-  interaction state in the shell.
+- Objective: Promote DLS raw evidence inspection and export into an immutable
+  application read.
+- Why this is next: Distribution visualizations now use typed application data,
+  but Streamlit's raw-data tabs still read mutable parsed-sample DataFrames,
+  metadata dictionaries, and source text directly.
+- Expected scope: Medium; preserve sample order, original point-table columns,
+  metadata field order, source diagnostics, truncation behavior, and CSV export.
+- Risks: Copying large evidence unnecessarily, weakening provenance, or moving
+  tab selection and rendering details into the application layer.
+- Success criteria: Streamlit receives immutable raw-evidence summaries and
+  copy-on-access export data through one registered application workflow while
+  retaining pandas display, downloads, and source selection in the shell.
 
 ## AI Context Window
 

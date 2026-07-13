@@ -59,6 +59,7 @@ from labassistant.models import (
     Measurement,
     Observation,
 )
+from labassistant.metrics import find_local_peaks
 from labassistant.observations import observations_from_samples
 from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
 from labassistant.trend_analysis import (
@@ -654,6 +655,87 @@ class DLSMetricsProjection:
     def to_dict(self) -> dict[str, Any]:
         return {
             "rows": [row.to_dict() for row in self.rows],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
+class DLSDistributionPoint:
+    """One filtered DLS distribution coordinate."""
+
+    diameter_nm: float
+    signal_value: float
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSDistributionPeak:
+    """One local maximum in an unnormalized DLS distribution."""
+
+    diameter_nm: float
+    signal_value: float
+
+    def to_dict(self) -> dict[str, float]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSDistributionSeries:
+    """Immutable evidence for one sample and distribution signal."""
+
+    signal: str
+    diameter_column_identified: bool
+    signal_column_identified: bool
+    points: tuple[DLSDistributionPoint, ...]
+    peaks: tuple[DLSDistributionPeak, ...]
+
+    @property
+    def columns_identified(self) -> bool:
+        return self.diameter_column_identified and self.signal_column_identified
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "signal": self.signal,
+            "diameter_column_identified": self.diameter_column_identified,
+            "signal_column_identified": self.signal_column_identified,
+            "points": [point.to_dict() for point in self.points],
+            "peaks": [peak.to_dict() for peak in self.peaks],
+        }
+
+
+@dataclass(frozen=True)
+class DLSDistributionSample:
+    """Ordered distribution signals and status for one parsed sample."""
+
+    sample_name: str
+    status: str
+    series: tuple[DLSDistributionSeries, ...]
+
+    def series_for(self, signal: str) -> DLSDistributionSeries | None:
+        return next((item for item in self.series if item.signal == signal), None)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sample_name": self.sample_name,
+            "status": self.status,
+            "series": [item.to_dict() for item in self.series],
+        }
+
+
+@dataclass(frozen=True)
+class DLSDistributionProjection:
+    """Versioned DLS distribution evidence without pandas or chart state."""
+
+    samples: tuple[DLSDistributionSample, ...]
+    available_signals: tuple[str, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "samples": [sample.to_dict() for sample in self.samples],
+            "available_signals": list(self.available_signals),
             "api_version": self.api_version,
         }
 
@@ -2440,6 +2522,89 @@ def retrieve_dls_metrics(samples: list[Any]) -> DLSMetricsProjection:
     return DLSMetricsProjection(rows=rows)
 
 
+def retrieve_dls_distributions(samples: list[Any]) -> DLSDistributionProjection:
+    """Return filtered DLS distribution evidence for visualization shells."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for distributions")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "data")
+        or not hasattr(sample, "metrics")
+        or not hasattr(sample, "warnings")
+        for sample in samples
+    ):
+        raise TypeError("DLS distributions require parsed samples")
+
+    signal_columns = (
+        ("Intensity", "Intensity Column"),
+        ("Volume", "Volume Column"),
+        ("Number", "Number Column"),
+    )
+    projected_samples = []
+    identified_signals: set[str] = set()
+    for sample in samples:
+        diameter_column = sample.metrics["Diameter Column"]
+        series = []
+        for signal, metric_key in signal_columns:
+            signal_column = sample.metrics[metric_key]
+            if signal_column:
+                identified_signals.add(signal)
+
+            points: tuple[DLSDistributionPoint, ...] = ()
+            peaks: tuple[DLSDistributionPeak, ...] = ()
+            if diameter_column and signal_column:
+                working = (
+                    sample.data[[diameter_column, signal_column]]
+                    .dropna()
+                    .sort_values(diameter_column)
+                )
+                working = working[
+                    (working[diameter_column] > 0)
+                    & (working[signal_column] >= 0)
+                ]
+                points = tuple(
+                    DLSDistributionPoint(
+                        diameter_nm=float(row[diameter_column]),
+                        signal_value=float(row[signal_column]),
+                    )
+                    for _, row in working.iterrows()
+                )
+                peaks = tuple(
+                    DLSDistributionPeak(
+                        diameter_nm=peak["diameter"],
+                        signal_value=peak["value"],
+                    )
+                    for peak in find_local_peaks(
+                        working, diameter_column, signal_column
+                    )
+                )
+            series.append(
+                DLSDistributionSeries(
+                    signal=signal,
+                    diameter_column_identified=bool(diameter_column),
+                    signal_column_identified=bool(signal_column),
+                    points=points,
+                    peaks=peaks,
+                )
+            )
+        projected_samples.append(
+            DLSDistributionSample(
+                sample_name=sample.name,
+                status=sample_status(sample),
+                series=tuple(series),
+            )
+        )
+
+    available_signals = tuple(
+        signal for signal, _ in signal_columns if signal in identified_signals
+    ) or ("Intensity",)
+    return DLSDistributionProjection(
+        samples=tuple(projected_samples),
+        available_signals=available_signals,
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2977,6 +3142,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_dls_metrics",
         purpose="Return immutable shared DLS metric rows.",
         handler=retrieve_dls_metrics,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_distributions",
+        purpose="Return immutable DLS distribution series and peak evidence.",
+        handler=retrieve_dls_distributions,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

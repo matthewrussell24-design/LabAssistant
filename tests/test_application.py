@@ -3,6 +3,7 @@ from dataclasses import FrozenInstanceError
 from io import BytesIO
 from pathlib import Path
 
+import pandas as pd
 from pytest import approx, raises
 
 from labassistant.application import (
@@ -26,6 +27,7 @@ from labassistant.application import (
     DLSSampleSummaries,
     DLSAngleDetails,
     DLSMetricsProjection,
+    DLSDistributionProjection,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -43,6 +45,7 @@ from labassistant.application import (
     summarize_dls_samples,
     retrieve_dls_angle_details,
     retrieve_dls_metrics,
+    retrieve_dls_distributions,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -100,7 +103,11 @@ from labassistant.trend_analysis import (
     replicate_statistics_table,
 )
 from labassistant.view_models import ParsedSample, build_angle_table, build_metrics_table
-from app import dls_metrics_dataframe
+from app import (
+    distribution_difference_dataframe,
+    distribution_series_dataframe,
+    dls_metrics_dataframe,
+)
 
 
 class RecordingStore:
@@ -1437,6 +1444,111 @@ def test_retrieve_dls_metrics_validates_parsed_samples():
         retrieve_dls_metrics([object()])
 
 
+def _distribution_sample(
+    name: str,
+    diameters: list[float],
+    intensity: list[float],
+    *,
+    volume: list[float] | None = None,
+) -> ParsedSample:
+    sample = _decision_sample(name, 0.12, [])
+    data = {"Diameter": diameters, "Intensity": intensity}
+    if volume is not None:
+        data["Volume"] = volume
+    sample.data = pd.DataFrame(data)
+    sample.metrics.update(
+        {
+            "Diameter Column": "Diameter",
+            "Intensity Column": "Intensity",
+            "Volume Column": "Volume" if volume is not None else None,
+            "Number Column": None,
+        }
+    )
+    return sample
+
+
+def test_retrieve_dls_distributions_preserves_points_peaks_and_signal_order():
+    reference = _distribution_sample(
+        "reference",
+        [100, -1, 10, 1000, 50],
+        [50, 20, 10, 5, -2],
+        volume=[40, 10, 5, 2, -1],
+    )
+    comparison = _distribution_sample(
+        "comparison", [9, 110, 900], [5, 20, 10]
+    )
+
+    result = retrieve_dls_distributions([reference, comparison])
+
+    assert isinstance(result, DLSDistributionProjection)
+    assert result.available_signals == ("Intensity", "Volume")
+    assert [sample.sample_name for sample in result.samples] == [
+        "reference",
+        "comparison",
+    ]
+    assert [series.signal for series in result.samples[0].series] == [
+        "Intensity",
+        "Volume",
+        "Number",
+    ]
+    intensity = result.samples[0].series_for("Intensity")
+    assert intensity is not None
+    assert intensity.columns_identified is True
+    assert [(point.diameter_nm, point.signal_value) for point in intensity.points] == [
+        (10.0, 10.0),
+        (100.0, 50.0),
+        (1000.0, 5.0),
+    ]
+    assert [(peak.diameter_nm, peak.signal_value) for peak in intensity.peaks] == [
+        (100.0, 50.0)
+    ]
+    assert result.samples[0].series_for("Number").signal_column_identified is False
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        intensity.points[0].diameter_nm = 20.0
+
+
+def test_distribution_shell_helpers_preserve_normalization_and_nearest_delta():
+    reference = retrieve_dls_distributions(
+        [_distribution_sample("reference", [100, 10, 1000], [50, 10, 5])]
+    ).samples[0].series_for("Intensity")
+    comparison = retrieve_dls_distributions(
+        [_distribution_sample("comparison", [9, 110, 900], [5, 20, 10])]
+    ).samples[0].series_for("Intensity")
+    assert reference is not None
+    assert comparison is not None
+
+    normalized = distribution_series_dataframe(reference, normalize=True)
+    assert normalized.to_dict(orient="list") == {
+        "Diameter": [10.0, 100.0, 1000.0],
+        "Signal": [20.0, 100.0, 10.0],
+    }
+    difference = distribution_difference_dataframe(comparison, reference)
+    assert difference.to_dict(orient="list") == {
+        "Diameter": [9.0, 110.0, 900.0],
+        "Delta": [5.0, 0.0, 40.0],
+    }
+
+
+def test_retrieve_dls_distributions_preserves_fallback_and_validates_samples():
+    sample = _distribution_sample("missing", [10], [1])
+    sample.metrics.update(
+        {
+            "Diameter Column": None,
+            "Intensity Column": None,
+            "Volume Column": None,
+            "Number Column": None,
+        }
+    )
+    result = retrieve_dls_distributions([sample])
+    assert result.available_signals == ("Intensity",)
+    assert result.samples[0].series_for("Intensity").points == ()
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        retrieve_dls_distributions([])
+    with raises(TypeError, match="require parsed samples"):
+        retrieve_dls_distributions([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1567,6 +1679,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "summarize_dls_samples",
         "retrieve_dls_angle_details",
         "retrieve_dls_metrics",
+        "retrieve_dls_distributions",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1621,6 +1734,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     metrics = get_capability("retrieve_dls_metrics")
     assert metrics.handler is retrieve_dls_metrics
     assert metrics.caller_types == ("Human UI", "CLI", "Future API")
+    distributions = get_capability("retrieve_dls_distributions")
+    assert distributions.handler is retrieve_dls_distributions
+    assert distributions.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

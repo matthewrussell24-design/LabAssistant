@@ -27,6 +27,7 @@ from labassistant.application import (
     summarize_dls_samples,
     retrieve_dls_angle_details,
     retrieve_dls_metrics,
+    retrieve_dls_distributions,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -41,6 +42,8 @@ from labassistant.application import (
     DLSSampleSummaries,
     DLSAngleDetails,
     DLSMetricsProjection,
+    DLSDistributionProjection,
+    DLSDistributionSeries,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -56,9 +59,6 @@ from labassistant.application import (
 )
 from labassistant.interpretation import (
     format_metric,
-)
-from labassistant.metrics import (
-    find_local_peaks,
 )
 from labassistant.filtration import (
     FILTRATION_DIFFICULTY_RUBRIC,
@@ -87,7 +87,6 @@ from labassistant.quality import (
 from labassistant.view_models import (
     ParsedSample,
     sample_from_measurement,
-    sample_status,
 )
 
 
@@ -841,78 +840,79 @@ def render_sample_card(sample: DLSSampleSummary) -> None:
     )
 
 
-def get_distribution_column(sample: ParsedSample, mode: str) -> str | None:
-    # Return only the requested signal's column. No cross-signal fallback, so a
-    # missing Volume/Number curve shows a clean empty state instead of intensity
-    # data mislabeled as volume/number.
-    return {
-        "Intensity": sample.metrics["Intensity Column"],
-        "Volume": sample.metrics["Volume Column"],
-        "Number": sample.metrics["Number Column"],
-    }.get(mode)
+def distribution_series_dataframe(
+    series: DLSDistributionSeries,
+    *,
+    normalize: bool = True,
+) -> pd.DataFrame:
+    """Construct a chart-ready DataFrame from immutable distribution points."""
+
+    working = pd.DataFrame(
+        [
+            {"Diameter": point.diameter_nm, "Signal": point.signal_value}
+            for point in series.points
+        ],
+        columns=["Diameter", "Signal"],
+    )
+    if normalize and not working.empty and working["Signal"].max() > 0:
+        working["Signal"] = working["Signal"] / working["Signal"].max() * 100
+    return working
 
 
-def available_signals(samples: list[ParsedSample]) -> list[str]:
-    """Distribution signals that actually have data across the imported samples."""
-    present = [
-        mode
-        for mode in ("Intensity", "Volume", "Number")
-        if any(get_distribution_column(sample, mode) for sample in samples)
-    ]
-    return present or ["Intensity"]
+def distribution_difference_dataframe(
+    series: DLSDistributionSeries,
+    reference: DLSDistributionSeries,
+) -> pd.DataFrame:
+    """Align normalized series to the nearest reference diameters."""
+
+    sample_data = distribution_series_dataframe(series, normalize=True)
+    reference_data = distribution_series_dataframe(reference, normalize=True)
+    if sample_data.empty or reference_data.empty:
+        return pd.DataFrame(columns=["Diameter", "Delta"])
+    merged = pd.merge_asof(
+        sample_data.sort_values("Diameter"),
+        reference_data.sort_values("Diameter"),
+        on="Diameter",
+        direction="nearest",
+        suffixes=("", "_Reference"),
+    ).dropna()
+    if merged.empty:
+        return pd.DataFrame(columns=["Diameter", "Delta"])
+    return pd.DataFrame(
+        {
+            "Diameter": merged["Diameter"],
+            "Delta": merged["Signal"] - merged["Signal_Reference"],
+        }
+    )
 
 
-def get_distribution_data(sample: ParsedSample, distribution_mode: str, normalize: bool = True) -> pd.DataFrame:
-    diameter_column = sample.metrics["Diameter Column"]
-    distribution_column = get_distribution_column(sample, distribution_mode)
-
-    if not diameter_column or not distribution_column:
-        return pd.DataFrame(columns=["Diameter", "Signal"])
-
-    working = sample.data[[diameter_column, distribution_column]].dropna().sort_values(diameter_column)
-    working = working[(working[diameter_column] > 0) & (working[distribution_column] >= 0)]
-
-    if working.empty:
-        return pd.DataFrame(columns=["Diameter", "Signal"])
-
-    signal = working[distribution_column]
-    if normalize and signal.max() > 0:
-        signal = signal / signal.max() * 100
-
-    return pd.DataFrame({"Diameter": working[diameter_column].astype(float), "Signal": signal.astype(float)})
-
-
-def render_distribution_chart(samples: list[ParsedSample], selected_names: list[str], distribution_mode: str, normalize: bool, show_peaks: bool, reference_name: str | None) -> None:
+def render_distribution_chart(
+    projection: DLSDistributionProjection,
+    selected_names: list[str],
+    distribution_mode: str,
+    normalize: bool,
+    show_peaks: bool,
+    reference_name: str | None,
+) -> None:
     figure = go.Figure()
-    selected = [sample for sample in samples if sample.name in selected_names]
+    selected = [
+        sample for sample in projection.samples if sample.sample_name in selected_names
+    ]
     reference_name = reference_name if reference_name and reference_name != "None" else None
     y_label = f"Normalized {distribution_mode}" if normalize else distribution_mode
 
     for sample in selected:
-        diameter_column = sample.metrics["Diameter Column"]
-        distribution_column = get_distribution_column(sample, distribution_mode)
-
-        if not diameter_column or not distribution_column:
+        series = sample.series_for(distribution_mode)
+        if series is None or not series.points:
             continue
-
-        working = sample.data[[diameter_column, distribution_column]].dropna().sort_values(diameter_column)
-        working = working[(working[diameter_column] > 0) & (working[distribution_column] >= 0)]
-
-        if working.empty:
-            continue
-
-        y_values = working[distribution_column]
-
-        if normalize and y_values.max() > 0:
-            y_values = y_values / y_values.max() * 100
-
-        is_reference = sample.name == reference_name
+        working = distribution_series_dataframe(series, normalize=normalize)
+        is_reference = sample.sample_name == reference_name
         figure.add_trace(
             go.Scatter(
-                x=working[diameter_column],
-                y=y_values,
+                x=working["Diameter"],
+                y=working["Signal"],
                 mode="lines",
-                name=sample.name,
+                name=sample.sample_name,
                 line={"width": 4 if is_reference else 2.2},
                 opacity=1 if is_reference or not reference_name else 0.72,
                 hovertemplate="<b>%{fullData.name}</b><br>Diameter: %{x:.3g} nm<br>Signal: %{y:.3g}<extra></extra>",
@@ -920,24 +920,23 @@ def render_distribution_chart(samples: list[ParsedSample], selected_names: list[
         )
 
         if show_peaks:
-            peaks = find_local_peaks(working, diameter_column, distribution_column)
-            for peak_index, peak in enumerate(peaks[:2]):
-                y_peak = peak["value"]
-                if normalize and y_values.max() > 0:
-                    original_max = working[distribution_column].max()
-                    y_peak = y_peak / original_max * 100 if original_max else y_peak
+            original_max = max(point.signal_value for point in series.points)
+            for peak_index, peak in enumerate(series.peaks[:2]):
+                y_peak = peak.signal_value
+                if normalize and original_max > 0:
+                    y_peak = y_peak / original_max * 100
 
                 figure.add_trace(
                     go.Scatter(
-                        x=[peak["diameter"]],
+                        x=[peak.diameter_nm],
                         y=[y_peak],
                         mode="markers+text" if peak_index == 0 else "markers",
-                        name=f"{sample.name} peak",
+                        name=f"{sample.sample_name} peak",
                         marker={"size": 8 if peak_index == 0 else 7, "symbol": "diamond" if peak_index == 0 else "circle-open"},
-                        text=[f"{peak['diameter']:.0f} nm"] if peak_index == 0 else None,
+                        text=[f"{peak.diameter_nm:.0f} nm"] if peak_index == 0 else None,
                         textposition="top center",
                         showlegend=False,
-                        hovertemplate=f"<b>{sample.name}</b><br>Peak: {peak['diameter']:.3g} nm<br>Signal: {peak['value']:.3g}<extra></extra>",
+                        hovertemplate=f"<b>{sample.sample_name}</b><br>Peak: {peak.diameter_nm:.3g} nm<br>Signal: {peak.signal_value:.3g}<extra></extra>",
                     )
                 )
 
@@ -974,46 +973,50 @@ def render_distribution_chart(samples: list[ParsedSample], selected_names: list[
     st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False, "scrollZoom": True})
 
 
-def render_difference_chart(samples: list[ParsedSample], selected_names: list[str], distribution_mode: str, reference_name: str | None) -> None:
+def render_difference_chart(
+    projection: DLSDistributionProjection,
+    selected_names: list[str],
+    distribution_mode: str,
+    reference_name: str | None,
+) -> None:
     if not reference_name or reference_name == "None":
         st.info("Choose a reference sample to see distribution differences.")
         return
 
-    reference = next((sample for sample in samples if sample.name == reference_name), None)
+    reference = next(
+        (sample for sample in projection.samples if sample.sample_name == reference_name),
+        None,
+    )
     if reference is None:
         st.info("Choose a valid reference sample to see distribution differences.")
         return
 
-    reference_data = get_distribution_data(reference, distribution_mode, normalize=True)
-    if reference_data.empty:
+    reference_series = reference.series_for(distribution_mode)
+    if reference_series is None or not reference_series.points:
         st.info("The reference sample does not have usable distribution points.")
         return
 
     figure = go.Figure()
-    selected = [sample for sample in samples if sample.name in selected_names and sample.name != reference_name]
+    selected = [
+        sample
+        for sample in projection.samples
+        if sample.sample_name in selected_names and sample.sample_name != reference_name
+    ]
 
     for sample in selected:
-        sample_data = get_distribution_data(sample, distribution_mode, normalize=True)
-        if sample_data.empty:
+        series = sample.series_for(distribution_mode)
+        if series is None:
             continue
-
-        merged = pd.merge_asof(
-            sample_data.sort_values("Diameter"),
-            reference_data.sort_values("Diameter"),
-            on="Diameter",
-            direction="nearest",
-            suffixes=("", "_Reference"),
-        ).dropna()
-
-        if merged.empty:
+        difference = distribution_difference_dataframe(series, reference_series)
+        if difference.empty:
             continue
 
         figure.add_trace(
             go.Scatter(
-                x=merged["Diameter"],
-                y=merged["Signal"] - merged["Signal_Reference"],
+                x=difference["Diameter"],
+                y=difference["Delta"],
                 mode="lines",
-                name=sample.name,
+                name=sample.sample_name,
                 hovertemplate="<b>%{fullData.name}</b><br>Diameter: %{x:.3g} nm<br>Delta signal: %{y:.3g}<extra></extra>",
             )
         )
@@ -1341,32 +1344,29 @@ def render_aggregation_review(summaries: DLSSampleSummaries) -> None:
         )
 
 
-def render_small_multiples(samples: list[ParsedSample], distribution_mode: str, normalize: bool) -> None:
+def render_small_multiples(
+    projection: DLSDistributionProjection,
+    distribution_mode: str,
+    normalize: bool,
+) -> None:
     columns = st.columns(3)
 
-    for index, sample in enumerate(samples):
-        diameter_column = sample.metrics["Diameter Column"]
-        distribution_column = get_distribution_column(sample, distribution_mode)
+    for index, sample in enumerate(projection.samples):
+        series = sample.series_for(distribution_mode)
         with columns[index % 3]:
-            if not diameter_column or not distribution_column:
-                st.info(f"{sample.name}: distribution columns not identified.")
+            if series is None or not series.columns_identified:
+                st.info(f"{sample.sample_name}: distribution columns not identified.")
                 continue
-
-            working = sample.data[[diameter_column, distribution_column]].dropna().sort_values(diameter_column)
-            working = working[(working[diameter_column] > 0) & (working[distribution_column] >= 0)]
+            working = distribution_series_dataframe(series, normalize=normalize)
             if working.empty:
-                st.info(f"{sample.name}: no usable distribution points.")
+                st.info(f"{sample.sample_name}: no usable distribution points.")
                 continue
-
-            y_values = working[distribution_column]
-            if normalize and y_values.max() > 0:
-                y_values = y_values / y_values.max() * 100
 
             figure = go.Figure()
             figure.add_trace(
                 go.Scatter(
-                    x=working[diameter_column],
-                    y=y_values,
+                    x=working["Diameter"],
+                    y=working["Signal"],
                     mode="lines",
                     line={"width": 2.2, "color": "#2563eb"},
                     hovertemplate="Diameter: %{x:.3g} nm<br>Signal: %{y:.3g}<extra></extra>",
@@ -1376,7 +1376,7 @@ def render_small_multiples(samples: list[ParsedSample], distribution_mode: str, 
                 template="plotly_white",
                 height=220,
                 margin={"l": 34, "r": 12, "t": 34, "b": 34},
-                title={"text": f"{sample.name} ({sample_status(sample)})", "font": {"size": 13}},
+                title={"text": f"{sample.sample_name} ({sample.status})", "font": {"size": 13}},
                 xaxis={"type": "log", "title": "", "showticklabels": True},
                 yaxis={"title": "", "showticklabels": False},
             )
@@ -2346,7 +2346,7 @@ def render_angle_breakdown(details: DLSAngleDetails) -> None:
 
 
 def render_primary_visualization(
-    samples: list[ParsedSample],
+    projection: DLSDistributionProjection,
     distribution_mode: str,
     normalize: bool,
     show_peaks: bool,
@@ -2356,23 +2356,42 @@ def render_primary_visualization(
     with control_cols[0]:
         selected_names = st.multiselect(
             "Visible samples",
-            [sample.name for sample in samples],
-            default=[sample.name for sample in samples[: min(len(samples), 8)]],
+            [sample.sample_name for sample in projection.samples],
+            default=[
+                sample.sample_name
+                for sample in projection.samples[: min(len(projection.samples), 8)]
+            ],
         )
     with control_cols[1]:
-        reference_name = st.selectbox("Reference sample", ["None"] + [sample.name for sample in samples])
+        reference_name = st.selectbox(
+            "Reference sample",
+            ["None"] + [sample.sample_name for sample in projection.samples],
+        )
     with control_cols[2]:
         view_mode = st.radio("View", ["Overlay", "Delta"], horizontal=True)
     with control_cols[3]:
         if st.button("Show flagged only", use_container_width=True):
-            selected_names = [sample.name for sample in samples if sample_status(sample) != STATUS_NORMAL]
+            selected_names = [
+                sample.sample_name
+                for sample in projection.samples
+                if sample.status != STATUS_NORMAL
+            ]
 
     if not selected_names:
         st.info("Select at least one sample to display the distribution overlay.")
     elif view_mode == "Delta":
-        render_difference_chart(samples, selected_names, distribution_mode, reference_name)
+        render_difference_chart(
+            projection, selected_names, distribution_mode, reference_name
+        )
     else:
-        render_distribution_chart(samples, selected_names, distribution_mode, normalize, show_peaks, reference_name)
+        render_distribution_chart(
+            projection,
+            selected_names,
+            distribution_mode,
+            normalize,
+            show_peaks,
+            reference_name,
+        )
 
 
 def main() -> None:
@@ -2443,7 +2462,14 @@ def main() -> None:
         st.divider()
         st.header("Distribution")
         cached_samples = st.session_state.get("imported_samples", [])
-        signal_options = available_signals(cached_samples) if cached_samples else ["Intensity"]
+        distribution_projection = (
+            retrieve_dls_distributions(cached_samples) if cached_samples else None
+        )
+        signal_options = (
+            list(distribution_projection.available_signals)
+            if distribution_projection is not None
+            else ["Intensity"]
+        )
         distribution_mode = st.radio("Signal", signal_options, horizontal=True)
         if len(signal_options) == 1:
             st.caption(f"Only {signal_options[0].lower()} distribution data is available in this batch.")
@@ -2460,6 +2486,9 @@ def main() -> None:
             for error in import_errors:
                 st.error(error)
         return
+
+    if distribution_projection is None:
+        distribution_projection = retrieve_dls_distributions(samples)
 
     apply_session_experimental_variables(samples)
 
@@ -2518,7 +2547,9 @@ def main() -> None:
     )
     render_research_journal_panel()
 
-    render_primary_visualization(samples, distribution_mode, normalize, show_peaks)
+    render_primary_visualization(
+        distribution_projection, distribution_mode, normalize, show_peaks
+    )
 
     st.subheader("Key Metric Comparison")
     comparison_cols = st.columns(2)
@@ -2576,7 +2607,7 @@ def main() -> None:
         render_correlogram_quality_chart(samples)
 
     with st.expander("Small multiples", expanded=False):
-        render_small_multiples(samples, distribution_mode, normalize)
+        render_small_multiples(distribution_projection, distribution_mode, normalize)
 
     with st.expander("Raw data and metadata"):
         render_raw_data(samples, metrics, preview.groups)
