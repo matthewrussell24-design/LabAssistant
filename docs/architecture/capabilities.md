@@ -49,6 +49,8 @@ History comparison and related-run capabilities now also accept parsed DLS
 samples directly while retaining established measurement callers.
 The explicit history-save command resolves parsed samples inside the
 application boundary and still copies evidence before adding append lineage.
+Reviewed circulation-time retrieval and mutation now also cross explicit
+parsed-sample contracts while Streamlit retains session and widget state.
 
 ## Implemented Capability Catalog
 
@@ -63,6 +65,8 @@ application boundary and still copies evidence before adding append lineage.
 | `compose_dls_narrative` | `compose_dls_narrative` | Available; used by Streamlit DLS findings and Data Story |
 | `summarize_dls_health` | `summarize_dls_health` | Available; used by Streamlit DLS health strip |
 | `analyze_dls_trend_diagnostics` | `analyze_dls_trend_diagnostics` | Available; used by Streamlit control and replicate diagnostics |
+| `retrieve_dls_circulation_time` | `retrieve_dls_circulation_time` | Available; used by Streamlit circulation-time prefill |
+| `set_dls_circulation_time` | `set_dls_circulation_time` | Available; explicit reviewed Streamlit evidence mutation |
 | `analyze_dls_forward_scatter_trends` | `analyze_dls_forward_scatter_trends` | Available; used by Streamlit circulation explorer |
 | `analyze_filtration_follow_up_trends` | `analyze_filtration_follow_up_trends` | Available; used by Streamlit filtration follow-up |
 | `assess_dls_aggregation` | `assess_dls_aggregation` | Available; used by Streamlit dual-angle comparison |
@@ -355,6 +359,50 @@ valid result with empty row tuples.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's control chart and
 replicate table are the first callers. Agent use is excluded while these DLS-
 specific diagnostics mature.
+
+## Retrieve DLS Circulation Time
+
+**Name:** `retrieve_dls_circulation_time`
+
+**Purpose:** Return explicitly reviewed circulation-time evidence without
+exposing mutable measurement provenance to interface shells.
+
+**Inputs:** One parsed DLS sample.
+
+**Outputs:** A frozen, versioned `DLSCirculationTimeRead` containing sample name,
+entered value, original unit, normalized minutes, and optional source. Missing
+or malformed stored provenance returns `None`; no session key or display value
+crosses the boundary.
+
+**Expected Errors:** `TypeError` when the input does not satisfy the parsed DLS
+sample contract.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit uses the read to prefill
+reviewed values. Agent use remains excluded because this is experiment-specific
+operator evidence.
+
+## Set DLS Circulation Time
+
+**Name:** `set_dls_circulation_time`
+
+**Purpose:** Attach, overwrite, or clear explicitly reviewed circulation-time
+evidence on one parsed DLS sample.
+
+**Inputs:** One parsed DLS sample, an optional numeric value and unit, and an
+optional provenance source. `None` value or unit retains the established clear
+semantics; callers decide whether a blank UI field should invoke the command.
+
+**Outputs:** The resulting frozen `DLSCirculationTimeRead`, or `None` after a
+clear. Valid writes retain the entered value/unit, normalize to minutes, and
+store their reviewed source.
+
+**Expected Errors:** `TypeError` for malformed sample inputs and `ValueError`
+for unsupported non-empty units. Established numeric conversion behavior is
+unchanged.
+
+**Caller Types:** Human UI and CLI only. Agent and Future API callers are
+excluded because this mutates reviewed experimental evidence. Streamlit remains
+responsible for explicit input and session behavior.
 
 ## Analyze DLS Forward-Scatter Trends
 

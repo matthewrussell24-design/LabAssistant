@@ -63,10 +63,12 @@ from labassistant.metrics import find_local_peaks
 from labassistant.observations import observations_from_samples
 from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
 from labassistant.trend_analysis import (
+    apply_circulation_time,
     build_filtration_trend_analysis,
     build_forward_scatter_trend_analysis_from_measurements,
     build_data_story,
     control_chart_table,
+    circulation_time_from_measurement,
     replicate_statistics_table,
 )
 from labassistant.view_models import build_metrics_table, sample_from_measurement, sample_status
@@ -376,6 +378,21 @@ class DLSTrendDiagnostics:
             ],
             "api_version": self.api_version,
         }
+
+
+@dataclass(frozen=True)
+class DLSCirculationTimeRead:
+    """Immutable reviewed circulation-time evidence for one DLS sample."""
+
+    sample_name: str
+    entered_value: float
+    unit: str
+    minutes: float
+    source: str | None
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)
@@ -2412,6 +2429,47 @@ def analyze_dls_trend_diagnostics(samples: list[Any]) -> DLSTrendDiagnostics:
     )
 
 
+def _parsed_dls_sample_measurement(sample: Any) -> tuple[str, Measurement]:
+    if not hasattr(sample, "name") or not hasattr(sample, "measurement"):
+        raise TypeError("DLS circulation time requires a parsed sample")
+    measurement = sample.measurement
+    if not isinstance(measurement, Measurement):
+        raise TypeError("DLS circulation time requires a parsed sample")
+    return str(sample.name), measurement
+
+
+def retrieve_dls_circulation_time(sample: Any) -> DLSCirculationTimeRead | None:
+    """Return reviewed circulation-time evidence for one parsed DLS sample."""
+
+    sample_name, measurement = _parsed_dls_sample_measurement(sample)
+    entry = circulation_time_from_measurement(measurement)
+    if entry is None:
+        return None
+    stored = measurement.provenance.get("total_circulation_time")
+    source = stored.get("source") if isinstance(stored, dict) else None
+    return DLSCirculationTimeRead(
+        sample_name=sample_name,
+        entered_value=float(entry["value"]),
+        unit=str(entry["unit"]),
+        minutes=float(entry["minutes"]),
+        source=str(source) if source is not None else None,
+    )
+
+
+def set_dls_circulation_time(
+    sample: Any,
+    value: float | int | None,
+    unit: str | None,
+    *,
+    source: str = "manual_entry",
+) -> DLSCirculationTimeRead | None:
+    """Attach or clear explicitly reviewed circulation time on one DLS sample."""
+
+    _, measurement = _parsed_dls_sample_measurement(sample)
+    apply_circulation_time(measurement, value, unit, source=source)
+    return retrieve_dls_circulation_time(sample)
+
+
 def analyze_dls_forward_scatter_trends(
     samples: list[Any],
 ) -> DLSForwardScatterTrendRead:
@@ -3463,6 +3521,18 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         purpose="Return immutable DLS control-chart and replicate diagnostics.",
         handler=analyze_dls_trend_diagnostics,
         caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_circulation_time",
+        purpose="Return reviewed circulation-time evidence for one DLS sample.",
+        handler=retrieve_dls_circulation_time,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="set_dls_circulation_time",
+        purpose="Attach or clear reviewed circulation-time evidence on a DLS sample.",
+        handler=set_dls_circulation_time,
+        caller_types=("Human UI", "CLI"),
     ),
     CapabilityContract(
         name="analyze_dls_forward_scatter_trends",

@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Extended the reviewed history-save command to accept
-  parsed DLS samples directly and migrated Streamlit (task 042).
-- Working Tree: Task 042 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted reviewed DLS circulation-time retrieval and
+  mutation behind parsed-sample application contracts (task 043).
+- Working Tree: Task 043 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `207 passed in 2.41s` from `scripts/test -q` on
+- Last Successful Test: `209 passed in 2.65s` from `scripts/test -q` on
   2026-07-13.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-13 for task 042.
+- Last Updated: 2026-07-13 for task 043.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 207 passing.
+- Tests: 🟢 Healthy — 209 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,8 +125,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of thirty-six stable capability names, including explicit
-  human/CLI-only note and experiment-history commands.
+  registry of thirty-eight stable capability names, including explicit
+  human/CLI-only note, experiment-history, and reviewed-evidence commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -331,6 +331,9 @@ architecture rationale.
 - Extended the reviewed experiment-history save command to resolve parsed DLS
   samples internally while preserving generic serializable evidence, defensive
   copying, and append-only lineage (task 042).
+- Promoted reviewed circulation-time reads and mutation into explicit
+  parsed-sample contracts while keeping session state and blank-input decisions
+  in Streamlit (task 043).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -346,8 +349,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS history-save input task 042 is complete.
-- The working tree was clean when task 042 began.
+- DLS circulation-time task 043 is complete.
+- The working tree was clean when task 043 began.
 
 ## Known Risks
 
@@ -382,9 +385,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `207 passed in 2.41s` from `scripts/test -q` on 2026-07-13.
+- Latest result: `209 passed in 2.65s` from `scripts/test -q` on 2026-07-13.
 - The Streamlit shell completed a headless startup and health smoke after task
-  042.
+  043.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -401,18 +404,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote reviewed DLS circulation-time attachment and retrieval
+- Objective: Promote reviewed filtration attachment and retrieval
   behind parsed-sample application workflows.
-- Why this is next: History workflows no longer require measurement extraction,
-  but Streamlit still reads and mutates circulation-time provenance directly on
-  each parsed sample's measurement.
-- Expected scope: Small to medium; preserve supported units, minute
-  normalization, session-prefill behavior, overwrite semantics, missing values,
-  and explicit user entry.
-- Risks: Moving Streamlit session keys into the application layer or obscuring
-  that this is reviewed mutable evidence rather than instrument-derived data.
-- Success criteria: Streamlit passes parsed samples and reviewed time values
-  through explicit application contracts without direct measurement access.
+- Why this is next: Circulation time now crosses explicit contracts, but manual
+  and CSV filtration workflows still read and mutate filtration provenance
+  directly on parsed-sample measurements.
+- Expected scope: Medium; preserve all filtration fields, pressure
+  normalization, sample-name matching, overwrite and clear semantics, unmatched
+  reporting, session prefill, and explicit attachment actions.
+- Risks: Moving widget/session behavior into the application layer or weakening
+  the distinction between operator-reviewed and instrument-derived evidence.
+- Success criteria: Streamlit retrieves and attaches reviewed filtration
+  evidence through parsed-sample application contracts without direct
+  measurement access.
 
 ## AI Context Window
 

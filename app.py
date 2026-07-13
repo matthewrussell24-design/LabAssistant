@@ -21,6 +21,8 @@ from labassistant.application import (
     analyze_filtration_csv,
     analyze_dls_uploads,
     analyze_dls_trend_diagnostics,
+    retrieve_dls_circulation_time,
+    set_dls_circulation_time,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
@@ -80,9 +82,7 @@ from labassistant.models import Experiment
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
     RelationshipAnalysis,
-    apply_circulation_time,
     apply_filtration_measurement,
-    circulation_time_from_measurement,
     filtration_measurement_from_provenance,
 )
 from labassistant.quality import (
@@ -1710,7 +1710,7 @@ def apply_session_experimental_variables(samples: list[ParsedSample]) -> None:
         time_value = parse_optional_float(st.session_state.get(f"circulation_time::{sample.name}"))
         time_unit = st.session_state.get(f"circulation_time_unit::{sample.name}")
         if time_value is not None and time_unit in CIRCULATION_TIME_UNITS_TO_MINUTES:
-            apply_circulation_time(sample.measurement, time_value, str(time_unit))
+            set_dls_circulation_time(sample, time_value, str(time_unit))
 
         ordinal_score = parse_filtration_score(st.session_state.get(f"filtration_difficulty::{sample.name}"))
         if ordinal_score is None:
@@ -1747,13 +1747,13 @@ def render_forward_scatter_trend_explorer(samples: list[ParsedSample]) -> None:
     input_columns = st.columns(min(3, len(samples)))
     invalid_time_samples: list[str] = []
     for index, sample in enumerate(samples):
-        existing_time = circulation_time_from_measurement(sample.measurement)
+        existing_time = retrieve_dls_circulation_time(sample)
         time_key = f"circulation_time::{sample.name}"
         unit_key = f"circulation_time_unit::{sample.name}"
         if existing_time and time_key not in st.session_state:
-            st.session_state[time_key] = str(existing_time["value"])
+            st.session_state[time_key] = str(existing_time.entered_value)
         if existing_time and unit_key not in st.session_state:
-            st.session_state[unit_key] = str(existing_time["unit"])
+            st.session_state[unit_key] = existing_time.unit
 
         with input_columns[index % len(input_columns)]:
             raw_value = st.text_input(

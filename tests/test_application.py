@@ -23,6 +23,7 @@ from labassistant.application import (
     DLSNarrative,
     DLSHealthOverview,
     DLSTrendDiagnostics,
+    DLSCirculationTimeRead,
     DLSForwardScatterTrendRead,
     FiltrationTrendRead,
     DLSAggregationRead,
@@ -44,6 +45,8 @@ from labassistant.application import (
     add_scientific_note,
     analyze_dls_dataset,
     analyze_dls_trend_diagnostics,
+    retrieve_dls_circulation_time,
+    set_dls_circulation_time,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
     assess_dls_aggregation,
@@ -1242,6 +1245,52 @@ def test_analyze_dls_trend_diagnostics_validates_samples_and_allows_empty_rows()
         analyze_dls_trend_diagnostics([object()])
 
 
+def test_dls_circulation_time_contracts_preserve_normalization_source_and_clear():
+    sample = _decision_sample("Lot 1", 0.20, [])
+
+    assert retrieve_dls_circulation_time(sample) is None
+    result = set_dls_circulation_time(
+        sample, 2, "hours", source="reviewed_manual_entry"
+    )
+
+    assert isinstance(result, DLSCirculationTimeRead)
+    assert result.to_dict() == {
+        "sample_name": "Lot 1",
+        "entered_value": 2.0,
+        "unit": "hours",
+        "minutes": 120.0,
+        "source": "reviewed_manual_entry",
+        "api_version": AGENT_API_VERSION,
+    }
+    assert sample.measurement.provenance["total_circulation_time"] == {
+        "value": 2.0,
+        "unit": "hours",
+        "minutes": 120.0,
+        "source": "reviewed_manual_entry",
+    }
+    overwritten = set_dls_circulation_time(sample, 90, "seconds")
+    assert overwritten is not None
+    assert overwritten.entered_value == 90.0
+    assert overwritten.minutes == 1.5
+    assert overwritten.source == "manual_entry"
+    with raises(FrozenInstanceError):
+        overwritten.minutes = 5.0
+    assert set_dls_circulation_time(sample, None, None) is None
+    assert "total_circulation_time" not in sample.measurement.provenance
+
+
+def test_dls_circulation_time_contracts_validate_units_samples_and_malformed_data():
+    sample = _decision_sample("Lot 1", 0.20, [])
+    with raises(ValueError, match="Unsupported circulation time unit"):
+        set_dls_circulation_time(sample, 2, "days")
+    with raises(TypeError, match="requires a parsed sample"):
+        retrieve_dls_circulation_time(object())
+    with raises(TypeError, match="requires a parsed sample"):
+        set_dls_circulation_time(object(), 2, "hours")
+    sample.measurement.provenance["total_circulation_time"] = {"unit": "hours"}
+    assert retrieve_dls_circulation_time(sample) is None
+
+
 def test_analyze_dls_forward_scatter_trends_preserves_points_and_relationships():
     samples = [
         _decision_sample("A", 0.20, []),
@@ -1944,6 +1993,8 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "compose_dls_narrative",
         "summarize_dls_health",
         "analyze_dls_trend_diagnostics",
+        "retrieve_dls_circulation_time",
+        "set_dls_circulation_time",
         "analyze_dls_forward_scatter_trends",
         "analyze_filtration_follow_up_trends",
         "assess_dls_aggregation",
@@ -1977,10 +2028,19 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     assert all(
         "Future API" in capability.caller_types
         for capability in capabilities
-        if capability.name not in {"add_scientific_note", "save_experiment_history"}
+        if capability.name
+        not in {
+            "add_scientific_note",
+            "save_experiment_history",
+            "set_dls_circulation_time",
+        }
     )
     assert get_capability("add_scientific_note").caller_types == ("Human UI", "CLI")
     assert get_capability("save_experiment_history").caller_types == ("Human UI", "CLI")
+    assert get_capability("set_dls_circulation_time").caller_types == (
+        "Human UI",
+        "CLI",
+    )
     narrative = get_capability("compose_dls_narrative")
     assert narrative.handler is compose_dls_narrative
     assert narrative.caller_types == ("Human UI", "CLI", "Future API")
@@ -1990,6 +2050,12 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     diagnostics = get_capability("analyze_dls_trend_diagnostics")
     assert diagnostics.handler is analyze_dls_trend_diagnostics
     assert diagnostics.caller_types == ("Human UI", "CLI", "Future API")
+    circulation = get_capability("retrieve_dls_circulation_time")
+    assert circulation.handler is retrieve_dls_circulation_time
+    assert circulation.caller_types == ("Human UI", "CLI", "Future API")
+    circulation_set = get_capability("set_dls_circulation_time")
+    assert circulation_set.handler is set_dls_circulation_time
+    assert circulation_set.caller_types == ("Human UI", "CLI")
     forward_trends = get_capability("analyze_dls_forward_scatter_trends")
     assert forward_trends.handler is analyze_dls_forward_scatter_trends
     assert forward_trends.caller_types == ("Human UI", "CLI", "Future API")
