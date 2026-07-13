@@ -26,6 +26,7 @@ from labassistant.application import (
     assess_dls_aggregation,
     summarize_dls_samples,
     retrieve_dls_angle_details,
+    retrieve_dls_metrics,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -39,6 +40,7 @@ from labassistant.application import (
     DLSSampleSummary,
     DLSSampleSummaries,
     DLSAngleDetails,
+    DLSMetricsProjection,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -84,13 +86,51 @@ from labassistant.quality import (
 )
 from labassistant.view_models import (
     ParsedSample,
-    build_metrics_table,
     sample_from_measurement,
     sample_status,
 )
 
 
 CHROMATOGRAPHY_FIXTURE_PATH = Path("sample_data/chromatography/mass_balance_demo.csv")
+
+
+def dls_metrics_dataframe(projection: DLSMetricsProjection) -> pd.DataFrame:
+    """Build the established Streamlit metrics schema from application rows."""
+
+    return pd.DataFrame(
+        [
+            {
+                "Sample": row.sample_name,
+                "Status": row.status,
+                "Data Type": row.data_type,
+                "Z-Average": row.z_average_nm,
+                "PDI": row.pdi,
+                "Max Z-Average": row.max_z_average_nm,
+                "Max PDI": row.max_pdi,
+                "Measurement Count": row.measurement_count,
+                "Scattering Angles": row.scattering_angles,
+                "Primary Peak": row.primary_peak_nm,
+                "Secondary Peak": row.secondary_peak_nm,
+                "Peak Count": row.peak_count,
+                "Peak Width Ratio": row.peak_width_ratio,
+                "Peak Symmetry": row.peak_symmetry,
+                "Count Rate": row.count_rate,
+                "Tail Index": row.tail_index_percent,
+                "Width Ratio": row.width_ratio,
+                "Skewness": row.skewness,
+                "Aggregation Risk": row.aggregation_risk,
+                "Aggregation Index": row.aggregation_index,
+                "Quality Score": row.quality_score,
+                "D10": row.d10_nm,
+                "D50": row.d50_nm,
+                "D90": row.d90_nm,
+                "Measurement Date": row.measurement_date,
+                "Correlogram Noise": row.correlogram_noise_score,
+                "Warnings": ", ".join(row.warnings) if row.warnings else "None",
+            }
+            for row in projection.rows
+        ]
+    )
 
 
 def render_metric_row(label: str, value: str) -> str:
@@ -2443,7 +2483,7 @@ def main() -> None:
         st.button("Export report", use_container_width=True, disabled=True, help="Report export is coming in a future version.")
         st.caption("Report export is coming soon.")
 
-    metrics = build_metrics_table(samples)
+    metrics = dls_metrics_dataframe(retrieve_dls_metrics(samples))
     source_file_names = [uploaded_file.name for uploaded_file in uploaded_files] if uploaded_files else [sample.file_name for sample in samples if sample.file_name]
     dls_memory_experiment = dls_experiment_from_samples(
         samples,

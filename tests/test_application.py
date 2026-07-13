@@ -25,6 +25,7 @@ from labassistant.application import (
     DLSAggregationRead,
     DLSSampleSummaries,
     DLSAngleDetails,
+    DLSMetricsProjection,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -41,6 +42,7 @@ from labassistant.application import (
     assess_dls_aggregation,
     summarize_dls_samples,
     retrieve_dls_angle_details,
+    retrieve_dls_metrics,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -98,6 +100,7 @@ from labassistant.trend_analysis import (
     replicate_statistics_table,
 )
 from labassistant.view_models import ParsedSample, build_angle_table, build_metrics_table
+from app import dls_metrics_dataframe
 
 
 class RecordingStore:
@@ -1398,6 +1401,42 @@ def test_retrieve_dls_angle_details_validates_and_allows_empty_rows():
         retrieve_dls_angle_details([object()])
 
 
+def test_retrieve_dls_metrics_preserves_established_projection_exactly():
+    clean = _decision_sample("clean", 0.12, [])
+    flagged = _decision_sample("flagged", 0.35, ["Moderate PDI", "Large tail"])
+    flagged.metrics.update(
+        {
+            "Peak Count": 2,
+            "Peak Width Ratio": 1.25,
+            "Peak Symmetry": 0.9,
+            "Skewness": 0.4,
+            "Aggregation Risk": "Watch",
+            "Aggregation Index": 0.3,
+            "Quality Score": 82.0,
+            "Correlogram Noise": 0.02,
+        }
+    )
+
+    result = retrieve_dls_metrics([clean, flagged])
+
+    assert isinstance(result, DLSMetricsProjection)
+    assert [row.sample_name for row in result.rows] == ["clean", "flagged"]
+    assert result.rows[1].status == "Watch"
+    assert result.rows[1].warnings == ("Moderate PDI", "Large tail")
+    assert dls_metrics_dataframe(result).equals(build_metrics_table([clean, flagged]))
+    assert result.to_dict()["rows"][1]["warnings"] == ["Moderate PDI", "Large tail"]
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.rows[0].status = "Changed"
+
+
+def test_retrieve_dls_metrics_validates_parsed_samples():
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        retrieve_dls_metrics([])
+    with raises(TypeError, match="require parsed samples"):
+        retrieve_dls_metrics([object()])
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1527,6 +1566,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "assess_dls_aggregation",
         "summarize_dls_samples",
         "retrieve_dls_angle_details",
+        "retrieve_dls_metrics",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1578,6 +1618,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     angle_details = get_capability("retrieve_dls_angle_details")
     assert angle_details.handler is retrieve_dls_angle_details
     assert angle_details.caller_types == ("Human UI", "CLI", "Future API")
+    metrics = get_capability("retrieve_dls_metrics")
+    assert metrics.handler is retrieve_dls_metrics
+    assert metrics.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

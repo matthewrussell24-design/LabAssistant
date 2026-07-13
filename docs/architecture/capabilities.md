@@ -33,15 +33,13 @@ Existing application operations:
 - Save an experiment and related hypotheses, recommendations, and notes to
   scientific memory.
 
-Duplicated or bypassed workflows:
-
-- `app.py` still calls the pandas-returning DLS metrics-table builder directly.
-
 Established DLS narrative, health, control-chart, and replicate diagnostics now
 cross application contracts, including forward-scatter/circulation and
 orthogonal filtration reads, dual-angle aggregation assessment, and per-sample
-and per-angle summaries. The remaining visible tabular bypass is the shared
-metrics projection used by visualizations.
+and per-angle summaries. The shared metrics projection used by visualizations
+now crosses the same boundary; Streamlit reconstructs pandas only for display,
+charting, and CSV export. Distribution-series visualization remains a direct
+parsed-sample read and is the next coherent extraction candidate.
 
 ## Implemented Capability Catalog
 
@@ -61,6 +59,7 @@ metrics projection used by visualizations.
 | `assess_dls_aggregation` | `assess_dls_aggregation` | Available; used by Streamlit dual-angle comparison |
 | `summarize_dls_samples` | `summarize_dls_samples` | Available; used by Streamlit sample cards and inspection list |
 | `retrieve_dls_angle_details` | `retrieve_dls_angle_details` | Available; used by Streamlit per-angle detail table |
+| `retrieve_dls_metrics` | `retrieve_dls_metrics` | Available; used by Streamlit charts, raw table, and CSV export |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -460,6 +459,29 @@ summaries produce an empty row tuple rather than an error.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's per-angle detail table
 is the first caller. Agent use remains excluded while this DLS-specific read
 contract matures.
+
+## Retrieve DLS Metrics
+
+**Name:** `retrieve_dls_metrics`
+
+**Purpose:** Project the shared per-sample DLS metrics into stable typed rows
+without exposing the pandas-returning view-model helper.
+
+**Inputs:** A non-empty list of parsed DLS samples.
+
+**Outputs:** A frozen, versioned `DLSMetricsProjection` containing ordered
+`DLSMetricRow` values with semantic names for status, summary and distribution
+metrics, optional diagnostic values, measurement metadata, and an immutable
+warning tuple. Numeric values and missing values remain unformatted. No
+DataFrame or display column labels cross the boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
+that does not satisfy the parsed-sample contract. Established missing-required-
+metric errors remain unchanged.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's shared comparison,
+diagnostic, raw-data, and CSV-export projection is the first caller. Agent use
+remains excluded while this DLS-specific read contract matures.
 
 ## Import Chromatography Experiment
 

@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted per-angle DLS detail rows into an immutable
-  application workflow and migrated Streamlit (task 035).
-- Working Tree: Task 035 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted shared DLS metric rows into an immutable
+  application workflow and migrated Streamlit (task 036).
+- Working Tree: Task 036 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `193 passed in 2.57s` from `scripts/test -q` on
-  2026-07-12.
+- Last Successful Test: `195 passed in 2.36s` from `scripts/test -q` on
+  2026-07-13.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-12 for task 035.
+- Last Updated: 2026-07-13 for task 036.
 
 ## North Star
 
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of thirty-one stable capability names, including explicit
+  registry of thirty-two stable capability names, including explicit
   human/CLI-only note and experiment-history commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -314,6 +314,8 @@ architecture rationale.
   values into immutable presentation-neutral summaries (task 034).
 - Promoted per-angle DLS detail into immutable typed rows with preserved sample
   and angle ordering plus empty-angle behavior (task 035).
+- Promoted the shared DLS metrics projection into immutable typed rows and kept
+  pandas reconstruction in the Streamlit shell (task 036).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -329,8 +331,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS angle-details task 035 is complete.
-- The working tree was clean when task 035 began.
+- DLS metrics-projection task 036 is complete.
+- The working tree was clean when task 036 began.
 
 ## Known Risks
 
@@ -365,8 +367,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `193 passed in 2.57s` from `scripts/test -q` on 2026-07-12.
-- The Streamlit shell completed a headless startup smoke after task 035.
+- Latest result: `195 passed in 2.36s` from `scripts/test -q` on 2026-07-13.
+- The Streamlit shell completed a headless startup and health smoke after task
+  036.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -383,17 +386,18 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote the shared DLS metrics projection into immutable application
-  rows.
-- Why this is next: Per-angle detail now crosses the application boundary, but
-  Streamlit still calls `build_metrics_table` directly and shares its DataFrame
-  across comparison and diagnostic visualizations.
-- Expected scope: Medium; preserve the established schema, numeric values,
-  statuses, warnings, ordering, and optional metrics.
-- Risks: Creating an overly UI-shaped contract or changing chart behavior when
-  reconstructing the display DataFrame.
-- Success criteria: Streamlit obtains typed DLS metric rows through one
-  registered application workflow and constructs pandas only in the shell.
+- Objective: Promote DLS distribution-series visualization data into immutable
+  application rows.
+- Why this is next: Shared metric tables now cross the application boundary,
+  but Streamlit still reads parsed-sample DataFrames and distribution-column
+  metadata directly to build overlays, deltas, and signal choices.
+- Expected scope: Medium; preserve available-signal selection, sample order,
+  diameter/value pairs, normalization, reference deltas, and peak annotations.
+- Risks: Moving Plotly or UI selection state into the application layer, or
+  changing handling of missing and uneven distribution series.
+- Success criteria: Streamlit receives typed distribution evidence through one
+  registered application read workflow while retaining chart composition and
+  interaction state in the shell.
 
 ## AI Context Window
 

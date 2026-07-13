@@ -607,6 +607,58 @@ class DLSSampleSummaries:
 
 
 @dataclass(frozen=True)
+class DLSMetricRow:
+    """Immutable shared DLS metric values for one sample."""
+
+    sample_name: str
+    status: str
+    data_type: str
+    z_average_nm: float | None
+    pdi: float | None
+    max_z_average_nm: float | None
+    max_pdi: float | None
+    measurement_count: int | float | None
+    scattering_angles: str | None
+    primary_peak_nm: float | None
+    secondary_peak_nm: float | None
+    peak_count: int | float | None
+    peak_width_ratio: float | None
+    peak_symmetry: float | None
+    count_rate: float | None
+    tail_index_percent: float | None
+    width_ratio: float | None
+    skewness: float | None
+    aggregation_risk: str | None
+    aggregation_index: float | None
+    quality_score: float | None
+    d10_nm: float | None
+    d50_nm: float | None
+    d90_nm: float | None
+    measurement_date: str | None
+    correlogram_noise_score: float | None
+    warnings: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        values = asdict(self)
+        values["warnings"] = list(self.warnings)
+        return values
+
+
+@dataclass(frozen=True)
+class DLSMetricsProjection:
+    """Versioned ordered DLS metric rows without pandas output."""
+
+    rows: tuple[DLSMetricRow, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "rows": [row.to_dict() for row in self.rows],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class DLSAngleDetailRow:
     """Immutable detail for one sample and scattering-angle summary."""
 
@@ -2340,6 +2392,54 @@ def retrieve_dls_angle_details(samples: list[Any]) -> DLSAngleDetails:
     return DLSAngleDetails(rows=rows)
 
 
+def retrieve_dls_metrics(samples: list[Any]) -> DLSMetricsProjection:
+    """Return the established shared DLS metrics as typed immutable rows."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for metrics")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "metrics")
+        or not hasattr(sample, "warnings")
+        for sample in samples
+    ):
+        raise TypeError("DLS metrics require parsed samples")
+
+    rows = tuple(
+        DLSMetricRow(
+            sample_name=sample.name,
+            status=sample_status(sample),
+            data_type=sample.metrics["Data Type"],
+            z_average_nm=sample.metrics["Z-Average"],
+            pdi=sample.metrics["PDI"],
+            max_z_average_nm=sample.metrics["Max Z-Average"],
+            max_pdi=sample.metrics["Max PDI"],
+            measurement_count=sample.metrics["Measurement Count"],
+            scattering_angles=sample.metrics["Scattering Angles"],
+            primary_peak_nm=sample.metrics["Primary Peak"],
+            secondary_peak_nm=sample.metrics["Secondary Peak"],
+            peak_count=sample.metrics.get("Peak Count"),
+            peak_width_ratio=sample.metrics.get("Peak Width Ratio"),
+            peak_symmetry=sample.metrics.get("Peak Symmetry"),
+            count_rate=sample.metrics["Count Rate"],
+            tail_index_percent=sample.metrics["Tail Index"],
+            width_ratio=sample.metrics["Width Ratio"],
+            skewness=sample.metrics.get("Skewness"),
+            aggregation_risk=sample.metrics.get("Aggregation Risk"),
+            aggregation_index=sample.metrics.get("Aggregation Index"),
+            quality_score=sample.metrics.get("Quality Score"),
+            d10_nm=sample.metrics["D10"],
+            d50_nm=sample.metrics["D50"],
+            d90_nm=sample.metrics["D90"],
+            measurement_date=sample.metrics["Measurement Date"],
+            correlogram_noise_score=sample.metrics.get("Correlogram Noise"),
+            warnings=tuple(str(warning) for warning in sample.warnings),
+        )
+        for sample in samples
+    )
+    return DLSMetricsProjection(rows=rows)
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -2871,6 +2971,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_dls_angle_details",
         purpose="Return immutable per-angle DLS detail rows.",
         handler=retrieve_dls_angle_details,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_metrics",
+        purpose="Return immutable shared DLS metric rows.",
+        handler=retrieve_dls_metrics,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(
