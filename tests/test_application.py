@@ -467,7 +467,7 @@ def test_save_experiment_history_validates_copies_lineage_and_returns_receipt(tm
     }
 
 
-def test_save_experiment_history_rejects_missing_or_unserializable_evidence(tmp_path):
+def test_save_experiment_history_validates_and_preserves_serializable_evidence(tmp_path):
     history_path = tmp_path / "experiments.jsonl"
 
     with raises(ValueError, match="At least one measurement"):
@@ -475,6 +475,54 @@ def test_save_experiment_history_rejects_missing_or_unserializable_evidence(tmp_
     with raises(TypeError, match="to_dict"):
         save_experiment_history([object()], history_path=history_path)
     assert not history_path.exists()
+    chromatography = ChromatographyMeasurement(sample_name="HPLC sample")
+    receipt = save_experiment_history(
+        [chromatography], "HPLC run", history_path=history_path
+    )
+    saved = json.loads(history_path.read_text(encoding="utf-8"))
+    assert receipt.measurement_count == 1
+    assert saved["measurements"][0]["sample_name"] == "HPLC sample"
+
+
+def test_save_experiment_history_accepts_parsed_samples_without_mutating_them(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    initial = Measurement(metadata=MeasurementMetadata(sample_name="Baseline"))
+    first_receipt = save_experiment_history(
+        [initial], "Baseline", history_path=history_path
+    )
+    sample = _decision_sample("Lot 1", 0.21, [])
+    sample.measurement.provenance["session_marker"] = "keep"
+
+    receipt = save_experiment_history(
+        [sample],
+        "  Follow-up  ",
+        loaded_from_record_id=first_receipt.record_id,
+        loaded_from_label="  Baseline  ",
+        history_path=history_path,
+    )
+
+    assert receipt.label == "Follow-up"
+    assert receipt.measurement_count == 1
+    assert receipt.loaded_from_record_id == first_receipt.record_id
+    assert sample.measurement.provenance == {"session_marker": "keep"}
+    saved = [
+        json.loads(line)
+        for line in history_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(saved) == 2
+    assert [record["id"] for record in saved] == [
+        first_receipt.record_id,
+        receipt.record_id,
+    ]
+    assert saved[1]["measurements"][0]["metadata"]["sample_name"] == "Lot 1"
+    assert saved[1]["measurements"][0]["provenance"] == {
+        "session_marker": "keep",
+        "history_lineage": {
+            "loaded_from_record_id": first_receipt.record_id,
+            "loaded_from_label": "Baseline",
+            "save_semantics": "append_new_version",
+        },
+    }
 
 
 def test_retrieve_experiment_returns_read_only_metadata_and_fresh_measurements(tmp_path):

@@ -1880,6 +1880,12 @@ def add_scientific_note(
     )
 
 
+def _measurement_evidence_input(value: Any) -> Any:
+    """Resolve a direct measurement or a parsed sample's measurement evidence."""
+
+    return getattr(value, "measurement", value)
+
+
 def save_experiment_history(
     measurements: list[object],
     label: str = "",
@@ -1892,12 +1898,16 @@ def save_experiment_history(
 
     if not measurements:
         raise ValueError("At least one measurement is required to save an experiment")
-    if any(not callable(getattr(measurement, "to_dict", None)) for measurement in measurements):
+    resolved_measurements = [_measurement_evidence_input(item) for item in measurements]
+    if any(
+        not callable(getattr(measurement, "to_dict", None))
+        for measurement in resolved_measurements
+    ):
         raise TypeError("Every saved measurement must provide to_dict() evidence")
 
     normalized_record_id = (loaded_from_record_id or "").strip() or None
     normalized_loaded_label = (loaded_from_label or "").strip() or None
-    evidence = deepcopy(measurements)
+    evidence = deepcopy(resolved_measurements)
     if normalized_record_id:
         lineage = {
             "loaded_from_record_id": normalized_record_id,
@@ -1972,7 +1982,7 @@ def list_experiments(
 def _dls_measurement_input(value: Any) -> Measurement:
     """Resolve an established measurement or parsed-sample application input."""
 
-    measurement = getattr(value, "measurement", value)
+    measurement = _measurement_evidence_input(value)
     if not isinstance(measurement, Measurement):
         raise TypeError("DLS history workflows require measurements or parsed samples")
     return measurement

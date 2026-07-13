@@ -47,6 +47,8 @@ and paired-angle distribution overlays are now also driven by immutable series.
 Streamlit retains sample selection, angle labels, colors, and chart composition.
 History comparison and related-run capabilities now also accept parsed DLS
 samples directly while retaining established measurement callers.
+The explicit history-save command resolves parsed samples inside the
+application boundary and still copies evidence before adding append lineage.
 
 ## Implemented Capability Catalog
 
@@ -760,18 +762,19 @@ proximity and must not be presented as causal evidence.
 **Purpose:** Append explicitly confirmed experiment evidence to local JSONL
 history without exposing the persistence writer to interface shells.
 
-**Inputs:** One or more serializable measurements, an optional label, optional
-loaded-record identity and label for append-only lineage, and an injectable
-history path.
+**Inputs:** One or more parsed DLS samples or established serializable
+measurements, an optional label, optional loaded-record identity and label for
+append-only lineage, and an injectable history path. Direct non-DLS measurement
+evidence remains supported by the generic writer.
 
 **Outputs:** A frozen, versioned `ExperimentSaveReceipt` containing record
 identity, saved timestamp, normalized label, measurement count, and optional
 source record identity. Evidence is copied before lineage is added, so the
 active analysis is not mutated by saving.
 
-**Expected Errors:** `ValueError` for empty evidence, `TypeError` for evidence
-without the established `to_dict()` serialization contract, and local I/O
-errors when persistence fails.
+**Expected Errors:** `ValueError` for empty evidence, `TypeError` when resolved
+evidence lacks the established `to_dict()` serialization contract, and local
+I/O errors when persistence fails.
 
 **Caller Types:** Human UI and CLI only. Agent and Future API use are excluded
 because this is an explicit reviewed write. Streamlit is the first caller.

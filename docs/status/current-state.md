@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Extended DLS history comparison and related-run
-  workflows to accept parsed samples directly and migrated Streamlit (task 041).
-- Working Tree: Task 041 is committed locally; inspect `git status --short`
+- Latest Completed Change: Extended the reviewed history-save command to accept
+  parsed DLS samples directly and migrated Streamlit (task 042).
+- Working Tree: Task 042 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `206 passed in 2.52s` from `scripts/test -q` on
+- Last Successful Test: `207 passed in 2.41s` from `scripts/test -q` on
   2026-07-13.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-13 for task 041.
+- Last Updated: 2026-07-13 for task 042.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 206 passing.
+- Tests: 🟢 Healthy — 207 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -328,6 +328,9 @@ architecture rationale.
 - Extended immutable history comparison and related-run capabilities to accept
   parsed DLS samples directly while retaining measurement compatibility and UI
   selection state (task 041).
+- Extended the reviewed experiment-history save command to resolve parsed DLS
+  samples internally while preserving generic serializable evidence, defensive
+  copying, and append-only lineage (task 042).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -343,8 +346,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS history-input task 041 is complete.
-- The working tree was clean when task 041 began.
+- DLS history-save input task 042 is complete.
+- The working tree was clean when task 042 began.
 
 ## Known Risks
 
@@ -379,9 +382,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `206 passed in 2.52s` from `scripts/test -q` on 2026-07-13.
+- Latest result: `207 passed in 2.41s` from `scripts/test -q` on 2026-07-13.
 - The Streamlit shell completed a headless startup and health smoke after task
-  041.
+  042.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -398,17 +401,18 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Let the experiment-history save command accept parsed DLS samples
-  directly.
-- Why this is next: History reads no longer require measurement extraction, but
-  Streamlit still unwraps every parsed sample before invoking the explicit save
-  command.
-- Expected scope: Small; preserve append-only writes, defensive copying,
-  loaded-record lineage, labels, receipts, validation, and explicit user action.
-- Risks: Mutating session samples while attaching lineage or broadening the save
-  command beyond DLS evidence.
-- Success criteria: Streamlit submits parsed DLS samples to the existing save
-  command without exposing mutable measurements across the UI boundary.
+- Objective: Promote reviewed DLS circulation-time attachment and retrieval
+  behind parsed-sample application workflows.
+- Why this is next: History workflows no longer require measurement extraction,
+  but Streamlit still reads and mutates circulation-time provenance directly on
+  each parsed sample's measurement.
+- Expected scope: Small to medium; preserve supported units, minute
+  normalization, session-prefill behavior, overwrite semantics, missing values,
+  and explicit user entry.
+- Risks: Moving Streamlit session keys into the application layer or obscuring
+  that this is reviewed mutable evidence rather than instrument-derived data.
+- Success criteria: Streamlit passes parsed samples and reviewed time values
+  through explicit application contracts without direct measurement access.
 
 ## AI Context Window
 

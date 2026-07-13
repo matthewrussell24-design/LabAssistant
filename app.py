@@ -2529,7 +2529,7 @@ def main() -> None:
         history_label = st.text_input("Experiment label", value=st.session_state.get("history_label", ""), key="history_label")
         if st.button("Save current experiment", use_container_width=True):
             receipt = save_experiment_history(
-                [sample.measurement for sample in samples],
+                samples,
                 history_label,
                 loaded_from_record_id=(loaded_record or {}).get("record_id"),
                 loaded_from_label=(loaded_record or {}).get("label"),
