@@ -17,6 +17,8 @@ from labassistant.application import (
     ExperimentSaveReceipt,
     ObservationGenerationResult,
     DLSUploadImportResult,
+    DLSUploadFileRead,
+    DLSUploadGroupRead,
     DLSDecisionRanking,
     DLSNarrative,
     DLSHealthOverview,
@@ -28,6 +30,7 @@ from labassistant.application import (
     DLSAngleDetails,
     DLSMetricsProjection,
     DLSDistributionProjection,
+    DLSRawEvidence,
     FiltrationImportRead,
     ChromatographyRestoreResult,
     ChromatographyAnalysisResult,
@@ -46,6 +49,7 @@ from labassistant.application import (
     retrieve_dls_angle_details,
     retrieve_dls_metrics,
     retrieve_dls_distributions,
+    retrieve_dls_raw_evidence,
     analyze_dls_uploads,
     analyze_chromatography_source,
     analyze_filtration_csv,
@@ -107,6 +111,7 @@ from app import (
     distribution_difference_dataframe,
     distribution_series_dataframe,
     dls_metrics_dataframe,
+    raw_point_table_dataframe,
 )
 
 
@@ -1549,6 +1554,74 @@ def test_retrieve_dls_distributions_preserves_fallback_and_validates_samples():
         retrieve_dls_distributions([object()])
 
 
+def test_retrieve_dls_raw_evidence_preserves_tables_metadata_and_sources():
+    sample = _distribution_sample("Lot 1", [100, 10], [50, 5])
+    sample.data["Comment"] = ["primary", "small"]
+    sample.metadata = {"Instrument": "Zetasizer", "Operator": "Ada"}
+    sample.source_text = "fallback source text"
+    source = DLSUploadFileRead(
+        file_name="Lot 1 intensity.csv",
+        file_type="Intensity distribution",
+        source_text="Diameter,Intensity\n10,5\n100,50\n",
+        error=None,
+    )
+    group = DLSUploadGroupRead(
+        lot="Lot 1",
+        status="Ready",
+        summary_files=(),
+        intensity_files=(source,),
+        correlogram_files=(),
+        files=(source,),
+    )
+
+    result = retrieve_dls_raw_evidence([sample], groups=(group,))
+
+    assert isinstance(result, DLSRawEvidence)
+    assert result.samples[0].point_table.columns == (
+        "Diameter",
+        "Intensity",
+        "Comment",
+    )
+    assert result.samples[0].point_table.rows == (
+        (100, 50, "primary"),
+        (10, 5, "small"),
+    )
+    assert [field.to_dict() for field in result.samples[0].metadata] == [
+        {"field": "Instrument", "value": "Zetasizer"},
+        {"field": "Operator", "value": "Ada"},
+    ]
+    assert result.samples[0].source_text == "fallback source text"
+    assert result.source_files[0].to_dict() == {
+        "lot": "Lot 1",
+        "file_name": "Lot 1 intensity.csv",
+        "file_type": "Intensity distribution",
+        "source_text": "Diameter,Intensity\n10,5\n100,50\n",
+        "error": None,
+    }
+    reconstructed = raw_point_table_dataframe(result.samples[0].point_table)
+    assert reconstructed.to_csv(index=False) == sample.data.to_csv(index=False)
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.samples[0].sample_name = "Changed"
+
+
+def test_retrieve_dls_raw_evidence_preserves_fallback_and_validates_inputs():
+    sample = _distribution_sample("Lot 1", [10], [5])
+    sample.metadata = {}
+    sample.source_text = "x" * 12001
+    result = retrieve_dls_raw_evidence([sample])
+
+    assert result.source_files == ()
+    assert result.samples[0].metadata == ()
+    assert len(result.samples[0].source_text[:12000]) == 12000
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        retrieve_dls_raw_evidence([])
+    with raises(TypeError, match="requires parsed samples"):
+        retrieve_dls_raw_evidence([object()])
+    with raises(TypeError, match="upload-group diagnostics"):
+        retrieve_dls_raw_evidence([sample], groups=(object(),))
+
+
 def test_analyze_dls_dataset_validates_local_file_selection(tmp_path):
     with raises(ValueError, match="Select at least one"):
         analyze_dls_dataset([])
@@ -1680,6 +1753,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "retrieve_dls_angle_details",
         "retrieve_dls_metrics",
         "retrieve_dls_distributions",
+        "retrieve_dls_raw_evidence",
         "import_chromatography_experiment",
         "analyze_chromatography_source",
         "analyze_filtration_csv",
@@ -1737,6 +1811,9 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     distributions = get_capability("retrieve_dls_distributions")
     assert distributions.handler is retrieve_dls_distributions
     assert distributions.caller_types == ("Human UI", "CLI", "Future API")
+    raw_evidence = get_capability("retrieve_dls_raw_evidence")
+    assert raw_evidence.handler is retrieve_dls_raw_evidence
+    assert raw_evidence.caller_types == ("Human UI", "CLI", "Future API")
 
 
 def test_capability_registry_resolves_existing_entry_points_without_wrapping_them():

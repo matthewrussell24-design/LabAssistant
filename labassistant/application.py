@@ -741,6 +741,79 @@ class DLSDistributionProjection:
 
 
 @dataclass(frozen=True)
+class DLSRawPointTable:
+    """Immutable vendor-shaped point table without a pandas dependency."""
+
+    columns: tuple[str, ...]
+    rows: tuple[tuple[Any, ...], ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "columns": list(self.columns),
+            "rows": [list(row) for row in self.rows],
+        }
+
+
+@dataclass(frozen=True)
+class DLSRawMetadataField:
+    """One ordered metadata field from a parsed DLS sample."""
+
+    field: str
+    value: str
+
+    def to_dict(self) -> dict[str, str]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSRawSampleEvidence:
+    """Raw point, metadata, and fallback source evidence for one sample."""
+
+    sample_name: str
+    point_table: DLSRawPointTable
+    metadata: tuple[DLSRawMetadataField, ...]
+    source_text: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "sample_name": self.sample_name,
+            "point_table": self.point_table.to_dict(),
+            "metadata": [field.to_dict() for field in self.metadata],
+            "source_text": self.source_text,
+        }
+
+
+@dataclass(frozen=True)
+class DLSRawSourceFile:
+    """Immutable original-file diagnostics in upload-group order."""
+
+    lot: str
+    file_name: str
+    file_type: str
+    source_text: str | None
+    error: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class DLSRawEvidence:
+    """Versioned raw DLS inspection evidence without pandas or UI state."""
+
+    samples: tuple[DLSRawSampleEvidence, ...]
+    source_files: tuple[DLSRawSourceFile, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "samples": [sample.to_dict() for sample in self.samples],
+            "source_files": [source.to_dict() for source in self.source_files],
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class DLSAngleDetailRow:
     """Immutable detail for one sample and scattering-angle summary."""
 
@@ -2605,6 +2678,78 @@ def retrieve_dls_distributions(samples: list[Any]) -> DLSDistributionProjection:
     )
 
 
+def retrieve_dls_raw_evidence(
+    samples: list[Any],
+    *,
+    groups: Any = (),
+) -> DLSRawEvidence:
+    """Return immutable raw point, metadata, and source-file inspection data."""
+
+    if not samples:
+        raise ValueError("At least one parsed DLS sample is required for raw evidence")
+    if any(
+        not hasattr(sample, "name")
+        or not hasattr(sample, "data")
+        or not hasattr(sample, "metadata")
+        or not hasattr(sample, "source_text")
+        for sample in samples
+    ):
+        raise TypeError("DLS raw evidence requires parsed samples")
+
+    resolved_groups = tuple(groups or ())
+    if any(
+        not hasattr(group, "lot") or not hasattr(group, "files")
+        for group in resolved_groups
+    ):
+        raise TypeError("DLS raw evidence requires upload-group diagnostics")
+
+    def cell_value(value: Any) -> Any:
+        item = getattr(value, "item", None)
+        return deepcopy(item() if callable(item) else value)
+
+    projected_samples = tuple(
+        DLSRawSampleEvidence(
+            sample_name=sample.name,
+            point_table=DLSRawPointTable(
+                columns=tuple(str(column) for column in sample.data.columns),
+                rows=tuple(
+                    tuple(cell_value(value) for value in row)
+                    for row in sample.data.itertuples(index=False, name=None)
+                ),
+            ),
+            metadata=tuple(
+                DLSRawMetadataField(field=str(key), value=str(value))
+                for key, value in sample.metadata.items()
+            ),
+            source_text=str(sample.source_text),
+        )
+        for sample in samples
+    )
+
+    source_files = []
+    for group in resolved_groups:
+        for source in group.files:
+            if any(
+                not hasattr(source, attribute)
+                for attribute in ("file_name", "file_type", "source_text", "error")
+            ):
+                raise TypeError("DLS raw evidence requires classified source diagnostics")
+            source_files.append(
+                DLSRawSourceFile(
+                    lot=str(group.lot),
+                    file_name=str(source.file_name),
+                    file_type=str(source.file_type),
+                    source_text=source.source_text,
+                    error=str(source.error) if source.error is not None else None,
+                )
+            )
+
+    return DLSRawEvidence(
+        samples=projected_samples,
+        source_files=tuple(source_files),
+    )
+
+
 def analyze_dls_dataset(
     paths: list[str | Path],
     *,
@@ -3148,6 +3293,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="retrieve_dls_distributions",
         purpose="Return immutable DLS distribution series and peak evidence.",
         handler=retrieve_dls_distributions,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="retrieve_dls_raw_evidence",
+        purpose="Return immutable DLS point tables, metadata, and source diagnostics.",
+        handler=retrieve_dls_raw_evidence,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

@@ -28,6 +28,7 @@ from labassistant.application import (
     retrieve_dls_angle_details,
     retrieve_dls_metrics,
     retrieve_dls_distributions,
+    retrieve_dls_raw_evidence,
     compare_experiments,
     compose_dls_narrative,
     DLSNarrative,
@@ -44,6 +45,8 @@ from labassistant.application import (
     DLSMetricsProjection,
     DLSDistributionProjection,
     DLSDistributionSeries,
+    DLSRawEvidence,
+    DLSRawPointTable,
     dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
@@ -130,6 +133,12 @@ def dls_metrics_dataframe(projection: DLSMetricsProjection) -> pd.DataFrame:
             for row in projection.rows
         ]
     )
+
+
+def raw_point_table_dataframe(table: DLSRawPointTable) -> pd.DataFrame:
+    """Reconstruct a vendor-shaped point table in the Streamlit shell."""
+
+    return pd.DataFrame(list(table.rows), columns=list(table.columns))
 
 
 def render_metric_row(label: str, value: str) -> str:
@@ -1383,7 +1392,7 @@ def render_small_multiples(
             st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
 
 
-def render_raw_data(samples: list[ParsedSample], metrics: pd.DataFrame, groups=None) -> None:
+def render_raw_data(evidence: DLSRawEvidence, metrics: pd.DataFrame) -> None:
     tab_results, tab_points, tab_metadata, tab_original = st.tabs(["Parsed Results", "Distribution Points", "Metadata", "Original Files"])
 
     with tab_results:
@@ -1396,37 +1405,55 @@ def render_raw_data(samples: list[ParsedSample], metrics: pd.DataFrame, groups=N
         )
 
     with tab_points:
-        selected_sample_name = st.selectbox("Sample", [sample.name for sample in samples], key="raw_points_sample")
-        sample = next(item for item in samples if item.name == selected_sample_name)
-        st.dataframe(sample.data, use_container_width=True, hide_index=True)
+        selected_sample_name = st.selectbox(
+            "Sample",
+            [sample.sample_name for sample in evidence.samples],
+            key="raw_points_sample",
+        )
+        sample = next(
+            item for item in evidence.samples if item.sample_name == selected_sample_name
+        )
+        point_table = raw_point_table_dataframe(sample.point_table)
+        st.dataframe(point_table, use_container_width=True, hide_index=True)
         st.download_button(
             "Download selected sample points",
-            data=sample.data.to_csv(index=False),
-            file_name=f"{sample.name}_distribution_points.csv",
+            data=point_table.to_csv(index=False),
+            file_name=f"{sample.sample_name}_distribution_points.csv",
             mime="text/csv",
         )
 
     with tab_metadata:
         metadata_rows = []
-        for sample in samples:
+        for sample in evidence.samples:
             if sample.metadata:
-                for key, value in sample.metadata.items():
-                    metadata_rows.append({"Sample": sample.name, "Field": key, "Value": value})
+                for field in sample.metadata:
+                    metadata_rows.append(
+                        {
+                            "Sample": sample.sample_name,
+                            "Field": field.field,
+                            "Value": field.value,
+                        }
+                    )
             else:
-                metadata_rows.append({"Sample": sample.name, "Field": "Metadata", "Value": "No metadata detected"})
+                metadata_rows.append(
+                    {
+                        "Sample": sample.sample_name,
+                        "Field": "Metadata",
+                        "Value": "No metadata detected",
+                    }
+                )
         st.dataframe(pd.DataFrame(metadata_rows), use_container_width=True, hide_index=True)
 
     with tab_original:
         source_files = [
             {
-                "label": f"{group.lot} - {classified.file_type}: {classified.file_name}",
-                "name": classified.file_name,
-                "type": classified.file_type,
-                "text": classified.source_text,
-                "error": classified.error,
+                "label": f"{source.lot} - {source.file_type}: {source.file_name}",
+                "name": source.file_name,
+                "type": source.file_type,
+                "text": source.source_text,
+                "error": source.error,
             }
-            for group in (groups or [])
-            for classified in group.files
+            for source in evidence.source_files
         ]
         if source_files:
             selected_file_label = st.selectbox("Original file", [item["label"] for item in source_files], key="source_text_sample")
@@ -1436,8 +1463,16 @@ def render_raw_data(samples: list[ParsedSample], metrics: pd.DataFrame, groups=N
             st.caption(f"{selected_file['type']} - {selected_file['name']}")
             st.code((selected_file["text"] or "No readable source text was extracted.")[:12000], language="text")
         else:
-            selected_file_name = st.selectbox("Original file", [sample.name for sample in samples], key="source_text_sample")
-            sample = next(item for item in samples if item.name == selected_file_name)
+            selected_file_name = st.selectbox(
+                "Original file",
+                [sample.sample_name for sample in evidence.samples],
+                key="source_text_sample",
+            )
+            sample = next(
+                item
+                for item in evidence.samples
+                if item.sample_name == selected_file_name
+            )
             st.code(sample.source_text[:12000], language="text")
 
 
@@ -2529,6 +2564,10 @@ def main() -> None:
     diagnostics = analyze_dls_trend_diagnostics(samples)
     sample_summaries = summarize_dls_samples(samples)
     angle_details = retrieve_dls_angle_details(samples)
+    raw_evidence = retrieve_dls_raw_evidence(
+        samples,
+        groups=preview.groups if preview is not None else (),
+    )
     render_decision_workbench(samples, narrative, diagnostics, sample_summaries)
     if chromatography_error:
         st.error(f"Chromatography preview failed: {chromatography_error}")
@@ -2610,7 +2649,7 @@ def main() -> None:
         render_small_multiples(distribution_projection, distribution_mode, normalize)
 
     with st.expander("Raw data and metadata"):
-        render_raw_data(samples, metrics, preview.groups)
+        render_raw_data(raw_evidence, metrics)
 
 
 if __name__ == "__main__":

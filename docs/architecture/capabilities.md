@@ -40,7 +40,10 @@ and per-angle summaries. The shared metrics projection used by visualizations
 now crosses the same boundary; Streamlit reconstructs pandas only for display,
 charting, and CSV export. Distribution-series evidence now also crosses the
 boundary while normalization, reference deltas, Plotly, and UI state remain in
-Streamlit. Raw evidence inspection and export remain direct parsed-sample reads.
+Streamlit. Raw evidence inspection and export now use typed point tables,
+metadata fields, and source diagnostics; pandas display, downloads, selection,
+and source-preview truncation remain in the shell. Correlogram visualization is
+the next direct presentation read.
 
 ## Implemented Capability Catalog
 
@@ -62,6 +65,7 @@ Streamlit. Raw evidence inspection and export remain direct parsed-sample reads.
 | `retrieve_dls_angle_details` | `retrieve_dls_angle_details` | Available; used by Streamlit per-angle detail table |
 | `retrieve_dls_metrics` | `retrieve_dls_metrics` | Available; used by Streamlit charts, raw table, and CSV export |
 | `retrieve_dls_distributions` | `retrieve_dls_distributions` | Available; used by Streamlit distribution visualizations |
+| `retrieve_dls_raw_evidence` | `retrieve_dls_raw_evidence` | Available; used by Streamlit raw evidence inspection and export |
 | `import_chromatography_experiment` | `chromatography_experiment_from_preview` | Available, transitional input |
 | `analyze_chromatography_source` | `analyze_chromatography_source` | Available; used by Streamlit chromatography preview |
 | `analyze_filtration_csv` | `analyze_filtration_csv` | Available; used by Streamlit filtration follow-up |
@@ -510,6 +514,32 @@ malformed-DataFrame errors remain unchanged.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's signal selector,
 overlay, delta chart, and small multiples are the first callers. Agent use
 remains excluded while this DLS-specific read contract matures.
+
+## Retrieve DLS Raw Evidence
+
+**Name:** `retrieve_dls_raw_evidence`
+
+**Purpose:** Project raw DLS point tables, metadata, fallback source text, and
+uploaded-file diagnostics into stable inspection records without exposing
+parsed samples or pandas to interface shells.
+
+**Inputs:** A non-empty list of parsed DLS samples and optional immutable DLS
+upload-group diagnostics.
+
+**Outputs:** A frozen, versioned `DLSRawEvidence` containing samples in import
+order, vendor-shaped `DLSRawPointTable` column/row tuples, ordered
+`DLSRawMetadataField` values, complete fallback source text, and grouped
+`DLSRawSourceFile` diagnostics in original file order. No DataFrame, CSV,
+selection state, display labels, or source-preview truncation crosses the
+boundary.
+
+**Expected Errors:** `ValueError` for no samples and `TypeError` for malformed
+parsed samples, upload groups, or classified source diagnostics. Established
+malformed-DataFrame errors remain unchanged.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's raw point, metadata,
+original-file, and CSV-download tabs are the first callers. Agent use remains
+excluded because this contract includes complete raw source content.
 
 ## Import Chromatography Experiment
 
