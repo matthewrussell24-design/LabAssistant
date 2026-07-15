@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Bounded raw DLS inspection behind explicit adapter
-  protocols and closed Application Contract Stabilization (task 056).
-- Working Tree: Task 056 is committed locally; inspect `git status --short`
+- Latest Completed Change: Classified all 42 application capabilities and
+  established the API contract-freeze policy (task 057).
+- Working Tree: Task 057 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `233 passed in 2.89s` from `scripts/test -q` on
+- Last Successful Test: `233 passed in 2.74s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 056.
+- Last Updated: 2026-07-15 for task 057.
 
 ## North Star
 
@@ -34,8 +34,8 @@ full traceability.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
   Measurement-first, raw vendor inspection is explicitly adapter-bounded, and
   reusable human workflows cross typed application contracts.
-- API Layer: ⚪ Not Started — intentionally deferred until the application
-  boundary is mature.
+- API Layer: 🟡 Design — seven candidate reads and a hardening gate are defined;
+  no transport or external authorization exists.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
 
 Health labels summarize the evidence in the detailed sections below. Update a
@@ -64,17 +64,14 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: Application Contract Stabilization
-- Status: Complete
-- Goal: Replace UI-shaped compatibility inputs with authoritative scientific
-  evidence contracts incrementally while preserving existing shells.
-- Current evidence: Task 050 removed reusable-core view-model imports through
-  `DLSSampleEvidence`; tasks 051 and 052 made shared metrics/status, review
-  evidence, and sample summaries Measurement-first; task 053 migrated decision
-  and narrative interpretation; task 054 migrated observation normalization;
-  task 055 migrated distribution projection; task 056 bounded raw vendor
-  inspection with explicit adapters and removed the final residual
-  workspace-warning read found by the closing audit.
+- Milestone: API Contract Readiness
+- Status: In Progress
+- Goal: Freeze a small, versioned, read-only external surface without exposing
+  Python-only domain/workspace inputs or prematurely choosing a transport.
+- Current evidence: Task 057 audited all 42 registry entries, selected seven
+  candidate reads, defined draft-to-stable versioning, and recorded a no-go for
+  HTTP or agent transports until shared envelopes, stable errors, access
+  boundaries, limits, and JSON conformance tests exist.
 
 ## Five-Minute Rule
 
@@ -175,6 +172,14 @@ non-goals.
   on normalized, reusable evidence.
 
 ## Recent Decisions
+
+2026-07-15:
+
+- Registry availability does not imply external API stability or authorization.
+- The first freeze candidate is limited to seven read operations.
+- External contracts require common success/error envelopes, stable error codes,
+  bounded reads, access policy, and JSON conformance before transport selection.
+- `0.1-draft` remains in place until that hardening gate passes.
 
 2026-07-10:
 
@@ -381,6 +386,8 @@ architecture rationale.
   through authoritative Measurement distributions (task 055).
 - Bounded raw DLS inspection behind structural adapter protocols and closed the
   current-workflow application stabilization milestone (task 056).
+- Classified all 42 registered capabilities, selected seven candidate reads,
+  and established API contract-freeze/versioning policy (task 057).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -396,8 +403,8 @@ architecture rationale.
 
 ## Active Work
 
-- Raw-evidence adapter and maturity-closeout task 056 is complete.
-- The working tree was clean when task 056 began.
+- API-readiness audit task 057 is complete.
+- The working tree was clean when task 057 began.
 
 ## Known Risks
 
@@ -432,7 +439,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `233 passed in 2.89s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `233 passed in 2.74s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -451,19 +458,20 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Run an API-readiness contract-freeze audit over the mature
-  application surface before choosing any HTTP or agent transport.
-- Why this is next: Application extraction is complete for current workflows.
-  The safest next move is to distinguish stable serializable reads from draft
-  in-process DTOs rather than immediately exposing all forty-two capabilities.
-- Expected scope: Medium; inventory versioned contracts, serialization and
-  error behavior, domain-object leakage, write authorization, and proposed
-  stable/draft classifications.
-- Risks: Freezing DLS-shaped contracts too early, exposing mutable domain
-  objects, or treating registry availability as external API stability.
-- Success criteria: a documented candidate public surface, explicit versioning
-  rules, a bounded hardening backlog, and a clear go/no-go decision for the
-  first transport adapter. No server implementation is required.
+- Objective: Add transport-neutral success/error envelopes and JSON conformance
+  tests for the seven candidate read capabilities without adding a server.
+- Why this is next: Task 057 found that the candidate DTOs are mostly frozen and
+  serializable, but callers lack one response shape, stable errors, and a
+  versioned list result.
+- Expected scope: Medium; define envelopes and error codes, wrap experiment
+  listings, add a safe invocation adapter for candidate reads, and verify JSON
+  round trips while preventing external path/store injection.
+- Risks: Masking programming defects as public errors, changing current Python
+  caller behavior, leaking internal exception text, or implying authorization
+  before an access policy exists.
+- Success criteria: all seven candidates conform to deterministic JSON success
+  and error shapes, in-process handlers remain backward compatible, and the
+  remaining gate is limited to access policy plus pagination/limits.
 
 ## AI Context Window
 
@@ -495,6 +503,7 @@ task instructions or repository agent rules.
 - Current Status: [`current-state.md`](current-state.md)
 - Architecture: [`../architecture/README.md`](../architecture/README.md),
   [`../architecture/capabilities.md`](../architecture/capabilities.md),
+  [`../architecture/api-readiness.md`](../architecture/api-readiness.md),
   [`../ARCHITECTURE.md`](../ARCHITECTURE.md), and
   [`../STANDALONE_APP.md`](../STANDALONE_APP.md)
 - Prompts: [`../prompts/README.md`](../prompts/README.md)

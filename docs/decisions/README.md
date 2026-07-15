@@ -9,3 +9,9 @@ Each record should state the status, date, context, decision, consequences, and
 related prompt. Do not create records for routine fixes or speculative ideas.
 
 Decision records use filenames such as `001-short-decision.md`.
+
+## Records
+
+- [`001-repository-development-workflow.md`](001-repository-development-workflow.md)
+- [`002-living-project-status.md`](002-living-project-status.md)
+- [`003-api-contract-freeze-policy.md`](003-api-contract-freeze-policy.md)

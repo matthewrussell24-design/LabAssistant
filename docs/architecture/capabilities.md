@@ -154,6 +154,11 @@ invoke the referenced Python handler directly; the registry adds no transport.
 `app_manifest()` publishes transport-neutral catalog metadata without exposing
 Python handlers or domain objects.
 
+External readiness is intentionally narrower than this catalog. The complete
+freeze classification, seven candidate reads, and hardening gate are documented
+in [`api-readiness.md`](api-readiness.md). Registry availability and the
+`Future API` caller label do not imply endpoint stability or authorization.
+
 ## Describe Platform
 
 **Name:** `describe_platform`
