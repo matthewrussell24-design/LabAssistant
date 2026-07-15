@@ -23,8 +23,8 @@ options.
 | --- | --- | --- |
 | Host/runtime | Python 3.12.13 and installed binaries are arm64 | First target is arm64 only |
 | Native UI | PyObjC Cocoa/WebKit 12.2.1; AppKit/WKWebView smoke passes | Bundle the native entry point |
-| Packaging tool | py2app is not installed | Pin it after a focused compatibility spike |
-| Dependencies | broad `requirements.txt` is mostly unpinned | Split and lock desktop runtime/build inputs |
+| Packaging tool | py2app 0.28.10 is pinned in the build lock but absent from the desktop runtime | Exercise it in the focused bundle spike |
+| Dependencies | task 069 split four inputs and generated hashed Python 3.12 arm64 locks | Reproducibility gate passed |
 | Persistence | task 068 routes history and memory through a pure Application Support resolver | Runtime-path gate passed |
 | Socket | task 068 routes the owner-only path through the same Caches contract | Keep default-off; qualify separately |
 | Resources | workspace HTML is an embedded Python constant | Keep mutable data out of `Contents/Resources` |
@@ -94,6 +94,12 @@ The native bundle needs the LabAssistant package, Python 3.12 runtime, PyObjC
 Cocoa/WebKit, pandas/numpy, openpyxl, xlrd, and their actual transitive runtime
 dependencies. Exclude Streamlit, Plotly, pytest, and development-only packages
 unless a frozen-import trace proves they are required by the native entry point.
+
+Task 069 records these boundaries in `requirements/*.in`. Generated wheel-only,
+hash-verified locks target Python 3.12 on macOS arm64: desktop excludes
+Streamlit, Plotly, pytest, and py2app; build adds py2app; Streamlit excludes
+PyObjC and build tools; and dev composes all groups. The repository regeneration
+script produces byte-identical lock output for unchanged inputs.
 
 Do not rely only on static imports. py2app notes that dynamic imports and
 in-package data can require explicit packages, includes, or recipes. The

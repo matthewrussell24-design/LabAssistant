@@ -79,7 +79,8 @@ Use `scripts/run` for the existing Streamlit application.
 On macOS, use `scripts/run-desktop` for the native desktop prototype. Select
 the summary, intensity-distribution, and correlogram files that make up an
 existing supported DLS dataset. The native AppKit/WebKit runtime is installed
-through the pinned PyObjC packages in `requirements.txt`.
+through the pinned PyObjC packages in the native desktop lock under
+`requirements/locks/` (the full `requirements.txt` setup includes it).
 
 To make the stable local reads available only for that desktop session, opt in
 explicitly:
@@ -393,6 +394,11 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+That compatibility entry point installs the hashed Python 3.12 macOS arm64
+development lock. Narrower hashed locks are available for native desktop,
+Streamlit, and desktop-build environments under `requirements/locks/`; see
+[`requirements/README.md`](requirements/README.md).
+
 Run the app:
 
 ```bash
@@ -419,6 +425,7 @@ Current structure:
 LabAssistant/
   app.py
   requirements.txt
+  requirements/
   README.md
   LabAssistant_Vision_and_Roadmap.md
   labassistant/

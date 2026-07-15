@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Centralized platform-native mutable runtime paths
-  and added explicit safe legacy-data import (task 068).
-- Working Tree: Task 068 is committed locally; inspect `git status --short`
+- Latest Completed Change: Split application dependency groups and generated
+  reproducible hashed Python 3.12 macOS arm64 locks (task 069).
+- Working Tree: Task 069 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `274 passed in 3.20s` from `scripts/test -q` on
+- Last Successful Test: `277 passed in 3.37s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 068.
+- Last Updated: 2026-07-15 for task 069.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 274 passing.
+- Tests: 🟢 Healthy — 277 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -96,6 +96,8 @@ are future platform capabilities and are not automatically the next task.
   bundles remain qualification-only; signing is blocked on an identity.
   Task 068 passed the first packaging gate with side-effect-free Application
   Support/Caches defaults and explicit safe copy-only legacy import.
+  Task 069 passed the reproducibility gate with separate desktop, Streamlit,
+  build, and development inputs plus deterministic hashed arm64 locks.
 
 ## Five-Minute Rule
 
@@ -295,6 +297,8 @@ architecture rationale.
   vision, and technical proposals.
 - `graphify-out/` — generated knowledge graph and architecture navigation data.
 - `scripts/` — repository run and test entry points.
+- `requirements/` — human-maintained dependency groups and generated Python
+  3.12 macOS arm64 locks.
 
 ## Recently Completed Work
 
@@ -451,6 +455,8 @@ architecture rationale.
   layout, signing/sandbox boundary, and verification gates (task 067).
 - Centralized platform-native runtime paths and explicit copy-only legacy
   history/memory migration without CWD scanning (task 068).
+- Split desktop, Streamlit, py2app-build, and development dependencies and
+  generated reproducible hash-verified arm64 locks (task 069).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -466,8 +472,8 @@ architecture rationale.
 
 ## Active Work
 
-- Runtime-path task 068 is complete; no bundle or release was created.
-- Dependency splitting and reproducible locking are the next packaging gate.
+- Dependency-lock task 069 is complete; no bundle or release was created.
+- A minimal non-release py2app standalone qualification is the next gate.
 
 ## Known Risks
 
@@ -477,8 +483,6 @@ architecture rationale.
   delimiters, workbook layouts, distribution types, or real OpenLab archives.
 - JSONL history has limited migration and query support; schema evolution needs
   care until stronger persistence requirements justify a change.
-- `requirements.txt` is unpinned, so environment resolution is not fully
-  reproducible.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
 - AppKit/WebKit proves native shell independence but is not yet packaged,
@@ -504,7 +508,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `274 passed in 3.20s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `277 passed in 3.37s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -523,21 +527,23 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Split and reproducibly lock desktop runtime, desktop-build,
-  Streamlit, and development dependencies.
-- Why this is next: Runtime placement now passes ADR 006's first gate, but the
-  broad unpinned `requirements.txt` cannot produce a reviewable py2app bundle.
-- Expected scope: Medium; inventory native imports and transitive requirements,
-  define separate human-readable input groups, produce a Python 3.12 arm64
-  reproducible lock with integrity metadata, and verify clean installation plus
-  the existing suite.
-- Risks: Omitting dynamically imported scientific dependencies, accidentally
-  bundling Streamlit/development tools, platform-specific wheels, or creating a
-  lock that only resolves from the current environment.
-- Success criteria: desktop runtime and build inputs are minimal and explicit;
-  Streamlit and development dependencies remain separately installable; a clean
-  Python 3.12 arm64 environment installs reproducibly and passes required
-  imports/tests. No py2app bundle, signing, notarization, or release yet.
+- Objective: Add and qualify a minimal standalone arm64 py2app configuration
+  for the native desktop entry point using a non-release bundle identity.
+- Why this is next: Runtime placement and reproducible dependency inputs now
+  pass ADR 006's first two gates; the next uncertainty is frozen import,
+  package-data, and native-library behavior inside a real standalone bundle.
+- Expected scope: Medium; add py2app metadata and a clean non-alias build script,
+  keep the development bundle ID visibly non-release, build from the build lock,
+  inspect bundle contents/architectures/linkage, and smoke Finder/CLI launch,
+  default-off IPC, representative importers, history, and SQLite memory.
+- Risks: Hidden imports, missing package data, host-absolute linked libraries,
+  accidental Streamlit/test inclusion, writes inside the signed bundle shape,
+  or describing an ad-hoc artifact as distributable.
+- Success criteria: a clean arm64 standalone bundle launches without `.venv`,
+  passes the bounded scientific/runtime smoke matrix, writes only approved user
+  locations, excludes unrelated dependency groups, and is explicitly labeled
+  local qualification only. No Developer ID signing, notarization, release,
+  sandbox, universal2, or packaged local-read enablement yet.
 
 ## AI Context Window
 

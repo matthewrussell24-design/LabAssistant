@@ -5,13 +5,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PYTHON="$ROOT_DIR/.venv/bin/python"
 
 if [[ ! -x "$PYTHON" ]]; then
-  echo "Missing project Python at .venv/bin/python. Run: python3.12 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt" >&2
+  echo "Missing project Python at .venv/bin/python. Run: python3.12 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements/locks/desktop-py312-macos-arm64.txt" >&2
   exit 1
 fi
 
 PYOBJC_VERSION="$($PYTHON -c 'import objc; print(objc.__version__)' 2>/dev/null || true)"
 if [[ "$PYOBJC_VERSION" != "12.2.1" ]]; then
-  echo "LabAssistant Desktop requires PyObjC 12.2.1 (found: ${PYOBJC_VERSION:-not installed}). Run: .venv/bin/pip install -r requirements.txt" >&2
+  echo "LabAssistant Desktop requires PyObjC 12.2.1 (found: ${PYOBJC_VERSION:-not installed}). Run: .venv/bin/pip install --require-hashes -r requirements/locks/desktop-py312-macos-arm64.txt" >&2
   exit 1
 fi
 

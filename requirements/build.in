@@ -1,0 +1,4 @@
+-r desktop.in
+
+# Local macOS bundle construction only; not required to run either shell.
+py2app==0.28.10

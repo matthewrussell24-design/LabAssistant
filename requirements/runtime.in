@@ -1,0 +1,4 @@
+# Shared scientific runtime used by both human shells.
+pandas==3.0.3
+openpyxl==3.1.5
+xlrd==2.0.2

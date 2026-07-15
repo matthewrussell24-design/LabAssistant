@@ -1,0 +1,5 @@
+-r runtime.in
+
+# Native AppKit/WebKit shell. These packages pull in pyobjc-core and Foundation.
+pyobjc-framework-Cocoa==12.2.1
+pyobjc-framework-WebKit==12.2.1

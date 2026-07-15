@@ -46,6 +46,13 @@ Application Support, while the socket remains a default-off Caches runtime
 artifact. Resolution creates no filesystem state; legacy CWD data is available
 solely through an explicit, copy-only migration that rejects links and conflicts.
 
+Dependency inputs follow the same shell boundary. `requirements/runtime.in`
+holds shared scientific libraries; native desktop and Streamlit inputs extend it
+independently; build adds py2app only to desktop; and dev composes all groups.
+Generated Python 3.12 macOS arm64 locks are wheel-only and hash verified, so
+bundle analysis starts from a reproducible native dependency set without
+silently including Streamlit or test tooling.
+
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
 

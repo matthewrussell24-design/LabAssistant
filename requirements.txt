@@ -1,8 +1,4 @@
-streamlit
-pandas
-plotly
-openpyxl
-xlrd
-pytest
-pyobjc-framework-Cocoa==12.2.1
-pyobjc-framework-WebKit==12.2.1
+# Full Python 3.12 macOS arm64 contributor environment.
+# Regenerate with scripts/lock-dependencies; select a narrower lock in
+# requirements/locks/ when only one application surface is needed.
+-r requirements/locks/dev-py312-macos-arm64.txt

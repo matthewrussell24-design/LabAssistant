@@ -1,0 +1,5 @@
+-r desktop.in
+-r streamlit.in
+-r build.in
+
+pytest==9.1.1
