@@ -5,9 +5,10 @@ freeze for an external read-only transport, and what must happen first?
 
 ## Decision
 
-Transport implementation is **not ready yet**. The application layer is mature,
-but every registry entry still carries the draft version `0.1-draft`, there is
-no common response/error envelope, and no external read-access boundary exists.
+Transport implementation is **not ready yet**. The application layer is mature
+and task 058 added a common draft response/error boundary, but every registry
+entry still carries `0.1-draft`; trusted access policy and bounded pagination
+remain unresolved.
 
 The first transport should expose only seven read candidates after the bounded
 hardening gate below. Registry presence does not imply external stability.
@@ -102,13 +103,31 @@ Before selecting or implementing a transport:
 6. Add JSON round-trip/schema-shape tests for all seven candidates.
 7. Replace `0.1-draft` only when those tests and rules are complete.
 
+## Current Gate Status
+
+- ✅ Shared success envelope: `APISuccessEnvelope`.
+- ✅ Shared typed error envelope and six stable draft codes.
+- ✅ Versioned `ExperimentListings` wrapper; `list_experiments()` itself remains
+  backward-compatible and returns its established tuple.
+- 🟡 Bounded reads: related-context `limit` is constrained to 1–50; history and
+  journal pagination/limits remain.
+- 🟡 Access: protected reads require a trusted `access_granted` decision and
+  reject request-controlled path/store injection; the policy producing that
+  decision is not yet defined.
+- ✅ JSON conformance and failure-mapping tests cover all seven candidates.
+- ⬜ Stable version: `0.1-draft` remains correct until the two yellow items are
+  complete and the candidate shapes receive a final freeze review.
+
+The conformance implementation lives in `labassistant.api_readiness`. It is an
+in-process boundary, not a server, authentication mechanism, or endpoint grant.
+
 ## Go/No-Go
 
 **No-go for an HTTP server or agent SDK today.**
 
-**Go for the next task:** implement the shared transport-neutral response/error
-envelopes and candidate-read conformance tests inside the application package.
-That work does not choose a framework, open a port, or grant write access.
+**Go for the next task:** define the trusted local read-access policy and add
+bounded pagination/limits for history, context, and journal candidates. That
+work still does not choose a framework, open a port, or grant write access.
 
 ## Deliberate Deferrals
 

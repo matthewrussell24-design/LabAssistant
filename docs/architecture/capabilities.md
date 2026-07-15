@@ -158,6 +158,9 @@ External readiness is intentionally narrower than this catalog. The complete
 freeze classification, seven candidate reads, and hardening gate are documented
 in [`api-readiness.md`](api-readiness.md). Registry availability and the
 `Future API` caller label do not imply endpoint stability or authorization.
+`labassistant.api_readiness` now provides the draft seven-read invocation,
+success/error envelopes, JSON conformance boundary, and request-parameter
+whitelist while preserving every registered Python handler.
 
 ## Describe Platform
 
