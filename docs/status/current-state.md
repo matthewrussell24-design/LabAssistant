@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Added the typed immutable local read client SDK over
-  all seven broker capabilities (task 064).
-- Working Tree: Task 064 is committed locally; inspect `git status --short`
+- Latest Completed Change: Accepted explicit per-launch desktop ownership of the
+  local read broker, default off (task 065).
+- Working Tree: Task 065 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `256 passed in 2.51s` from `scripts/test -q` on
+- Last Successful Test: `256 passed in 2.99s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 064.
+- Last Updated: 2026-07-15 for task 065.
 
 ## North Star
 
@@ -65,9 +65,9 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: Typed Local Read SDK
+- Milestone: Desktop Broker Lifecycle Design
 - Status: Complete
-- Goal: Give independent Python callers typed access to the stable read surface.
+- Goal: Define explicit desktop broker ownership without hidden IPC startup.
 - Current evidence: Task 057 audited all 42 registry entries, selected seven
   candidate reads, defined draft-to-stable versioning, and recorded a no-go for
   HTTP or agent transports until shared envelopes, stable errors, access
@@ -85,6 +85,8 @@ are future platform capabilities and are not automatically the next task.
   access mapping, safe socket lifecycle, and a diagnostic client.
   Task 064 added immutable capability-specific results and kept connection,
   transport, protocol, and stable application failures distinct.
+  Task 065 selected a non-persistent `--share-local-reads` launch opt-in and
+  defined ownership, collision, thread, shutdown, and packaging gates.
 
 ## Five-Minute Rule
 
@@ -212,6 +214,8 @@ non-goals.
   based on scientific intent rather than low-level functions.
 - The first local external transport is owner-only Unix-domain IPC, with access
   context derived by the broker rather than accepted from requests.
+- Native desktop ownership of that broker must remain default-off and require
+  explicit per-launch consent; compatible external brokers remain externally owned.
 
 This is a concise captain's log, not a replacement for formal decision records.
 Keep only the most recent strategic choices here and preserve full rationale in
@@ -422,6 +426,8 @@ architecture rationale.
   same-user peer verification for all seven stable reads (task 063).
 - Added the typed immutable local read client SDK with layered failures and
   seven capability-specific methods (task 064).
+- Accepted a default-off, explicit-launch desktop broker lifecycle with bounded
+  ownership, collision, shutdown, and packaging rules (task 065).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -437,9 +443,9 @@ architecture rationale.
 
 ## Active Work
 
-- Typed local client task 064 is complete; no agent runtime or write route was
-  added.
-- The working tree was clean when task 064 began.
+- Desktop broker lifecycle decision task 065 is complete; no runtime behavior
+  changed.
+- The working tree was clean when task 065 began.
 
 ## Known Risks
 
@@ -476,7 +482,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `256 passed in 2.51s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `256 passed in 2.99s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -495,20 +501,21 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Decide and document whether the native desktop should explicitly
-  own the local read broker lifecycle; do not implement hidden startup.
-- Why this is next: The manual broker and typed client are complete. Desktop
-  ownership is the next unresolved product boundary for making local reads
-  available during normal human use without creating a surprise background
-  service.
-- Expected scope: Medium; compare explicit launch flag, in-app opt-in, and
-  separate broker ownership; define consent, status/diagnostics, shutdown,
-  collision recovery, sandbox/packaging consequences, and implementation gate.
-- Risks: Starting a listener without user intent, blocking AppKit shutdown,
-  weakening socket ownership, or coupling scientific reads to window state.
-- Success criteria: an accepted lifecycle decision and bounded implementation
-  sequence that preserves foreground/manual operation and same-user trust. No
-  hidden daemon, writes, remote transport, autonomous runtime, or instrument control.
+- Objective: Implement ADR 005's explicit `--share-local-reads` desktop
+  lifecycle with cooperative broker shutdown and default-off behavior.
+- Why this is next: Consent and ownership rules are now decided. The smallest
+  implementation can make reads available during an opted-in desktop session
+  without changing the default app or adding a persistent service.
+- Expected scope: Medium; add an AppKit-independent lifecycle owner, cooperative
+  broker stop/unblock, desktop argument parsing, compatible collision probing,
+  safe stderr status, and lifecycle/integration tests.
+- Risks: Accept-loop shutdown races, closing an externally owned broker,
+  blocking AppKit termination, leaking diagnostics, or treating the flag as a
+  persisted preference.
+- Success criteria: default desktop launch creates no socket; explicit opt-in
+  serves typed reads, handles compatible and unsafe collisions correctly, and
+  removes only its owned socket on every exit path. No hidden daemon, packaged
+  enablement, writes, remote transport, autonomous runtime, or instrument control.
 
 ## AI Context Window
 

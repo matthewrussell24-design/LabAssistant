@@ -16,3 +16,4 @@ Decision records use filenames such as `001-short-decision.md`.
 - [`002-living-project-status.md`](002-living-project-status.md)
 - [`003-api-contract-freeze-policy.md`](003-api-contract-freeze-policy.md)
 - [`004-local-read-only-transport.md`](004-local-read-only-transport.md)
+- [`005-desktop-read-broker-lifecycle.md`](005-desktop-read-broker-lifecycle.md)

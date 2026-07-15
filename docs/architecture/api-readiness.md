@@ -195,6 +195,13 @@ transport version, contract version, capability, envelope status, and required
 payload fields. Connection, transport, protocol, and stable application errors
 remain distinct. It never starts or manages the broker.
 
+ADR 005 approves a first desktop lifecycle integration, but does not implement
+it. The native desktop remains listener-free by default and may own the broker
+only for a launch explicitly containing `--share-local-reads`. Ownership must
+run outside AppKit state, close in an outer `try/finally`, distinguish owned
+from compatible external brokers, and remain disabled in packaged builds until
+sandbox and entitlement behavior is validated.
+
 ## Go/No-Go
 
 **The minimal foreground Unix-domain read broker is implemented.**
