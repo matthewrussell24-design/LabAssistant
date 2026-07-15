@@ -2163,10 +2163,33 @@ def test_retrieve_dls_raw_evidence_preserves_fallback_and_validates_inputs():
     assert len(result.samples[0].source_text[:12000]) == 12000
     with raises(ValueError, match="At least one parsed DLS sample"):
         retrieve_dls_raw_evidence([])
-    with raises(TypeError, match="requires parsed samples"):
+    with raises(TypeError, match="requires raw sample adapters"):
         retrieve_dls_raw_evidence([object()])
     with raises(TypeError, match="upload-group diagnostics"):
         retrieve_dls_raw_evidence([sample], groups=(object(),))
+
+
+def test_retrieve_dls_raw_evidence_accepts_minimal_non_measurement_adapter():
+    class RawSampleAdapter:
+        name = "vendor sample"
+        data = pd.DataFrame({"Vendor Field": [1, None], "Note": ["a", "b"]})
+        metadata = {"Opaque": "yes"}
+        source_text = "original vendor text"
+
+    result = retrieve_dls_raw_evidence([RawSampleAdapter()])
+
+    assert result.samples[0].sample_name == "vendor sample"
+    assert result.samples[0].point_table.columns == ("Vendor Field", "Note")
+    assert result.samples[0].point_table.rows[0] == (1.0, "a")
+    assert result.samples[0].metadata[0].to_dict() == {
+        "field": "Opaque",
+        "value": "yes",
+    }
+    assert result.samples[0].source_text == "original vendor text"
+
+    RawSampleAdapter.data = object()
+    with raises(TypeError, match="requires tabular raw sample data"):
+        retrieve_dls_raw_evidence([RawSampleAdapter()])
 
 
 def test_retrieve_dls_correlograms_preserves_series_points_noise_and_order():

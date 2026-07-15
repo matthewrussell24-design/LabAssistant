@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Routed immutable DLS distribution projection through
-  authoritative Measurement distributions (task 055).
-- Working Tree: Task 055 is committed locally; inspect `git status --short`
+- Latest Completed Change: Bounded raw DLS inspection behind explicit adapter
+  protocols and closed Application Contract Stabilization (task 056).
+- Working Tree: Task 056 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `232 passed in 2.52s` from `scripts/test -q` on
+- Last Successful Test: `233 passed in 2.89s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 055.
+- Last Updated: 2026-07-15 for task 056.
 
 ## North Star
 
@@ -28,12 +28,12 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 232 passing.
+- Tests: 🟢 Healthy — 233 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
-- Application Layer: 🟡 In Progress — metrics, summaries, decisions, narratives,
-  observations, and distributions are Measurement-first; arbitrary raw-table
-  inspection remains a bounded workspace adapter read.
+- Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
+  Measurement-first, raw vendor inspection is explicitly adapter-bounded, and
+  reusable human workflows cross typed application contracts.
 - API Layer: ⚪ Not Started — intentionally deferred until the application
   boundary is mature.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
@@ -50,7 +50,7 @@ use planned work to imply an active implementation commitment.
 - ✅ Observation model
 - ✅ Initial application boundary
 - ✅ Capability catalog and registry
-- ⬜ Mature application layer
+- ✅ Mature application layer
 - ⬜ API layer
 - ⬜ Agent SDK
 - ⬜ Authentication
@@ -65,15 +65,16 @@ are future platform capabilities and are not automatically the next task.
 ## Current Milestone
 
 - Milestone: Application Contract Stabilization
-- Status: In Progress
+- Status: Complete
 - Goal: Replace UI-shaped compatibility inputs with authoritative scientific
   evidence contracts incrementally while preserving existing shells.
 - Current evidence: Task 050 removed reusable-core view-model imports through
   `DLSSampleEvidence`; tasks 051 and 052 made shared metrics/status, review
   evidence, and sample summaries Measurement-first; task 053 migrated decision
   and narrative interpretation; task 054 migrated observation normalization;
-  task 055 migrated distribution projection. Arbitrary raw-table inspection is
-  the remaining bounded compatibility projection.
+  task 055 migrated distribution projection; task 056 bounded raw vendor
+  inspection with explicit adapters and removed the final residual
+  workspace-warning read found by the closing audit.
 
 ## Five-Minute Rule
 
@@ -206,7 +207,7 @@ when a decision establishes a durable contract.
 
 ## Current Non-Goals
 
-Until the application layer is mature, do not:
+Until an explicitly scoped next-milestone prompt changes direction, do not:
 
 - Introduce FastAPI or another HTTP service.
 - Split the application into microservices.
@@ -378,6 +379,8 @@ architecture rationale.
   correlogram findings through Measurement flags and projected metrics (task 054).
 - Routed immutable DLS distribution selection, signals, points, and peaks
   through authoritative Measurement distributions (task 055).
+- Bounded raw DLS inspection behind structural adapter protocols and closed the
+  current-workflow application stabilization milestone (task 056).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -393,8 +396,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS Measurement-first distribution task 055 is complete.
-- The working tree was clean when task 055 began.
+- Raw-evidence adapter and maturity-closeout task 056 is complete.
+- The working tree was clean when task 056 began.
 
 ## Known Risks
 
@@ -429,9 +432,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `232 passed in 2.52s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `233 passed in 2.89s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  055.
+  056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -448,19 +451,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Isolate `retrieve_dls_raw_evidence` behind an explicit raw-source
-  adapter contract instead of treating vendor tables as normalized science.
-- Why this is next: Task 055 removed the final normalized distribution read from
-  workspace fields. Raw inspection is now the only deliberate application read
-  of opaque dataframe, metadata, and source-text compatibility state.
-- Expected scope: Medium; preserve arbitrary cells, metadata, source text,
-  upload diagnostics, ordering, fallbacks, and immutable result shape.
-- Risks: Losing non-numeric columns, changing null serialization, confusing
-  upload diagnostics with sample evidence, or forcing raw tables into
-  `Measurement`.
-- Success criteria: raw inspection has an explicit bounded adapter input,
-  normalized workflows remain Measurement-first, existing regressions pass,
-  and the capability catalog states the boundary honestly.
+- Objective: Run an API-readiness contract-freeze audit over the mature
+  application surface before choosing any HTTP or agent transport.
+- Why this is next: Application extraction is complete for current workflows.
+  The safest next move is to distinguish stable serializable reads from draft
+  in-process DTOs rather than immediately exposing all forty-two capabilities.
+- Expected scope: Medium; inventory versioned contracts, serialization and
+  error behavior, domain-object leakage, write authorization, and proposed
+  stable/draft classifications.
+- Risks: Freezing DLS-shaped contracts too early, exposing mutable domain
+  objects, or treating registry availability as external API stability.
+- Success criteria: a documented candidate public surface, explicit versioning
+  rules, a bounded hardening backlog, and a clear go/no-go decision for the
+  first transport adapter. No server implementation is required.
 
 ## AI Context Window
 

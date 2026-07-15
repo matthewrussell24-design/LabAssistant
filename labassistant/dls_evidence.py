@@ -33,6 +33,43 @@ class DLSSampleEvidence(Protocol):
     measurement: Measurement
 
 
+@runtime_checkable
+class DLSRawPointTableSource(Protocol):
+    """Opaque vendor table surface required by raw inspection only."""
+
+    columns: Any
+
+    def itertuples(self, *, index: bool, name: None) -> Any: ...
+
+
+@runtime_checkable
+class DLSRawSampleSource(Protocol):
+    """Minimal sample adapter for lossless raw DLS inspection."""
+
+    name: str
+    data: DLSRawPointTableSource
+    metadata: dict[str, str]
+    source_text: str
+
+
+@runtime_checkable
+class DLSRawFileDiagnosticSource(Protocol):
+    """One classified source-file diagnostic supplied by an importer adapter."""
+
+    file_name: str
+    file_type: str
+    source_text: str | None
+    error: str | None
+
+
+@runtime_checkable
+class DLSRawGroupDiagnosticSource(Protocol):
+    """One lot and its original classified files in importer order."""
+
+    lot: str
+    files: Any
+
+
 @dataclass
 class DLSWorkspaceEvidence:
     """Mutable local-workspace adapter implementing ``DLSSampleEvidence``."""

@@ -15,6 +15,10 @@ from labassistant.context_engine import (
     ResearchJournal,
 )
 from labassistant.dls_evidence import (
+    DLSRawFileDiagnosticSource,
+    DLSRawGroupDiagnosticSource,
+    DLSRawPointTableSource,
+    DLSRawSampleSource,
     DLSSampleEvidence,
     build_metrics_table,
     measurement_metrics,
@@ -3083,28 +3087,21 @@ def retrieve_dls_distributions(
 
 
 def retrieve_dls_raw_evidence(
-    samples: list[DLSSampleEvidence],
+    samples: list[DLSRawSampleSource],
     *,
-    groups: Any = (),
+    groups: tuple[DLSRawGroupDiagnosticSource, ...] = (),
 ) -> DLSRawEvidence:
     """Return immutable raw point, metadata, and source-file inspection data."""
 
     if not samples:
         raise ValueError("At least one parsed DLS sample is required for raw evidence")
-    if any(
-        not hasattr(sample, "name")
-        or not hasattr(sample, "data")
-        or not hasattr(sample, "metadata")
-        or not hasattr(sample, "source_text")
-        for sample in samples
-    ):
-        raise TypeError("DLS raw evidence requires parsed samples")
+    if any(not isinstance(sample, DLSRawSampleSource) for sample in samples):
+        raise TypeError("DLS raw evidence requires raw sample adapters")
+    if any(not isinstance(sample.data, DLSRawPointTableSource) for sample in samples):
+        raise TypeError("DLS raw evidence requires tabular raw sample data")
 
     resolved_groups = tuple(groups or ())
-    if any(
-        not hasattr(group, "lot") or not hasattr(group, "files")
-        for group in resolved_groups
-    ):
+    if any(not isinstance(group, DLSRawGroupDiagnosticSource) for group in resolved_groups):
         raise TypeError("DLS raw evidence requires upload-group diagnostics")
 
     def cell_value(value: Any) -> Any:
@@ -3133,10 +3130,7 @@ def retrieve_dls_raw_evidence(
     source_files = []
     for group in resolved_groups:
         for source in group.files:
-            if any(
-                not hasattr(source, attribute)
-                for attribute in ("file_name", "file_type", "source_text", "error")
-            ):
+            if not isinstance(source, DLSRawFileDiagnosticSource):
                 raise TypeError("DLS raw evidence requires classified source diagnostics")
             source_files.append(
                 DLSRawSourceFile(
@@ -3360,21 +3354,24 @@ def _dls_measurement_summaries(
 ) -> tuple[DLSMeasurementSummary, ...]:
     """Build immutable per-lot read summaries shared by import and restore."""
 
-    return tuple(
-        DLSMeasurementSummary(
-            sample_name=sample.name,
-            status=sample_status(sample),
-            source_files=tuple(sample.measurement.metadata.source_files),
-            z_average_nm=sample.measurement.summary_metrics.z_average,
-            pdi=sample.measurement.summary_metrics.pdi,
-            primary_peak_nm=sample.measurement.derived_metrics.primary_peak_nm,
-            d50_nm=sample.measurement.derived_metrics.d50_nm,
-            aggregation_risk=sample.measurement.derived_metrics.aggregation_risk,
-            quality_score=sample.measurement.derived_metrics.quality_score,
-            warnings=tuple(sample.warnings),
+    summaries = []
+    for sample in samples:
+        projected = measurement_metrics(sample.measurement)
+        summaries.append(
+            DLSMeasurementSummary(
+                sample_name=sample.name,
+                status=projected.status,
+                source_files=tuple(sample.measurement.metadata.source_files),
+                z_average_nm=sample.measurement.summary_metrics.z_average,
+                pdi=sample.measurement.summary_metrics.pdi,
+                primary_peak_nm=sample.measurement.derived_metrics.primary_peak_nm,
+                d50_nm=sample.measurement.derived_metrics.d50_nm,
+                aggregation_risk=sample.measurement.derived_metrics.aggregation_risk,
+                quality_score=sample.measurement.derived_metrics.quality_score,
+                warnings=projected.warnings,
+            )
         )
-        for sample in samples
-    )
+    return tuple(summaries)
 
 
 def restore_chromatography_experiment(

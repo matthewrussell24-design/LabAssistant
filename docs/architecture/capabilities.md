@@ -95,7 +95,11 @@ ordering, evidence values, severity, and correlogram findings to Measurement
 flags and the frozen projection; observation normalization no longer reads the
 workspace dictionary. Task 055 migrated immutable distribution selection,
 signals, points, and peaks to authoritative `Measurement.distributions`; the
-workspace adapter remains only for arbitrary raw-table inspection.
+workspace adapter remains only for arbitrary raw-table inspection. Task 056
+bounded that exception with dedicated raw table/sample/group/file protocols and
+proved the capability does not require Measurement or the broader scientific
+sample contract. Application extraction for current human workflows is now
+complete.
 
 ## Implemented Capability Catalog
 
@@ -722,8 +726,9 @@ remains excluded while this DLS-specific read contract matures.
 uploaded-file diagnostics into stable inspection records without exposing
 parsed samples or pandas to interface shells.
 
-**Inputs:** A non-empty list of parsed DLS samples and optional immutable DLS
-upload-group diagnostics.
+**Inputs:** A non-empty list of structural `DLSRawSampleSource` adapters and
+optional structural `DLSRawGroupDiagnosticSource` adapters. These deliberately
+model opaque importer evidence rather than normalized Measurement science.
 
 **Outputs:** A frozen, versioned `DLSRawEvidence` containing samples in import
 order, vendor-shaped `DLSRawPointTable` column/row tuples, ordered
@@ -733,8 +738,7 @@ selection state, display labels, or source-preview truncation crosses the
 boundary.
 
 **Expected Errors:** `ValueError` for no samples and `TypeError` for malformed
-parsed samples, upload groups, or classified source diagnostics. Established
-malformed-DataFrame errors remain unchanged.
+raw sample/table adapters, upload groups, or classified source diagnostics.
 
 **Caller Types:** Human UI, CLI, Future API. Streamlit's raw point, metadata,
 original-file, and CSV-download tabs are the first callers. Agent use remains
@@ -1153,7 +1157,7 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Isolate `retrieve_dls_raw_evidence` behind an explicit raw-source adapter
-contract. Preserve arbitrary table cells, metadata, source text, upload-group
-diagnostics, and immutable output ordering while keeping raw vendor inspection
-separate from normalized Measurement science.
+Begin API-readiness hardening with a contract-freeze audit: classify which
+versioned application reads are ready for external serialization, document
+draft-to-stable versioning rules, and identify DTOs that still expose in-process
+domain objects. Do not add an HTTP server until that audit defines the surface.
