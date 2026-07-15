@@ -1950,20 +1950,37 @@ def _distribution_sample(
     intensity: list[float],
     *,
     volume: list[float] | None = None,
+    number: list[float] | None = None,
 ) -> ParsedSample:
     sample = _decision_sample(name, 0.12, [])
     data = {"Diameter": diameters, "Intensity": intensity}
     if volume is not None:
         data["Volume"] = volume
+    if number is not None:
+        data["Number"] = number
     sample.data = pd.DataFrame(data)
     sample.metrics.update(
         {
             "Diameter Column": "Diameter",
             "Intensity Column": "Intensity",
             "Volume Column": "Volume" if volume is not None else None,
-            "Number Column": None,
+            "Number Column": "Number" if number is not None else None,
         }
     )
+    sample.measurement.distributions = {
+        "particle_size": DistributionData(
+            diameter_nm=diameters,
+            intensity=intensity,
+            volume=volume or [],
+            number=number or [],
+            source_columns={
+                "diameter_nm": "Diameter",
+                "intensity": "Intensity",
+                **({"volume": "Volume"} if volume is not None else {}),
+                **({"number": "Number"} if number is not None else {}),
+            },
+        )
+    }
     return sample
 
 
@@ -2032,6 +2049,7 @@ def test_distribution_shell_helpers_preserve_normalization_and_nearest_delta():
 
 def test_retrieve_dls_distributions_preserves_fallback_and_validates_samples():
     sample = _distribution_sample("missing", [10], [1])
+    sample.measurement.distributions = {}
     sample.metrics.update(
         {
             "Diameter Column": None,
@@ -2047,6 +2065,40 @@ def test_retrieve_dls_distributions_preserves_fallback_and_validates_samples():
         retrieve_dls_distributions([])
     with raises(TypeError, match="require parsed samples"):
         retrieve_dls_distributions([object()])
+
+
+def test_retrieve_dls_distributions_uses_authoritative_measurement_evidence():
+    sample = _distribution_sample(
+        "authoritative",
+        [100, 10, 1000],
+        [99, 99, 99],
+        volume=[50, 10, 5],
+        number=[40, 8, 4],
+    )
+    distribution = sample.measurement.distributions["particle_size"]
+    distribution.intensity = []
+    distribution.source_columns.pop("intensity")
+    expected = retrieve_dls_distributions([sample])
+
+    sample.data = pd.DataFrame({"Legacy Diameter": [1], "Legacy Signal": [99]})
+    sample.metrics.update(
+        {
+            "Diameter Column": "Legacy Diameter",
+            "Intensity Column": "Legacy Signal",
+            "Volume Column": None,
+            "Number Column": None,
+        }
+    )
+    sample.warnings = ["legacy warning"]
+
+    assert retrieve_dls_distributions([sample]) == expected
+    assert expected.available_signals == ("Volume", "Number")
+    assert expected.samples[0].series_for("Intensity").points == ()
+    first_volume_point = expected.samples[0].series_for("Volume").points[0]
+    assert (first_volume_point.diameter_nm, first_volume_point.signal_value) == (
+        10.0,
+        10.0,
+    )
 
 
 def test_retrieve_dls_raw_evidence_preserves_tables_metadata_and_sources():

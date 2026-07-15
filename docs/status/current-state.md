@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Routed DLS observation normalization through
-  Measurement flags and projected metrics (task 054).
-- Working Tree: Task 054 is committed locally; inspect `git status --short`
+- Latest Completed Change: Routed immutable DLS distribution projection through
+  authoritative Measurement distributions (task 055).
+- Working Tree: Task 055 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `231 passed in 2.28s` from `scripts/test -q` on
+- Last Successful Test: `232 passed in 2.52s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 054.
+- Last Updated: 2026-07-15 for task 055.
 
 ## North Star
 
@@ -28,12 +28,12 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 231 passing.
+- Tests: 🟢 Healthy — 232 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — metrics, summaries, decisions, narratives,
-  and observations are Measurement-first; distribution and raw-table reads
-  still use compatibility workspace fields.
+  observations, and distributions are Measurement-first; arbitrary raw-table
+  inspection remains a bounded workspace adapter read.
 - API Layer: ⚪ Not Started — intentionally deferred until the application
   boundary is mature.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
@@ -71,9 +71,9 @@ are future platform capabilities and are not automatically the next task.
 - Current evidence: Task 050 removed reusable-core view-model imports through
   `DLSSampleEvidence`; tasks 051 and 052 made shared metrics/status, review
   evidence, and sample summaries Measurement-first; task 053 migrated decision
-  and narrative interpretation; task 054 migrated observation normalization.
-  Distribution and raw-table compatibility projections remain before the layer
-  is transport-neutral.
+  and narrative interpretation; task 054 migrated observation normalization;
+  task 055 migrated distribution projection. Arbitrary raw-table inspection is
+  the remaining bounded compatibility projection.
 
 ## Five-Minute Rule
 
@@ -376,6 +376,8 @@ architecture rationale.
   checks through Measurement evidence (task 053).
 - Routed DLS warning iteration, observation evidence, status severity, and
   correlogram findings through Measurement flags and projected metrics (task 054).
+- Routed immutable DLS distribution selection, signals, points, and peaks
+  through authoritative Measurement distributions (task 055).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -391,8 +393,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS Measurement-first observation task 054 is complete.
-- The working tree was clean when task 054 began.
+- DLS Measurement-first distribution task 055 is complete.
+- The working tree was clean when task 055 began.
 
 ## Known Risks
 
@@ -427,9 +429,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `231 passed in 2.28s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `232 passed in 2.52s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  054.
+  055.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -446,21 +448,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Route `retrieve_dls_distributions` through authoritative
-  `Measurement.distributions` and projected status instead of workspace
-  dataframes and column-name metrics.
-- Why this is next: Task 054 removed the final scientific-core workspace reads.
-  The immutable distribution application read is now the clearest remaining
-  reusable workflow that still depends on presentation-compatible tables.
-- Expected scope: Medium; project intensity/volume/number signals directly from
-  `DistributionData`, preserve filtering, sorting, peak detection, signal
-  ordering, fallbacks, and immutable result shape.
-- Risks: Changing canonical distribution selection, point ordering, peak
-  locations, empty-signal behavior, or volume/number-only handling.
-- Success criteria: `retrieve_dls_distributions` no longer reads `sample.data`,
-  `sample.metrics`, or `sample.warnings`; representative and synthetic
-  distribution regressions remain unchanged; arbitrary raw-table inspection is
-  explicitly left as the final workspace adapter concern.
+- Objective: Isolate `retrieve_dls_raw_evidence` behind an explicit raw-source
+  adapter contract instead of treating vendor tables as normalized science.
+- Why this is next: Task 055 removed the final normalized distribution read from
+  workspace fields. Raw inspection is now the only deliberate application read
+  of opaque dataframe, metadata, and source-text compatibility state.
+- Expected scope: Medium; preserve arbitrary cells, metadata, source text,
+  upload diagnostics, ordering, fallbacks, and immutable result shape.
+- Risks: Losing non-numeric columns, changing null serialization, confusing
+  upload diagnostics with sample evidence, or forcing raw tables into
+  `Measurement`.
+- Success criteria: raw inspection has an explicit bounded adapter input,
+  normalized workflows remain Measurement-first, existing regressions pass,
+  and the capability catalog states the boundary honestly.
 
 ## AI Context Window
 

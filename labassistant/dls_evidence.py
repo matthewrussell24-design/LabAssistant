@@ -96,7 +96,7 @@ def parse_uploaded_file(uploaded_file: Any) -> DLSWorkspaceEvidence:
 
 def sample_from_measurement(measurement: Measurement) -> DLSWorkspaceEvidence:
     measurement.provenance["workspace_data_type"] = "Multi-file Measurement"
-    distribution = _primary_distribution(measurement)
+    distribution = primary_distribution(measurement)
     data = _distribution_dataframe(distribution)
     warnings = [flag.label for flag in measurement.flags]
     metrics = {
@@ -263,7 +263,9 @@ def _scattering_angles_label(measurement: Measurement) -> str | None:
     return measurement.metadata.scattering_angle
 
 
-def _primary_distribution(measurement: Measurement) -> DistributionData | None:
+def primary_distribution(measurement: Measurement) -> DistributionData | None:
+    """Return the canonical distribution used by compatibility projections."""
+
     if "particle_size" in measurement.distributions:
         return measurement.distributions["particle_size"]
     if "intensity_replicate_1" in measurement.distributions:

@@ -18,6 +18,7 @@ from labassistant.dls_evidence import (
     DLSSampleEvidence,
     build_metrics_table,
     measurement_metrics,
+    primary_distribution,
     sample_from_measurement,
     sample_status,
 )
@@ -66,7 +67,7 @@ from labassistant.models import (
     Measurement,
     Observation,
 )
-from labassistant.metrics import find_local_peaks
+from labassistant.metrics import find_local_peaks_from_values
 from labassistant.observations import observations_from_samples
 from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
 from labassistant.trend_analysis import (
@@ -2996,61 +2997,70 @@ def retrieve_dls_distributions(
         raise ValueError("At least one parsed DLS sample is required for distributions")
     if any(
         not hasattr(sample, "name")
-        or not hasattr(sample, "data")
-        or not hasattr(sample, "metrics")
-        or not hasattr(sample, "warnings")
+        or not isinstance(getattr(sample, "measurement", None), Measurement)
         for sample in samples
     ):
         raise TypeError("DLS distributions require parsed samples")
 
-    signal_columns = (
-        ("Intensity", "Intensity Column"),
-        ("Volume", "Volume Column"),
-        ("Number", "Number Column"),
+    signals = (
+        ("Intensity", "intensity"),
+        ("Volume", "volume"),
+        ("Number", "number"),
     )
     projected_samples = []
     identified_signals: set[str] = set()
     for sample in samples:
-        diameter_column = sample.metrics["Diameter Column"]
+        distribution = primary_distribution(sample.measurement)
+        diameter_identified = bool(
+            distribution
+            and (distribution.diameter_nm or distribution.source_columns.get("diameter_nm"))
+        )
         series = []
-        for signal, metric_key in signal_columns:
-            signal_column = sample.metrics[metric_key]
-            if signal_column:
+        for signal, attribute in signals:
+            signal_values = getattr(distribution, attribute) if distribution else []
+            signal_identified = bool(
+                distribution
+                and (signal_values or distribution.source_columns.get(attribute))
+            )
+            if signal_identified:
                 identified_signals.add(signal)
 
             points: tuple[DLSDistributionPoint, ...] = ()
             peaks: tuple[DLSDistributionPeak, ...] = ()
-            if diameter_column and signal_column:
-                working = (
-                    sample.data[[diameter_column, signal_column]]
-                    .dropna()
-                    .sort_values(diameter_column)
+            if distribution and diameter_identified and signal_identified:
+                cleaned = sorted(
+                    (
+                        (float(diameter), float(value))
+                        for diameter, value in zip(distribution.diameter_nm, signal_values)
+                        if diameter is not None
+                        and value is not None
+                        and diameter > 0
+                        and value >= 0
+                    ),
+                    key=lambda point: point[0],
                 )
-                working = working[
-                    (working[diameter_column] > 0)
-                    & (working[signal_column] >= 0)
-                ]
                 points = tuple(
                     DLSDistributionPoint(
-                        diameter_nm=float(row[diameter_column]),
-                        signal_value=float(row[signal_column]),
+                        diameter_nm=diameter,
+                        signal_value=value,
                     )
-                    for _, row in working.iterrows()
+                    for diameter, value in cleaned
                 )
                 peaks = tuple(
                     DLSDistributionPeak(
                         diameter_nm=peak["diameter"],
                         signal_value=peak["value"],
                     )
-                    for peak in find_local_peaks(
-                        working, diameter_column, signal_column
+                    for peak in find_local_peaks_from_values(
+                        [diameter for diameter, _ in cleaned],
+                        [value for _, value in cleaned],
                     )
                 )
             series.append(
                 DLSDistributionSeries(
                     signal=signal,
-                    diameter_column_identified=bool(diameter_column),
-                    signal_column_identified=bool(signal_column),
+                    diameter_column_identified=diameter_identified,
+                    signal_column_identified=signal_identified,
                     points=points,
                     peaks=peaks,
                 )
@@ -3064,7 +3074,7 @@ def retrieve_dls_distributions(
         )
 
     available_signals = tuple(
-        signal for signal, _ in signal_columns if signal in identified_signals
+        signal for signal, _ in signals if signal in identified_signals
     ) or ("Intensity",)
     return DLSDistributionProjection(
         samples=tuple(projected_samples),

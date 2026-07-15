@@ -41,8 +41,20 @@ def find_local_peaks(data: pd.DataFrame, diameter_column: str | None, distributi
     if len(working) < 3:
         return []
 
-    x_values = working[diameter_column].to_list()
-    y_values = working[distribution_column].to_list()
+    return find_local_peaks_from_values(
+        working[diameter_column].to_list(),
+        working[distribution_column].to_list(),
+    )
+
+
+def find_local_peaks_from_values(
+    x_values: list[float], y_values: list[float]
+) -> list[dict[str, float]]:
+    """Find peaks in cleaned, diameter-sorted distribution values."""
+
+    if len(x_values) < 3 or len(y_values) < 3:
+        return []
+
     max_y = max(y_values)
 
     if max_y <= 0:

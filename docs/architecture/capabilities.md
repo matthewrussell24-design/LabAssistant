@@ -87,15 +87,15 @@ summary metrics, derived metrics, metadata, flags, and provenance. Both the
 immutable `retrieve_dls_metrics` application read and the legacy pandas metrics
 table now use that projection, so mutable workspace metric overrides cannot
 change their results. Task 052 migrated ordered warning evidence and immutable
-per-sample summaries to the same Measurement-first projection. The workspace
-Task 053 then migrated decision scoring, attention rows, narrative warning
+per-sample summaries to the same Measurement-first projection. Task 053 then
+migrated decision scoring, attention rows, narrative warning
 selection, and distribution-confidence wording to the Measurement-first
-projection. The workspace adapter still carries its compatibility metrics
-dictionary/table for distribution selection and raw-evidence inspection, so the
-boundary is not yet a transport contract. Task 054 migrated DLS observation
+projection. Task 054 migrated DLS observation
 ordering, evidence values, severity, and correlogram findings to Measurement
 flags and the frozen projection; observation normalization no longer reads the
-workspace dictionary.
+workspace dictionary. Task 055 migrated immutable distribution selection,
+signals, points, and peaks to authoritative `Measurement.distributions`; the
+workspace adapter remains only for arbitrary raw-table inspection.
 
 ## Implemented Capability Catalog
 
@@ -696,7 +696,8 @@ remains excluded while this DLS-specific read contract matures.
 into stable typed series without exposing parsed-sample DataFrames or vendor
 column labels to visualization shells.
 
-**Inputs:** A non-empty list of parsed DLS samples.
+**Inputs:** A non-empty list of named DLS evidence records carrying an
+authoritative `Measurement`.
 
 **Outputs:** A frozen, versioned `DLSDistributionProjection` containing samples
 in import order, sample status, signal-major `DLSDistributionSeries`, filtered
@@ -707,8 +708,7 @@ signals. No DataFrame, normalization choice, reference choice, or chart state
 crosses the boundary.
 
 **Expected Errors:** `ValueError` for no samples and `TypeError` for evidence
-that does not satisfy the parsed-sample contract. Established missing-column and
-malformed-DataFrame errors remain unchanged.
+without an authoritative `Measurement`.
 
 **Caller Types:** Human UI, CLI, Future API. Streamlit's signal selector,
 overlay, delta chart, and small multiples are the first callers. Agent use
@@ -1153,7 +1153,7 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Migrate `retrieve_dls_distributions` to authoritative `Measurement.distributions`
-and projected status rather than workspace dataframes and column-name metrics.
-Preserve signal ordering, point filtering/sorting, peaks, fallbacks, and the
-immutable application schema; keep arbitrary raw-table inspection separate.
+Isolate `retrieve_dls_raw_evidence` behind an explicit raw-source adapter
+contract. Preserve arbitrary table cells, metadata, source text, upload-group
+diagnostics, and immutable output ordering while keeping raw vendor inspection
+separate from normalized Measurement science.
