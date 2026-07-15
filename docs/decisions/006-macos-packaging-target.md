@@ -23,13 +23,22 @@ options.
 | --- | --- | --- |
 | Host/runtime | Python 3.12.13 and installed binaries are arm64 | First target is arm64 only |
 | Native UI | PyObjC Cocoa/WebKit 12.2.1; AppKit/WKWebView smoke passes | Bundle the native entry point |
-| Packaging tool | py2app 0.28.10 is pinned in the build lock but absent from the desktop runtime | Exercise it in the focused bundle spike |
+| Packaging tool | task 070 builds a standalone py2app 0.28.10 qualification app | Local bundle gate passed |
 | Dependencies | task 069 split four inputs and generated hashed Python 3.12 arm64 locks | Reproducibility gate passed |
 | Persistence | task 068 routes history and memory through a pure Application Support resolver | Runtime-path gate passed |
 | Socket | task 068 routes the owner-only path through the same Caches contract | Keep default-off; qualify separately |
 | Resources | workspace HTML is an embedded Python constant | Keep mutable data out of `Contents/Resources` |
 | Tooling | Xcode 26.6, `notarytool`, `stapler`, and `codesign` exist | Scripted notarization is possible |
 | Credentials | zero valid signing identities are installed | Distribution signing is currently blocked |
+
+Task 070 produced `/tmp/LabAssistantQualification.app` with the visibly
+non-release identifier `dev.labassistant.local-qualification`. The clean build
+uses no alias mode, removes its build virtual environment, thins all 135 Mach-O
+files to arm64, rejects development-linked libraries and unrelated shell/test
+packages, and applies a verified ad-hoc signature. Packaged smoke passed for
+DLS/XLSX, chromatography CSV, synthetic OpenLab `.olax`, JSONL history, SQLite
+memory, paths with spaces, and default-off IPC; Launch Services open/quit also
+passed. The 136 MB artifact remains local-only and non-distributable.
 
 ## Why This Distribution Model
 
@@ -139,6 +148,12 @@ The minimum supported macOS version is not yet frozen. Inspect deployment
 targets for Python and every bundled Mach-O dependency, choose the highest
 required minimum, then verify clean machines. Until that matrix exists, only
 the build/test host is qualified and development artifacts must say so.
+
+The task 070 audit found embedded minimum targets of macOS 11.0, 14.0, and 26.0.
+The Homebrew Python 3.12.13 runtime and many standard-library/native support
+files require macOS 26.0, so this host-built artifact cannot establish a useful
+lower deployment target. A controlled Python runtime and clean-machine matrix
+are required before freezing compatibility.
 
 ## Verification Matrix
 

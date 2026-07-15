@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Split application dependency groups and generated
-  reproducible hashed Python 3.12 macOS arm64 locks (task 069).
-- Working Tree: Task 069 is committed locally; inspect `git status --short`
+- Latest Completed Change: Built and qualified the first standalone arm64
+  py2app artifact as an explicitly local-only non-release bundle (task 070).
+- Working Tree: Task 070 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `277 passed in 3.37s` from `scripts/test -q` on
+- Last Successful Test: `278 passed in 3.58s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 069.
+- Last Updated: 2026-07-15 for task 070.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 277 passing.
+- Tests: 🟢 Healthy — 278 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -98,6 +98,10 @@ are future platform capabilities and are not automatically the next task.
   Support/Caches defaults and explicit safe copy-only legacy import.
   Task 069 passed the reproducibility gate with separate desktop, Streamlit,
   build, and development inputs plus deterministic hashed arm64 locks.
+  Task 070 passed the local standalone gate with a 135-Mach-O arm64 py2app
+  bundle, structural audit, packaged scientific smoke, and Launch Services
+  open/quit. Its Homebrew Python payload requires macOS 26.0, so compatibility
+  below the build host remains unqualified.
 
 ## Five-Minute Rule
 
@@ -299,6 +303,7 @@ architecture rationale.
 - `scripts/` — repository run and test entry points.
 - `requirements/` — human-maintained dependency groups and generated Python
   3.12 macOS arm64 locks.
+- `packaging/macos/` — non-release py2app entry and local qualification metadata.
 
 ## Recently Completed Work
 
@@ -457,6 +462,8 @@ architecture rationale.
   history/memory migration without CWD scanning (task 068).
 - Split desktop, Streamlit, py2app-build, and development dependencies and
   generated reproducible hash-verified arm64 locks (task 069).
+- Built and audited the first local-only standalone arm64 py2app artifact,
+  including packaged scientific/runtime and Launch Services smoke (task 070).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -472,8 +479,10 @@ architecture rationale.
 
 ## Active Work
 
-- Dependency-lock task 069 is complete; no bundle or release was created.
-- A minimal non-release py2app standalone qualification is the next gate.
+- Local bundle task 070 is complete; `/tmp/LabAssistantQualification.app` is an
+  ad-hoc host-qualification artifact, not a release.
+- Deployment-runtime selection and a clean-machine compatibility matrix are the
+  next gate.
 
 ## Known Risks
 
@@ -485,8 +494,9 @@ architecture rationale.
   care until stronger persistence requirements justify a change.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
-- AppKit/WebKit proves native shell independence but is not yet packaged,
-  notarized, or validated across target macOS versions.
+- AppKit/WebKit is locally packaged but not Developer ID signed, notarized, or
+  validated across target macOS versions. The qualification bundle works on the
+  build host but its embedded Homebrew Python requires macOS 26.0.
 - Persisted technique detection currently relies on measurement shape because
   the JSONL record envelope predates an explicit technique discriminator.
 - PySide6 6.11.1, 6.10.1, and 6.8.3 all failed to initialize their installed
@@ -508,7 +518,10 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `277 passed in 3.37s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `278 passed in 3.58s` from `scripts/test -q` on 2026-07-15.
+- Task 070's first full run had one same-second Research Journal ordering
+  failure; the isolated rerun and immediate full rerun passed. Treat recurrence
+  as a persistence-ordering defect rather than a packaging failure.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -527,23 +540,23 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Add and qualify a minimal standalone arm64 py2app configuration
-  for the native desktop entry point using a non-release bundle identity.
-- Why this is next: Runtime placement and reproducible dependency inputs now
-  pass ADR 006's first two gates; the next uncertainty is frozen import,
-  package-data, and native-library behavior inside a real standalone bundle.
-- Expected scope: Medium; add py2app metadata and a clean non-alias build script,
-  keep the development bundle ID visibly non-release, build from the build lock,
-  inspect bundle contents/architectures/linkage, and smoke Finder/CLI launch,
-  default-off IPC, representative importers, history, and SQLite memory.
-- Risks: Hidden imports, missing package data, host-absolute linked libraries,
-  accidental Streamlit/test inclusion, writes inside the signed bundle shape,
-  or describing an ad-hoc artifact as distributable.
-- Success criteria: a clean arm64 standalone bundle launches without `.venv`,
-  passes the bounded scientific/runtime smoke matrix, writes only approved user
-  locations, excludes unrelated dependency groups, and is explicitly labeled
-  local qualification only. No Developer ID signing, notarization, release,
-  sandbox, universal2, or packaged local-read enablement yet.
+- Objective: Select and qualify the Python runtime/deployment target for the
+  first arm64 bundle, then define the clean-machine compatibility matrix.
+- Why this is next: Task 070 proved the frozen application boundary but found
+  macOS 11.0, 14.0, and 26.0 minimums; Homebrew Python 3.12.13 makes the current
+  artifact effectively macOS 26-only and cannot support an honest product floor.
+- Expected scope: Medium; compare controlled arm64 Python 3.12 runtime sources,
+  inspect their Mach-O deployment targets and licensing/provenance, choose the
+  highest justified minimum across runtime and wheels, parameterize the build,
+  and run the existing audit/smoke on clean machines at the proposed minimum and
+  current macOS.
+- Risks: Rewriting deployment metadata without compatible binaries, relying on
+  the build host, mixing runtime provenance, or claiming compatibility from a
+  single machine.
+- Success criteria: one documented reproducible Python runtime produces a clean
+  arm64 bundle whose every Mach-O supports the declared minimum; packaged smoke
+  passes on clean arm64 systems at that minimum and current macOS. No Developer
+  ID signing, notarization, release upload, sandbox, or universal2 yet.
 
 ## AI Context Window
 

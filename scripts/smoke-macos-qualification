@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP="${1:-/tmp/LabAssistantQualification.app}"
+EXECUTABLE="$APP/Contents/MacOS/LabAssistantQualification"
+SMOKE_HOME="$(mktemp -d /tmp/labassistant-packaged-smoke.XXXXXX)"
+trap 'rm -rf "$SMOKE_HOME"' EXIT
+
+[[ -x "$EXECUTABLE" ]] || { echo "Bundle executable not found: $EXECUTABLE" >&2; exit 1; }
+
+HOME="$SMOKE_HOME/home with spaces" \
+LABASSISTANT_DATA_HOME="$SMOKE_HOME/Application Support/LabAssistant" \
+LABASSISTANT_CACHE_HOME="$SMOKE_HOME/Caches/LabAssistant" \
+LABASSISTANT_QUALIFICATION_SMOKE=1 \
+LABASSISTANT_QUALIFICATION_SOURCE="$ROOT_DIR" \
+  "$EXECUTABLE"
+
+[[ -f "$SMOKE_HOME/Application Support/LabAssistant/history/experiments.jsonl" ]]
+[[ -f "$SMOKE_HOME/Application Support/LabAssistant/memory/knowledge.sqlite" ]]
+[[ ! -e "$SMOKE_HOME/Caches/LabAssistant/runtime/read-api.sock" ]]
+
+echo "Packaged scientific/runtime smoke passed; local qualification only."

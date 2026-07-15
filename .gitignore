@@ -12,3 +12,8 @@ __pycache__/
 .codex/
 graphify-out/
 .labassistant_memory/
+
+# Local py2app qualification outputs
+.packaging-venv/
+build/
+dist/

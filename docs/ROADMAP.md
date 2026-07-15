@@ -73,9 +73,10 @@ application query and wired the desktop History timeline plus "Open Existing
 Experiment" to browse and restore persisted records through the application
 boundary. Task 067 selected arm64 py2app with an ad-hoc local qualification
 stage followed by Developer ID signing, hardened runtime, and notarization for
-direct distribution. Sandbox, Mac App Store, universal2, and packaged local-read
-sharing remain separate qualification tracks; runtime paths and dependency
-reproducibility come before the first bundle.
+direct distribution. Tasks 068–070 completed runtime paths, dependency
+reproducibility, and the first local-only standalone arm64 bundle. Sandbox, Mac
+App Store, universal2, and packaged local-read sharing remain separate
+qualification tracks; deployment-runtime compatibility is the next gate.
 
 ## Phase 1: Rename The Product Concepts
 

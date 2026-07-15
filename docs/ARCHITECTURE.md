@@ -53,6 +53,12 @@ Generated Python 3.12 macOS arm64 locks are wheel-only and hash verified, so
 bundle analysis starts from a reproducible native dependency set without
 silently including Streamlit or test tooling.
 
+The first frozen shell is a separate qualification surface, not a release
+variant. `packaging/macos/` owns its py2app entry and visibly local-only bundle
+identity; repository scripts build into `/tmp`, thin every native file to arm64,
+ad-hoc sign, structurally inspect, and exercise a packaged scientific/runtime
+smoke. No packaging code changes the normal desktop launch or enables IPC.
+
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
 

@@ -93,6 +93,28 @@ Normal desktop startup remains listener-free. The opted-in broker stops with
 the app and removes only its owned socket; a compatible separately started
 broker remains externally owned.
 
+### Local macOS Bundle Qualification
+
+On an arm64 Mac, build the explicitly non-release standalone qualification app:
+
+```bash
+scripts/build-macos-qualification
+scripts/inspect-macos-qualification
+scripts/smoke-macos-qualification
+```
+
+The artifact is `/tmp/LabAssistantQualification.app`, carries the development
+identity `dev.labassistant.local-qualification`, is ad-hoc signed, and is labeled
+“Local Only.” It is intentionally outside the repository because it is a
+temporary host-qualification artifact, not a distributable release. The audit
+requires every Mach-O to be arm64 and rejects Streamlit, Plotly, pytest, linked
+development paths, and an invalid signature. The smoke exercises packaged
+DLS/XLSX, chromatography CSV, synthetic OpenLab `.olax`, JSONL history, SQLite
+memory, paths with spaces, and default-off IPC.
+
+This bundle is not Developer ID signed, hardened/notarized, sandboxed,
+universal2, or qualified below the build host's deployment target.
+
 The desktop app opens into a research workspace with reusable experiment,
 metric, analysis, and session-history cards. Streamlit remains available for
 the broader compatibility workflow.

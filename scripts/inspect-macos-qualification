@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP="${1:-/tmp/LabAssistantQualification.app}"
+PLIST="$APP/Contents/Info.plist"
+TARGETS_FILE="$(mktemp /tmp/labassistant-deployment-targets.XXXXXX)"
+trap 'rm -f "$TARGETS_FILE"' EXIT
+
+[[ -d "$APP" ]] || { echo "Bundle not found: $APP" >&2; exit 1; }
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST")" == \
+  "dev.labassistant.local-qualification" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$PLIST")" == \
+  "LabAssistant Qualification (Local Only)" ]]
+
+for excluded in streamlit plotly pytest; do
+  if find "$APP" -type d -iname "$excluded" -print -quit | grep -q .; then
+    echo "Bundle unexpectedly contains $excluded." >&2
+    exit 1
+  fi
+  if unzip -Z1 "$APP/Contents/Resources/lib/python312.zip" | \
+    grep -Eiq "(^|/)$excluded(/|\.py$)"; then
+    echo "Bundle archive unexpectedly contains $excluded." >&2
+    exit 1
+  fi
+done
+
+mach_o_count=0
+while IFS= read -r -d '' candidate; do
+  if file "$candidate" | grep -q 'Mach-O'; then
+    mach_o_count=$((mach_o_count + 1))
+    architectures="$(lipo -archs "$candidate")"
+    [[ "$architectures" == "arm64" ]] || {
+      echo "Unexpected architecture ($architectures): $candidate" >&2
+      exit 1
+    }
+    if otool -L "$candidate" | tail -n +2 | grep -Eq '/Users/|\.venv|\.packaging-venv'; then
+      echo "Mach-O links to a development path: $candidate" >&2
+      exit 1
+    fi
+    vtool -show-build "$candidate" 2>/dev/null | \
+      awk '/minos/{print $2; exit}' >> "$TARGETS_FILE"
+  fi
+done < <(find "$APP" -type f -print0)
+
+(( mach_o_count > 0 )) || { echo "No Mach-O files found." >&2; exit 1; }
+codesign --verify --deep --strict "$APP"
+targets="$(sort -Vu "$TARGETS_FILE" | paste -sd, -)"
+echo "Bundle audit passed: $mach_o_count arm64 Mach-O files; deployment minimums: $targets."
+echo "Local qualification only."

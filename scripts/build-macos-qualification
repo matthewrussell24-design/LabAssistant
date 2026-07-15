@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV="$ROOT_DIR/.packaging-venv"
+BUILD_ROOT="/tmp/labassistant-py2app-build"
+DIST_ROOT="/tmp"
+APP="$DIST_ROOT/LabAssistantQualification.app"
+
+if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
+  echo "The qualification bundle requires an arm64 macOS host." >&2
+  exit 1
+fi
+
+rm -rf "$VENV" "$BUILD_ROOT" "$APP"
+python3.12 -m venv "$VENV"
+"$VENV/bin/python" -m pip install -q --require-hashes \
+  -r "$ROOT_DIR/requirements/locks/build-py312-macos-arm64.txt"
+
+cd "$ROOT_DIR"
+"$VENV/bin/python" packaging/macos/setup.py py2app \
+  --arch arm64 \
+  --bdist-base "$BUILD_ROOT" \
+  --dist-dir "$DIST_ROOT"
+
+while IFS= read -r -d '' candidate; do
+  if file "$candidate" | grep -q 'Mach-O'; then
+    architectures="$(lipo -archs "$candidate")"
+    case " $architectures " in
+      *" arm64 "*) ;;
+      *) echo "Mach-O file has no arm64 slice: $candidate" >&2; exit 1 ;;
+    esac
+    if [[ "$architectures" != "arm64" ]]; then
+      thinned="$candidate.arm64"
+      lipo "$candidate" -thin arm64 -output "$thinned"
+      mv "$thinned" "$candidate"
+    fi
+  fi
+done < <(find "$APP" -type f -print0)
+
+xattr -cr "$APP"
+codesign --force --deep --sign - "$APP"
+codesign --verify --deep --strict "$APP"
+rm -rf "$VENV"
+
+echo "Built local qualification artifact: $APP"
+echo "This ad-hoc bundle is NOT signed for distribution and is NOT a release."
