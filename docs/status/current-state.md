@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted the filtration relationship hypothesis into
-  an immutable, evidence-qualified application read (task 048).
-- Working Tree: Task 048 is committed locally; inspect `git status --short`
+- Latest Completed Change: Audited the Streamlit application boundary, removed
+  its dead domain-type dependency, and completed workflow extraction (task 049).
+- Working Tree: Task 049 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `224 passed in 2.53s` from `scripts/test -q` on
+- Last Successful Test: `224 passed in 2.73s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 048.
+- Last Updated: 2026-07-15 for task 049.
 
 ## North Star
 
@@ -31,8 +31,8 @@ full traceability.
 - Tests: 🟢 Healthy — 224 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
-- Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
-  a second human shell; broader Streamlit workflow extraction continues.
+- Application Layer: 🟡 In Progress — current human workflows cross application
+  contracts, but transitional DLS view-model inputs are not transport-neutral.
 - API Layer: ⚪ Not Started — intentionally deferred until the application
   boundary is mature.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
@@ -64,12 +64,14 @@ are future platform capabilities and are not automatically the next task.
 ## Current Milestone
 
 - Milestone: Application Layer Extraction
-- Status: In Progress
+- Status: Complete
 - Goal: Separate reusable scientific workflows from the Streamlit UI while
   preserving existing functionality and backwards compatibility.
-- Completion signal: Existing human workflows call stable application-layer
-  contracts, reusable logic no longer depends on Streamlit, and compatibility
-  tests protect current behavior.
+- Completion evidence: Existing human workflows call stable application-layer
+  contracts, reusable logic does not depend on Streamlit, compatibility tests
+  protect current behavior, and task 049 classified every remaining direct
+  core import as presentation, input handling, reviewed command data, or
+  transitional UI state.
 
 ## Five-Minute Rule
 
@@ -116,6 +118,10 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
 ```
 
 - `app.py` owns UI layout, widgets, session state, and visualization.
+- Its remaining direct core imports are limited to display formatting and
+  thresholds, widget/input normalization, a reviewed filtration command DTO,
+  and transitional `ParsedSample` workspace typing. The dependency inventory
+  is recorded in `docs/architecture/capabilities.md`.
 - `labassistant.desktop` owns native startup and application invocation;
   `labassistant.ui` owns the pure presenter, local workspace document, and
   AppKit/WebKit controller.
@@ -400,9 +406,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `224 passed in 2.53s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `224 passed in 2.73s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  048.
+  049.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -419,22 +425,22 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Audit the remaining direct Streamlit-to-core dependencies and
-  determine whether the Application Layer Extraction milestone can close or
-  which concrete boundary remains.
-- Why this is next: Active experiment assembly, persistence workflows,
-  scientific reads, and the filtration hypothesis now cross application
-  contracts. Remaining direct imports appear to be presentation formatting,
-  thresholds, input normalization, and transitional `ParsedSample` typing, but
-  that assumption needs an explicit evidence-backed review.
-- Expected scope: Small to medium; classify every non-application import,
-  remove dead dependencies such as any unused domain-only type, document
-  intentional UI ownership, and identify the next genuine capability gap.
-- Risks: Declaring the application layer mature prematurely or converting
-  legitimate presentation/input concerns into unnecessary service contracts.
-- Success criteria: Architecture and handoff records contain a concise
-  dependency inventory, dead boundary leaks are removed, and the milestone has
-  an evidence-based completion decision or one clearly scoped next task.
+- Objective: Define a presentation-neutral DLS evidence input contract and
+  migrate application entry points away from direct `ParsedSample`/view-model
+  coupling while preserving existing Streamlit and desktop behavior.
+- Why this is next: Task 049 completed workflow extraction but confirmed that
+  `labassistant.application` still imports view-model helpers and several public
+  operations accept the UI-shaped `ParsedSample` compatibility type. This is
+  the clearest remaining obstacle to a mature, transport-neutral boundary.
+- Expected scope: Medium; introduce the smallest immutable evidence contract or
+  protocol justified by existing callers, add compatibility adapters, migrate
+  application internals incrementally, and retain current Python entry points.
+- Risks: Duplicating the full DLS measurement model, forcing pandas into a
+  public contract, or breaking history restoration and Streamlit session state.
+- Success criteria: Application contracts and internals no longer require
+  `labassistant.view_models` for migrated paths, compatibility tests prove
+  unchanged scientific output, and the remaining migration is explicitly
+  bounded if it cannot safely land in one task.
 
 ## AI Context Window
 

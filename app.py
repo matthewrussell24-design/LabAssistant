@@ -83,7 +83,6 @@ from labassistant.filtration import (
 )
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
-    RelationshipAnalysis,
 )
 from labassistant.quality import (
     SIGNAL_WARNINGS,
@@ -1893,7 +1892,6 @@ def render_relationship_summary(
     analysis: (
         DLSRelationshipSummary
         | FiltrationRelationshipSummary
-        | RelationshipAnalysis
     ),
 ) -> None:
     if analysis.correlation is None:

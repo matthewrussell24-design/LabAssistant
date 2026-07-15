@@ -54,6 +54,33 @@ parsed-sample contracts while Streamlit retains session and widget state.
 Reviewed filtration reads, single-sample mutation, and CSV batch attachment now
 cross the same boundary with ordered matching results.
 
+### Streamlit Dependency Audit
+
+The task 049 audit classified every direct `app.py` import outside
+`labassistant.application`:
+
+| Dependency | UI ownership | Decision |
+| --- | --- | --- |
+| Aggregation index thresholds and quality status/warning constants | Chart reference lines, badge colors, and warning copy | Intentional presentation dependency |
+| `format_metric` | Display-only number and unit formatting | Intentional presentation dependency |
+| Filtration rubric, pressure labels/conversions, and validation helpers | Widget choices, reviewed input parsing, and normalized-value preview | Intentional input dependency |
+| `FiltrationMeasurement` | Typed payload for the reviewed application command | Intentional in-process command data |
+| Circulation-time unit conversions | Widget choices and session-value validation | Intentional input dependency |
+| `ParsedSample` | Streamlit workspace/session state and local type annotations | Transitional UI state |
+
+`RelationshipAnalysis` was the only dead domain dependency: it widened a
+renderer annotation after all callers had migrated to immutable application
+relationship summaries, so task 049 removed it. No remaining import performs
+workflow orchestration, persistence, or scientific claim construction in
+Streamlit.
+
+This completes extraction for the current human workflows, but it does not make
+the application boundary transport-neutral. `labassistant.application` still
+imports DLS-oriented view-model helpers and accepts `ParsedSample`-shaped
+inputs. The next contract-maturity step is to define a neutral DLS evidence
+input and migrate application entry points without changing Streamlit's local
+workspace state.
+
 ## Implemented Capability Catalog
 
 | Stable name | Python entry point | Status |
@@ -1109,6 +1136,8 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Promote additional UI-owned workflows only when a second shell or existing
-human workflow needs them. Keep desktop packaging and richer presentation
-separate from scientific capability contracts.
+Replace the transitional `ParsedSample` application input with a
+presentation-neutral DLS evidence contract while preserving Streamlit's local
+workspace state and existing compatibility entry points. Keep desktop
+packaging, HTTP transport, and richer presentation separate from that contract
+stabilization work.
