@@ -7,7 +7,11 @@ import pandas as pd
 
 from labassistant.models import Observation
 from labassistant.quality import STATUS_REVIEW, STATUS_WATCH
-from labassistant.dls_evidence import DLSSampleEvidence, sample_status
+from labassistant.dls_evidence import (
+    DLSMeasurementMetrics,
+    DLSSampleEvidence,
+    measurement_metrics,
+)
 
 ParsedSample = DLSSampleEvidence
 
@@ -21,14 +25,15 @@ def observations_from_samples(samples: list[ParsedSample]) -> list[Observation]:
 
 def observations_from_sample(sample: ParsedSample) -> list[Observation]:
     observations: list[Observation] = []
-    warnings = set(sample.warnings)
+    projected = measurement_metrics(sample.measurement)
+    warnings = set(projected.warnings)
 
-    for warning in sample.warnings:
-        observation = _observation_from_warning(sample, warning)
+    for warning in projected.warnings:
+        observation = _observation_from_warning(sample, warning, projected)
         if observation is not None:
             observations.append(observation)
 
-    correlogram_noise = _metric(sample, "Correlogram Noise")
+    correlogram_noise = projected.correlogram_noise_score
     if correlogram_noise is not None:
         if correlogram_noise <= 0.02:
             observations.append(
@@ -121,13 +126,22 @@ def build_experiment_brief_from_observations(observations: list[Observation], sa
     }
 
 
-def _observation_from_warning(sample: ParsedSample, warning: str) -> Observation | None:
-    status = sample_status(sample)
-    severity = "review" if status == STATUS_REVIEW else "watch" if status == STATUS_WATCH else "info"
+def _observation_from_warning(
+    sample: ParsedSample,
+    warning: str,
+    projected: DLSMeasurementMetrics,
+) -> Observation | None:
+    severity = (
+        "review"
+        if projected.status == STATUS_REVIEW
+        else "watch"
+        if projected.status == STATUS_WATCH
+        else "info"
+    )
     source_id = sample.file_name or sample.name
 
     if warning in {"High PDI", "Moderate PDI"}:
-        pdi = _metric(sample, "PDI")
+        pdi = projected.pdi
         return Observation(
             label="High variability",
             category="reproducibility",
@@ -141,7 +155,7 @@ def _observation_from_warning(sample: ParsedSample, warning: str) -> Observation
         )
 
     if warning == "Secondary peak":
-        secondary = _metric(sample, "Secondary Peak")
+        secondary = projected.secondary_peak_nm
         return Observation(
             label="Secondary particle population detected",
             category="particle_quality",
@@ -155,7 +169,7 @@ def _observation_from_warning(sample: ParsedSample, warning: str) -> Observation
         )
 
     if warning == "Large-particle tail":
-        tail = _metric(sample, "Tail Index")
+        tail = projected.tail_index_percent
         return Observation(
             label="Large-particle tail detected",
             category="particle_quality",
@@ -169,7 +183,7 @@ def _observation_from_warning(sample: ParsedSample, warning: str) -> Observation
         )
 
     if warning == "Broad distribution":
-        width = _metric(sample, "Width Ratio")
+        width = projected.width_ratio
         return Observation(
             label="Particle-size distribution broadened",
             category="particle_quality",
@@ -184,7 +198,7 @@ def _observation_from_warning(sample: ParsedSample, warning: str) -> Observation
 
     if warning == "Dual-angle aggregation":
         assessment = sample.measurement.provenance.get("dual_angle_aggregation", {})
-        index = _metric(sample, "Aggregation Index")
+        index = projected.aggregation_index
         category = assessment.get("category")
         evidence_parts = []
         if category:
@@ -267,16 +281,6 @@ def _observation_list(observations: list[Observation]) -> str:
         f"{observation.sample_name}: {observation.label}" if observation.sample_name else observation.label
         for observation in observations
     )
-
-
-def _metric(sample: ParsedSample, metric: str) -> float | None:
-    value = sample.metrics.get(metric)
-    if value is None or pd.isna(value):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 def _format_number(value: Any, unit: str = "", digits: int = 2) -> str:

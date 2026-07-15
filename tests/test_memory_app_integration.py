@@ -13,8 +13,10 @@ from labassistant.models import (
     ChromatographyMeasurement,
     MassBalanceAssessment,
     Measurement,
+    MeasurementFlag,
     MeasurementMetadata,
     Observation,
+    SummaryMetrics,
 )
 from labassistant.view_models import ParsedSample
 
@@ -39,6 +41,8 @@ def make_sample() -> ParsedSample:
         source_text="",
         measurement=Measurement(
             metadata=MeasurementMetadata(sample_name="Lot 1", source_files=["lot1.csv"]),
+            summary_metrics=SummaryMetrics(z_average=125.0, pdi=0.42),
+            flags=[MeasurementFlag(label="Moderate PDI")],
         ),
     )
 

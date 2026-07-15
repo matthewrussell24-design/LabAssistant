@@ -91,8 +91,11 @@ per-sample summaries to the same Measurement-first projection. The workspace
 Task 053 then migrated decision scoring, attention rows, narrative warning
 selection, and distribution-confidence wording to the Measurement-first
 projection. The workspace adapter still carries its compatibility metrics
-dictionary for observation normalization and distribution table selection, so
-the boundary is not yet a transport contract.
+dictionary/table for distribution selection and raw-evidence inspection, so the
+boundary is not yet a transport contract. Task 054 migrated DLS observation
+ordering, evidence values, severity, and correlogram findings to Measurement
+flags and the frozen projection; observation normalization no longer reads the
+workspace dictionary.
 
 ## Implemented Capability Catalog
 
@@ -1150,7 +1153,7 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Migrate DLS observation normalization to authoritative Measurement flags and
-projected metrics while preserving labels, categories, evidence wording,
-severity, confidence, and recommendations. Keep the raw distribution/table
-adapter migration separate.
+Migrate `retrieve_dls_distributions` to authoritative `Measurement.distributions`
+and projected status rather than workspace dataframes and column-name metrics.
+Preserve signal ordering, point filtering/sorting, peaks, fallbacks, and the
+immutable application schema; keep arbitrary raw-table inspection separate.

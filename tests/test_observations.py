@@ -1,6 +1,12 @@
 import pandas as pd
 
-from labassistant.models import Measurement, MeasurementFlag, MeasurementMetadata
+from labassistant.models import (
+    DerivedMetrics,
+    Measurement,
+    MeasurementFlag,
+    MeasurementMetadata,
+    SummaryMetrics,
+)
 from labassistant.observations import (
     build_experiment_brief_from_observations,
     observation_table,
@@ -21,6 +27,19 @@ def make_sample(name: str, warnings: list[str], metrics: dict | None = None, pro
         "Correlogram Noise": None,
     }
     base_metrics.update(metrics or {})
+    measurement = Measurement(
+        metadata=MeasurementMetadata(sample_name=name),
+        summary_metrics=SummaryMetrics(pdi=base_metrics.get("PDI")),
+        derived_metrics=DerivedMetrics(
+            secondary_peak_nm=base_metrics.get("Secondary Peak"),
+            tail_index_percent=base_metrics.get("Tail Index"),
+            width_ratio=base_metrics.get("Width Ratio"),
+            aggregation_index=base_metrics.get("Aggregation Index"),
+            correlogram_noise_score=base_metrics.get("Correlogram Noise"),
+        ),
+        flags=[MeasurementFlag(label=warning) for warning in warnings],
+        provenance=provenance or {},
+    )
     return ParsedSample(
         name=name,
         file_name=f"{name}.xlsx",
@@ -29,11 +48,7 @@ def make_sample(name: str, warnings: list[str], metrics: dict | None = None, pro
         metrics=base_metrics,
         warnings=warnings,
         source_text="",
-        measurement=Measurement(
-            metadata=MeasurementMetadata(sample_name=name),
-            flags=[MeasurementFlag(label=warning) for warning in warnings],
-            provenance=provenance or {},
-        ),
+        measurement=measurement,
     )
 
 
@@ -94,3 +109,24 @@ def test_experiment_brief_uses_observation_severity():
     assert any("Reproducibility observations" in item for item in brief["Why might it have happened?"])
     assert "Observation" not in table.columns
     assert {"label", "category", "severity", "evidence"}.issubset(table.columns)
+
+
+def test_observations_ignore_workspace_overrides_and_preserve_flag_order():
+    sample = make_sample(
+        "Flagged",
+        ["Moderate PDI", "Large-particle tail", "Moderate PDI"],
+        metrics={"PDI": 0.35, "Tail Index": 7.2},
+    )
+    expected = observations_from_sample(sample)
+
+    sample.metrics["PDI"] = 9.99
+    sample.metrics["Tail Index"] = 99.0
+    sample.warnings.clear()
+
+    actual = observations_from_sample(sample)
+    assert actual == expected
+    assert [observation.label for observation in actual] == [
+        "High variability",
+        "Large-particle tail detected",
+        "High variability",
+    ]

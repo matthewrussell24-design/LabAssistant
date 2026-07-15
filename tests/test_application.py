@@ -965,23 +965,7 @@ def _import_fixture_measurements(fixture_dir):
 
 
 def test_dls_experiment_creation_is_available_outside_streamlit():
-    sample = ParsedSample(
-        name="Lot 1",
-        file_name="lot1.csv",
-        data=None,
-        metadata={},
-        metrics={
-            "PDI": 0.42,
-            "Secondary Peak": None,
-            "Tail Index": None,
-            "Width Ratio": None,
-            "Aggregation Index": None,
-            "Correlogram Noise": None,
-        },
-        warnings=["Moderate PDI"],
-        source_text="",
-        measurement=Measurement(metadata=MeasurementMetadata(sample_name="Lot 1")),
-    )
+    sample = _decision_sample("Lot 1", 0.42, ["Moderate PDI"])
 
     experiment = dls_experiment_from_samples([sample], label="Run A", source_files=["lot1.csv"])
 
@@ -993,16 +977,7 @@ def test_dls_experiment_creation_is_available_outside_streamlit():
 
 
 def test_generate_observations_returns_immutable_dls_findings_and_fresh_domain_copies():
-    sample = ParsedSample(
-        name="Lot 1",
-        file_name="lot1.csv",
-        data=None,
-        metadata={},
-        metrics={"PDI": 0.42, "Correlogram Noise": None},
-        warnings=["Moderate PDI"],
-        source_text="",
-        measurement=Measurement(metadata=MeasurementMetadata(sample_name="Lot 1")),
-    )
+    sample = _decision_sample("Lot 1", 0.42, ["Moderate PDI"])
 
     result = generate_observations([sample], technique=" dls ")
 

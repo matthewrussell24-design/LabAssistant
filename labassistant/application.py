@@ -2257,7 +2257,10 @@ def generate_observations(
     if normalized_technique == "dls":
         if assessment is not None:
             raise ValueError("DLS observation generation does not accept an assessment")
-        if any(not hasattr(item, "measurement") or not hasattr(item, "warnings") for item in evidence):
+        if any(
+            not isinstance(getattr(item, "measurement", None), Measurement)
+            for item in evidence
+        ):
             raise TypeError("DLS observation evidence must contain parsed samples")
         observations = observations_from_samples(evidence)
         public_technique = "DLS"

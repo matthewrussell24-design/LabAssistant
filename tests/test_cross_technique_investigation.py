@@ -7,10 +7,12 @@ from labassistant.chromatography import (
 from labassistant.filtration import observations_from_filtration_measurement
 from labassistant.investigator import investigate
 from labassistant.models import (
+    DerivedMetrics,
     Experiment,
     FiltrationMeasurement,
     MassBalanceAssessment,
     Measurement,
+    MeasurementFlag,
     MeasurementMetadata,
 )
 from labassistant.observations import observations_from_sample
@@ -29,6 +31,8 @@ def test_cross_technique_investigation_links_missing_mass_particles_and_filtrati
         source_text="",
         measurement=Measurement(
             metadata=MeasurementMetadata(sample_name=sample_name),
+            derived_metrics=DerivedMetrics(aggregation_index=0.71),
+            flags=[MeasurementFlag(label="Dual-angle aggregation")],
             provenance={
                 "dual_angle_aggregation": {
                     "category": "Strong signal, corroborated",
