@@ -54,7 +54,7 @@ PROTECTED_READS = frozenset(CANDIDATE_READS[2:])
 
 HISTORY_READ = "history:read"
 MEMORY_READ = "memory:read"
-LOCAL_CLIENTS = ("labassistant-ui", "labassistant-cli")
+LOCAL_CLIENTS = ("labassistant-ui", "labassistant-cli", "labassistant-local-broker")
 
 REQUIRED_SCOPES = {
     "list_experiments": HISTORY_READ,

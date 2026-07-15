@@ -85,6 +85,20 @@ The desktop app opens into a research workspace with reusable experiment,
 metric, analysis, and session-history cards. Streamlit remains available for
 the broader compatibility workflow.
 
+The stable seven-read `1.0` contract is also available through an explicit
+foreground, owner-only local broker on macOS:
+
+```bash
+scripts/run-read-broker
+scripts/read-api describe_platform
+scripts/read-api list_experiments --parameters '{"limit": 5}'
+```
+
+The broker uses Unix-domain IPC, verifies the connecting OS user, and never
+opens a network port. Stop it with `Ctrl-C`. Its first trust boundary is the
+current local OS user; it is not remote authentication and does not expose
+writes.
+
 ## Product Direction
 
 LabAssistant should eventually support multiple analytical techniques:

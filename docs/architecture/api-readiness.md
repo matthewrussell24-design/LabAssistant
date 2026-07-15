@@ -170,10 +170,26 @@ in-process boundary, not a server, remote authentication mechanism, or endpoint
 grant. Access context is host-asserted and is never accepted inside request
 parameters; loopback alone is not treated as identity.
 
+## Local Transport Implementation
+
+Task 063 implemented ADR 004 in `labassistant.local_read_transport`:
+
+- an explicit foreground Unix-domain broker with owner-only runtime/socket
+  modes and guarded stale-socket cleanup;
+- macOS `getpeereid` verification through the Python standard library, failing
+  closed when peer identity is unavailable or belongs to another user;
+- bounded newline-delimited JSON frames that wrap the unchanged stable `1.0`
+  envelope and reject fields outside the public transport request;
+- broker-derived subject, fixed approved client identity, local origin, and
+  server-owned history/memory scopes;
+- a diagnostic client and launch scripts for independent-process verification.
+
+The implementation remains a same-local-user boundary. It does not distinguish
+two processes owned by that user, run as a daemon, bind TCP, or expose writes.
+
 ## Go/No-Go
 
-**Go for a minimal foreground Unix-domain read broker, conditional on proving
-peer-credential retrieval on the supported macOS/Python runtime.**
+**The minimal foreground Unix-domain read broker is implemented.**
 
 ADR 004 selects owner-only Unix-domain stream IPC with newline-delimited JSON.
 The broker, not the request, derives the local OS subject and supplies a fixed
@@ -182,8 +198,7 @@ stable application envelope remains nested unchanged inside transport framing.
 The trust claim is deliberately limited to the same local OS user; it does not
 distinguish or protect against a malicious process already running as that user.
 
-The stable contract does not itself open a socket, authenticate remote clients,
-or approve writes. See
+The stable contract does not authenticate remote clients or approve writes. See
 [`004-local-read-only-transport.md`](../decisions/004-local-read-only-transport.md)
 for lifecycle, framing, alternatives, and the implementation gate.
 

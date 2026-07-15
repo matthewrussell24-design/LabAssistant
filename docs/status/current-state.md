@@ -9,11 +9,11 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Selected owner-only Unix-domain IPC for the first
-  local read transport and documented its trust/lifecycle gate (task 062).
-- Working Tree: Task 062 is committed locally; inspect `git status --short`
+- Latest Completed Change: Implemented the foreground owner-only Unix-domain
+  read broker and diagnostic client (task 063).
+- Working Tree: Task 063 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `237 passed in 2.48s` from `scripts/test -q` on
+- Last Successful Test: `248 passed in 2.53s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
 - Last Updated: 2026-07-15 for task 062.
@@ -34,8 +34,8 @@ full traceability.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
   Measurement-first, raw vendor inspection is explicitly adapter-bounded, and
   reusable human workflows cross typed application contracts.
-- API Layer: 🟢 Transport Designed — seven reads have stable `1.0` shapes and
-  owner-only Unix-domain IPC is selected; the broker is not implemented.
+- API Layer: 🟢 Local Transport Available — seven stable `1.0` reads are exposed
+  through a bounded, same-user Unix-domain broker; no remote or write API exists.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
 
 Health labels summarize the evidence in the detailed sections below. Update a
@@ -64,9 +64,9 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: Local Read Transport Design
+- Milestone: Local Read Transport
 - Status: Complete
-- Goal: Select a local transport and trust boundary without opening a listener.
+- Goal: Prove an independent local client can use exactly the stable read surface.
 - Current evidence: Task 057 audited all 42 registry entries, selected seven
   candidate reads, defined draft-to-stable versioning, and recorded a no-go for
   HTTP or agent transports until shared envelopes, stable errors, access
@@ -79,7 +79,9 @@ are future platform capabilities and are not automatically the next task.
   resolved both blockers and promoted only the external seven-read contract to
   stable `1.0`; the internal registry remains unchanged. Task 062 selected a
   foreground Unix-domain read broker, documented same-user trust limits, and
-  made peer-credential verification the implementation gate.
+  made peer-credential verification the implementation gate. Task 063 passed
+  that gate on macOS/Python 3.12 and implemented bounded framing, broker-owned
+  access mapping, safe socket lifecycle, and a diagnostic client.
 
 ## Five-Minute Rule
 
@@ -146,6 +148,9 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   scientific-context and Research Journal reads, and a transport-independent
   registry of forty-two stable capability names, including explicit
   human/CLI-only note, experiment-history, and reviewed-evidence commands.
+- `labassistant.local_read_transport` exposes only the stable seven-read
+  projection through foreground owner-only Unix-domain IPC and derives access
+  context from verified macOS peer credentials.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -408,6 +413,8 @@ architecture rationale.
   golden seven-read contract to stable `1.0` (task 061).
 - Selected Unix-domain IPC for the first local read transport and documented
   threat assumptions, framing, lifecycle, and implementation gates (task 062).
+- Implemented the bounded foreground Unix-domain broker, diagnostic CLI, and
+  same-user peer verification for all seven stable reads (task 063).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -423,8 +430,8 @@ architecture rationale.
 
 ## Active Work
 
-- Local transport selection task 062 is complete; no listener was implemented.
-- The working tree was clean when task 062 began.
+- Local broker task 063 is complete; no remote listener or write route was added.
+- The working tree was clean when task 063 began.
 
 ## Known Risks
 
@@ -461,7 +468,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `237 passed in 2.48s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `248 passed in 2.53s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -480,21 +487,20 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Implement the minimal foreground Unix-domain read broker selected
-  by ADR 004, beginning with a peer-credential compatibility spike.
-- Why this is next: The contract and transport decisions are complete; a small
-  adapter is the shortest path to proving an independent local client without
-  expanding the application surface.
-- Expected scope: Medium; add strict transport frames and limits, broker-derived
-  access context, guarded socket lifecycle, a diagnostic CLI client, and focused
-  integration tests for all seven reads and failure paths.
-- Risks: Platform-specific peer credentials, unsafe stale-socket cleanup,
-  leaking exception/path details, or accidentally exposing the internal
-  42-capability registry.
-- Success criteria: supported macOS/Python peers are verified or fail closed;
-  the owner-only foreground broker exposes exactly seven stable reads; bounds,
-  errors, cleanup, and desktop/CLI smoke tests pass. No writes, background daemon,
-  remote listener, agent runtime, or instrument control is authorized.
+- Objective: Define and implement the first typed local read client SDK over the
+  stable broker without adding an autonomous agent runtime.
+- Why this is next: Independent transport is proven, but callers currently
+  receive raw dictionaries. A small typed client is the remaining reusable
+  boundary before any future agent or additional shell integration.
+- Expected scope: Medium; define client result/error types, connection and
+  contract-version behavior, capability-specific read methods, and compatibility
+  tests against the foreground broker while retaining the diagnostic CLI.
+- Risks: Duplicating stable schemas, hiding application errors as transport
+  failures, automatic broker startup, or implying write/remote support.
+- Success criteria: typed client calls cover exactly seven reads, preserve
+  stable application errors and transport failures distinctly, and pass an
+  independent-process compatibility smoke. No autonomous runtime, writes,
+  background service, remote transport, or desktop lifecycle coupling.
 
 ## AI Context Window
 

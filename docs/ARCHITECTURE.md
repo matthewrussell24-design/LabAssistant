@@ -25,8 +25,9 @@ Future agent clients use stable read-only app contracts before write commands.
 
 The first selected external boundary is local Unix-domain IPC, documented in
 ADR 004. Its initial form is an explicit foreground read-only broker over the
-stable seven-read `1.0` contract. It is not yet implemented, does not bind a
-network port, and does not authorize writes or remote clients.
+stable seven-read `1.0` contract. Task 063 implemented that broker with verified
+same-user macOS peer credentials and bounded Unix-domain framing. It does not
+bind a network port or authorize writes or remote clients.
 
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
