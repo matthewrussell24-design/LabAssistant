@@ -56,7 +56,6 @@ from labassistant.application import (
     DLSRawPointTable,
     DLSCorrelograms,
     DLSPairedAngleSample,
-    dls_experiment_from_samples,
     find_related_experiments,
     produce_experiment_brief,
     rank_dls_decisions,
@@ -281,8 +280,7 @@ def render_decision_brief(samples: list[ParsedSample]) -> None:
 
 
 def render_experiment_brief(samples: list[ParsedSample]) -> None:
-    experiment = dls_experiment_from_samples(samples, label="Current DLS experiment")
-    brief = produce_experiment_brief(experiment)
+    brief = produce_experiment_brief(samples, label="Current DLS experiment")
 
     st.subheader("Experiment Brief")
     st.caption("Generated from normalized observations derived from the current DLS measurements.")

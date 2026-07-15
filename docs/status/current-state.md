@@ -9,15 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Promoted reviewed DLS and chromatography
-  scientific-memory saves behind application inputs and immutable receipts
-  (task 046).
-- Working Tree: Task 046 is committed locally; inspect `git status --short`
+- Latest Completed Change: Extended the immutable Experiment Brief with parsed
+  DLS inputs and removed Streamlit's final DLS experiment assembly (task 047).
+- Working Tree: Task 047 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `218 passed in 2.23s` from `scripts/test -q` on
+- Last Successful Test: `220 passed in 2.59s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 046.
+- Last Updated: 2026-07-15 for task 047.
 
 ## North Star
 
@@ -29,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 212 passing.
+- Tests: 🟢 Healthy — 220 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -344,6 +343,9 @@ architecture rationale.
 - Promoted reviewed DLS and chromatography scientific-memory saves into a
   mutation-safe application command with immutable receipts while keeping
   selection, labels, project tags, notes, and confirmation in Streamlit (task 046).
+- Extended the immutable generic Experiment Brief with parsed-DLS inputs and
+  removed Streamlit's final direct DLS experiment assembly while preserving
+  authoritative `Experiment` callers (task 047).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -359,8 +361,8 @@ architecture rationale.
 
 ## Active Work
 
-- Reviewed scientific-memory save task 046 is complete.
-- The working tree was clean when task 046 began.
+- DLS Experiment Brief input task 047 is complete.
+- The working tree was clean when task 047 began.
 
 ## Known Risks
 
@@ -395,9 +397,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `218 passed in 2.23s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `220 passed in 2.59s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  046.
+  047.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -414,20 +416,20 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Let the DLS Experiment Brief accept parsed samples directly so
-  Streamlit does not assemble a domain `Experiment` before requesting the
-  immutable report preview.
-- Why this is next: `render_experiment_brief` is now the final Streamlit caller
-  of `dls_experiment_from_samples`; all other active DLS experiment assembly for
-  saved workspaces and scientific-memory writes is application-owned.
-- Expected scope: Small; preserve the current DLS label, normalized
-  observations, section ordering, completeness and interpretability fields,
-  display text, and established generic `Experiment` callers.
-- Risks: Narrowing the generic Experiment-first report contract or changing
-  observation generation and experiment identity semantics.
-- Success criteria: Streamlit requests the DLS Experiment Brief from parsed
-  samples through the application layer without importing or calling
-  `dls_experiment_from_samples`.
+- Objective: Promote the qualified filtration relationship hypothesis into an
+  immutable application read instead of authoring the scientific claim in a
+  static Streamlit callout.
+- Why this is next: Experiment assembly is now application-owned for active
+  Streamlit workflows, while `render_filtration_hypothesis_callout` still owns
+  a cross-technique scientific hypothesis in presentation code; hypothesis
+  generation is the remaining named capability candidate.
+- Expected scope: Small to medium; preserve cautious non-causal wording,
+  circulation-time, forward-size/PDI, and orthogonal-filtration relationships,
+  empty/insufficient-evidence behavior, and the existing trend read.
+- Risks: Overstating correlation as causation or hiding the working hypothesis
+  before the minimum evidence exists.
+- Success criteria: Streamlit renders application-provided, evidence-qualified
+  hypothesis text and contains no presentation-authored scientific claim.
 
 ## AI Context Window
 

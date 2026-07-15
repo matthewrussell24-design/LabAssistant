@@ -1021,20 +1021,26 @@ is the first composed application caller.
 
 **Name:** `produce_experiment_brief`
 
-**Purpose:** Compose an instrument-independent report preview from an Experiment
-without coupling scientific reasoning to Streamlit, document export, or DLS-only
-decision ranking.
+**Purpose:** Compose an instrument-independent report preview from an
+authoritative Experiment, with a DLS convenience composition for parsed
+samples, without coupling scientific reasoning to Streamlit, document export,
+or DLS-only decision ranking.
 
-**Inputs:** One `Experiment` containing its normalized observations and evidence counts.
+**Inputs:** One `Experiment` containing its normalized observations and evidence
+counts, or a non-empty list/tuple of parsed DLS samples plus an optional label.
+The parsed-sample path assembles the same DLS experiment and normalized
+observations inside the application boundary; established Experiment callers
+remain authoritative and unchanged.
 
 **Outputs:** A deeply frozen, versioned `ExperimentBriefPreview` containing an
 immutable experiment identity, summary, completeness and interpretability state,
 five canonical report sections, and immutable observation evidence. Serialization
 returns plain dictionaries and lists without exposing domain models or DataFrames.
 
-**Expected Errors:** `TypeError` when the input is not an `Experiment`. Empty
-observation streams produce a valid non-interpretable preview through the established
-Investigator behavior.
+**Expected Errors:** `ValueError` for empty parsed DLS evidence and `TypeError`
+for unsupported or malformed inputs. Empty observation streams on an
+authoritative Experiment produce a valid non-interpretable preview through the
+established Investigator behavior.
 
 **Caller Types:** Human UI, Agent, CLI, Future API. Streamlit's generic Experiment
 Brief is the first direct caller.

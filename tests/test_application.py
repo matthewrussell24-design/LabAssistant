@@ -267,7 +267,7 @@ def test_produce_experiment_brief_composes_immutable_investigator_preview():
         ],
     )
 
-    result = produce_experiment_brief(experiment)
+    result = produce_experiment_brief(experiment, label="Ignored for Experiment input")
     experiment.label = "Changed"
     experiment.observations[0].label = "Changed"
 
@@ -284,8 +284,36 @@ def test_produce_experiment_brief_composes_immutable_investigator_preview():
 
 
 def test_produce_experiment_brief_rejects_non_experiment_input():
-    with raises(TypeError, match="must be an Experiment"):
+    with raises(TypeError, match="must be an Experiment or parsed DLS samples"):
         produce_experiment_brief(object())
+
+
+def test_produce_experiment_brief_accepts_parsed_dls_samples():
+    sample = _decision_sample("Lot 1", 0.42, ["Moderate PDI"])
+
+    result = produce_experiment_brief(
+        [sample],
+        label="Current DLS experiment",
+    )
+    sample.name = "Changed by caller"
+    sample.warnings.append("Changed by caller")
+
+    assert result.experiment.label == "Current DLS experiment"
+    assert result.experiment.technique == "DLS"
+    assert result.experiment.instrument == "DLS"
+    assert result.experiment.measurement_count == 1
+    assert result.experiment.observation_count == 1
+    assert result.experiment.observation_categories == (("reproducibility", 1),)
+    assert result.observations[0].label == "High variability"
+    assert result.observations[0].sample_name == "Lot 1"
+    assert len(result.sections) == 5
+
+
+def test_produce_experiment_brief_validates_parsed_dls_samples():
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        produce_experiment_brief([])
+    with raises(TypeError, match="must contain parsed samples"):
+        produce_experiment_brief([object()])
 
 
 def test_retrieve_related_context_returns_immutable_ranked_provenance(tmp_path):

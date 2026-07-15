@@ -1809,11 +1809,28 @@ def investigate_experiment(experiment: Experiment) -> ExperimentInvestigation:
     )
 
 
-def produce_experiment_brief(experiment: Experiment) -> ExperimentBriefPreview:
-    """Compose a stable report preview from an Experiment and Investigator result."""
+def produce_experiment_brief(
+    evidence: Any,
+    *,
+    label: str = "",
+) -> ExperimentBriefPreview:
+    """Compose a stable report preview from an Experiment or parsed DLS samples."""
 
-    if not isinstance(experiment, Experiment):
-        raise TypeError("Experiment brief input must be an Experiment")
+    if isinstance(evidence, Experiment):
+        experiment = evidence
+    elif isinstance(evidence, (list, tuple)):
+        if not evidence:
+            raise ValueError("At least one parsed DLS sample is required")
+        if any(
+            not hasattr(sample, "name") or not hasattr(sample, "measurement")
+            for sample in evidence
+        ):
+            raise TypeError("Experiment brief DLS evidence must contain parsed samples")
+        experiment = dls_experiment_from_samples(list(evidence), label=label)
+    else:
+        raise TypeError(
+            "Experiment brief input must be an Experiment or parsed DLS samples"
+        )
     investigation = investigate_experiment(experiment)
     snapshot = build_experiment_snapshot(experiment)
     return ExperimentBriefPreview(
