@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import labassistant.api_readiness as api
-from labassistant.application import AGENT_API_VERSION, ExperimentListing
+from labassistant.application import AGENT_API_VERSION, ExperimentListing, list_capabilities
 from labassistant.history import ExperimentRecordNotFoundError
 
 
@@ -37,7 +37,7 @@ def assert_golden_fields(payload, expected):
         value = payload
         if path:
             for part in path.split("."):
-                value = value[part]
+                value = value[int(part)] if isinstance(value, list) else value[part]
         assert sorted(value) == sorted(fields)
 
 
@@ -165,7 +165,7 @@ def test_all_candidate_reads_produce_deterministic_json_envelopes(monkeypatch):
         payload = result.to_dict()
         payloads[capability] = payload
         assert payload["ok"] is True
-        assert payload["api_version"] == AGENT_API_VERSION
+        assert payload["api_version"] == api.PUBLIC_READ_CONTRACT_VERSION
         assert payload["capability"] == capability
         assert json.loads(json.dumps(payload, allow_nan=False)) == payload
 
@@ -183,7 +183,6 @@ def test_all_candidate_reads_produce_deterministic_json_envelopes(monkeypatch):
                 "saved_at": "2026-07-15T12:00:00+00:00",
                 "label": "Run 1",
                 "measurement_count": 2,
-                "api_version": AGENT_API_VERSION,
             }
         ],
         "pagination": {
@@ -193,8 +192,26 @@ def test_all_candidate_reads_produce_deterministic_json_envelopes(monkeypatch):
             "total": 1,
             "has_more": False,
         },
-        "api_version": AGENT_API_VERSION,
     }
+
+    platform = payloads["describe_platform"]["data"]
+    assert [item["name"] for item in platform["capabilities"]] == list(
+        api.CANDIDATE_READS
+    )
+    assert platform["contract_version"] == "1.0"
+    assert platform["contract_status"] == "stable"
+    for item in platform["capabilities"]:
+        assert item["request_parameters"] == list(
+            api.REQUEST_PARAMETERS[item["name"]]
+        )
+        assert item["required_scope"] == api.REQUIRED_SCOPES.get(item["name"])
+    access = payloads["describe_agent_access"]["data"]
+    assert access["public_capabilities"] == list(api.CANDIDATE_READS[:2])
+    assert access["protected_capabilities"] == list(api.CANDIDATE_READS[2:])
+    assert access["writes_allowed"] is False
+    assert access["remote_authentication"] is False
+    assert len(list_capabilities()) == 42
+    assert "api_version" not in json.dumps(payloads["list_experiments"]["data"])
 
     history = api.invoke_candidate_read(
         "retrieve_history_overview",
@@ -332,10 +349,11 @@ def test_error_code_catalog_is_stable_and_complete():
     assert list(api.ERROR_CODES) == GOLDEN_SHAPE["error"]["codes"]
     for code in api.ERROR_CODES:
         payload = api.APIErrorEnvelope(
-            api_version=AGENT_API_VERSION,
+            api_version=api.PUBLIC_READ_CONTRACT_VERSION,
             capability="candidate",
             error=api.APIError(code=code, message="message"),
         ).to_dict()
+        assert payload["api_version"] == "1.0"
         assert_golden_fields(
             payload,
             {

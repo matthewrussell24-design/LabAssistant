@@ -5,11 +5,10 @@ freeze for an external read-only transport, and what must happen first?
 
 ## Decision
 
-Transport implementation is **not ready yet**. The application layer is mature;
-tasks 058 and 059 completed the draft response/error boundary, local read
-policy, and bounded collections. Task 060 captured the golden shapes and made an
-explicit **remain-draft** decision because discovery and version layers are not
-yet cleanly separated.
+The seven-read external contract is **stable at version `1.0`**. Tasks 058 and
+059 completed envelopes, errors, local read policy, and bounded collections;
+task 060 captured golden shapes; task 061 separated public discovery/versioning
+from internal application DTOs and passed the repeated freeze review.
 
 The first transport should expose only seven read candidates after the bounded
 hardening gate below. Registry presence does not imply external stability.
@@ -116,8 +115,8 @@ Before selecting or implementing a transport:
   subject, known client, local origin, and capability-specific scope. This is a
   local host policy, not remote authentication.
 - ✅ JSON conformance and failure-mapping tests cover all seven candidates.
-- 🟡 Stable version: the final review retained `0.1-draft` until public discovery
-  and external-versus-internal version separation are complete.
+- ✅ Stable version: the reviewed external read contract is `1.0`; internal
+  application DTOs remain independently versioned at `0.1-draft`.
 
 ## Task 060 Freeze Review
 
@@ -145,6 +144,27 @@ Pagination and local policy passed review. Offset paging is acceptable for the
 initial single-user, append-only local stores as long as clients treat each page
 as a point-in-time read rather than a snapshot transaction.
 
+## Task 061 Stable Review
+
+Decision: **promote the seven-read external contract to `1.0`**.
+
+- `describe_platform` exposes exactly the seven reviewed reads with purpose,
+  access class, required scope, accepted parameters, and contract version.
+- `describe_agent_access` describes only the host-asserted local read policy; it
+  does not claim remote authentication or write access.
+- The envelope uses `PUBLIC_READ_CONTRACT_VERSION`; internal DTO `api_version`
+  fields are removed recursively from external data rather than relabeled.
+- The 42-entry application registry and all existing handlers remain unchanged.
+- Golden success/error fixtures passed after the projection changes.
+
+Compatibility promise:
+
+- Error codes and golden field semantics are stable at `1.0`; human-readable
+  error messages are descriptive and are not compatibility keys.
+- Additive optional fields require a minor version increment.
+- Removals, renames, required fields, type changes, and semantic changes require
+  a major version increment.
+
 The conformance implementation lives in `labassistant.api_readiness`. It is an
 in-process boundary, not a server, remote authentication mechanism, or endpoint
 grant. Access context is host-asserted and is never accepted inside request
@@ -152,12 +172,12 @@ parameters; loopback alone is not treated as identity.
 
 ## Go/No-Go
 
-**No-go for an HTTP server or agent SDK today.**
+**Go for selecting and designing the first local read-only transport.**
 
-**Go for the next task:** add a seven-read public discovery projection and an
-independent external contract-version constant, then update the golden fixtures
-and repeat the freeze decision. That work still does not choose a framework,
-open a port, or grant write access.
+The stable contract does not itself open a port, authenticate remote clients,
+or approve writes. The next task should choose a local transport and define how
+its trusted host maps identity/scopes into `LocalReadAccessContext` before any
+listener is implemented.
 
 ## Deliberate Deferrals
 

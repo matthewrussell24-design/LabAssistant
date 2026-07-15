@@ -11,6 +11,7 @@ from labassistant.application import (
     ExperimentListing,
     agent_access_policy,
     app_manifest,
+    get_capability,
     list_experiments,
     retrieve_experiment,
     retrieve_history_overview,
@@ -26,6 +27,9 @@ CONFLICT = "conflict"
 UNSUPPORTED_EVIDENCE = "unsupported_evidence"
 ACCESS_DENIED = "access_denied"
 INTERNAL_FAILURE = "internal_failure"
+
+PUBLIC_READ_CONTRACT_VERSION = "1.0"
+PUBLIC_READ_CONTRACT_STATUS = "stable"
 
 ERROR_CODES = (
     INVALID_INPUT,
@@ -62,6 +66,23 @@ REQUIRED_SCOPES = {
 
 DEFAULT_PAGE_LIMIT = 25
 MAX_PAGE_LIMIT = 100
+
+REQUEST_PARAMETERS = {
+    "describe_platform": (),
+    "describe_agent_access": (),
+    "list_experiments": ("limit", "offset"),
+    "retrieve_history_overview": ("limit", "offset"),
+    "retrieve_experiment": ("record_id",),
+    "retrieve_related_context": ("question", "tags", "limit"),
+    "retrieve_research_journal": (
+        "keyword",
+        "tag",
+        "instrument",
+        "sample",
+        "limit",
+        "offset",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -144,7 +165,7 @@ class ExperimentListings:
 
 @dataclass(frozen=True)
 class APIError:
-    """Stable draft error payload without internal exception details."""
+    """Stable error payload without internal exception details."""
 
     code: str
     message: str
@@ -238,11 +259,12 @@ def invoke_candidate_read(
             items, page = _page(tuple(result), **bounds)
             result = ExperimentListings(items=items, pagination=page)
         data = _bounded_data(capability, _serialize_result(result), bounds)
-        json.dumps(data, allow_nan=False)
+        public_data = _public_data(capability, data)
+        json.dumps(public_data, allow_nan=False)
         return APISuccessEnvelope(
-            api_version=AGENT_API_VERSION,
+            api_version=PUBLIC_READ_CONTRACT_VERSION,
             capability=capability,
-            data=data,
+            data=public_data,
         )
     except ExperimentRecordNotFoundError:
         return _error(capability, NOT_FOUND, "Experiment record was not found")
@@ -462,9 +484,57 @@ def _serialize_result(result: Any) -> Any:
     raise TypeError("Candidate read returned an unsupported result")
 
 
+def _public_data(capability: str, data: Any) -> Any:
+    if capability == "describe_platform":
+        return {
+            "name": data["name"],
+            "direction": data["direction"],
+            "primary_surface": data["primary_surface"],
+            "contract_version": PUBLIC_READ_CONTRACT_VERSION,
+            "contract_status": PUBLIC_READ_CONTRACT_STATUS,
+            "capabilities": [_public_capability(name) for name in CANDIDATE_READS],
+        }
+    if capability == "describe_agent_access":
+        return {
+            "contract_version": PUBLIC_READ_CONTRACT_VERSION,
+            "status": "local_read_only",
+            "access_model": "host_asserted_local_policy",
+            "public_capabilities": list(CANDIDATE_READS[:2]),
+            "protected_capabilities": list(CANDIDATE_READS[2:]),
+            "scopes": [HISTORY_READ, MEMORY_READ],
+            "writes_allowed": False,
+            "remote_authentication": False,
+        }
+    return _without_internal_versions(data)
+
+
+def _public_capability(name: str) -> dict[str, Any]:
+    contract = get_capability(name)
+    return {
+        "name": name,
+        "purpose": contract.purpose,
+        "access": "scoped_local" if name in PROTECTED_READS else "public",
+        "required_scope": REQUIRED_SCOPES.get(name),
+        "request_parameters": list(REQUEST_PARAMETERS[name]),
+        "contract_version": PUBLIC_READ_CONTRACT_VERSION,
+    }
+
+
+def _without_internal_versions(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _without_internal_versions(item)
+            for key, item in value.items()
+            if key != "api_version"
+        }
+    if isinstance(value, list):
+        return [_without_internal_versions(item) for item in value]
+    return value
+
+
 def _error(capability: str, code: str, message: str) -> APIErrorEnvelope:
     return APIErrorEnvelope(
-        api_version=AGENT_API_VERSION,
+        api_version=PUBLIC_READ_CONTRACT_VERSION,
         capability=capability,
         error=APIError(code=code, message=message),
     )

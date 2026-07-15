@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Captured golden seven-read shapes and recorded the
-  explicit remain-draft freeze decision (task 060).
-- Working Tree: Task 060 is committed locally; inspect `git status --short`
+- Latest Completed Change: Stabilized the seven-read external contract at `1.0`
+  with public-only discovery and independent versioning (task 061).
+- Working Tree: Task 061 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `237 passed in 2.90s` from `scripts/test -q` on
+- Last Successful Test: `237 passed in 2.81s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 060.
+- Last Updated: 2026-07-15 for task 061.
 
 ## North Star
 
@@ -34,9 +34,8 @@ full traceability.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
   Measurement-first, raw vendor inspection is explicitly adapter-bounded, and
   reusable human workflows cross typed application contracts.
-- API Layer: 🟡 Foundation — seven candidates have golden draft shapes, scoped
-  local access, and bounds; public discovery/version separation blocks a stable
-  version and transport selection.
+- API Layer: 🟢 Contract Ready — seven read operations have stable `1.0` golden
+  shapes, scoped local access, bounds, and public discovery; no transport exists.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
 
 Health labels summarize the evidence in the detailed sections below. Update a
@@ -52,7 +51,7 @@ use planned work to imply an active implementation commitment.
 - ✅ Initial application boundary
 - ✅ Capability catalog and registry
 - ✅ Mature application layer
-- ⬜ API layer
+- ✅ API layer
 - ⬜ Agent SDK
 - ⬜ Authentication
 - ✅ Desktop prototype
@@ -66,7 +65,7 @@ are future platform capabilities and are not automatically the next task.
 ## Current Milestone
 
 - Milestone: API Contract Readiness
-- Status: In Progress
+- Status: Complete
 - Goal: Freeze a small, versioned, read-only external surface without exposing
   Python-only domain/workspace inputs or prematurely choosing a transport.
 - Current evidence: Task 057 audited all 42 registry entries, selected seven
@@ -77,7 +76,9 @@ are future platform capabilities and are not automatically the next task.
   existing handlers. Task 059 added policy-derived local access and honest
   bounds/pagination metadata for every candidate collection. Task 060 captured
   golden shapes and retained `0.1-draft` because discovery exposes all 42
-  registry entries and external/internal versions are conflated.
+  registry entries and external/internal versions are conflated. Task 061
+  resolved both blockers and promoted only the external seven-read contract to
+  stable `1.0`; the internal registry remains unchanged.
 
 ## Five-Minute Rule
 
@@ -400,6 +401,8 @@ architecture rationale.
   treating loopback as identity or adding remote authentication (task 059).
 - Captured golden success/error shapes and explicitly retained `0.1-draft` with
   two bounded release blockers (task 060).
+- Added public-only discovery, independent external versioning, and promoted the
+  golden seven-read contract to stable `1.0` (task 061).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -415,8 +418,8 @@ architecture rationale.
 
 ## Active Work
 
-- Final schema-review task 060 is complete with a remain-draft decision.
-- The working tree was clean when task 060 began.
+- Public discovery/version task 061 is complete with a stable `1.0` decision.
+- The working tree was clean when task 061 began.
 
 ## Known Risks
 
@@ -451,7 +454,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `237 passed in 2.90s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `237 passed in 2.81s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -470,19 +473,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Add public discovery for only the seven candidate reads and split
-  the external contract version from internal application DTO versions.
-- Why this is next: Task 060 found these are the two concrete blockers to a
-  stable freeze; pagination, access policy, envelopes, errors, and golden tests
-  have passed review.
-- Expected scope: Medium; define public capability metadata, transform
-  `describe_platform` and `describe_agent_access` at the conformance boundary,
-  introduce an independent draft contract version, and update golden fixtures.
-- Risks: Duplicating registry metadata, hiding useful platform context, or
-  accidentally relabeling nested draft DTOs as stable.
-- Success criteria: discovery exposes exactly seven read-only candidates,
-  envelope versioning is independent and unambiguous, internal registry callers
-  remain unchanged, and a repeated freeze review can make a stable/no-go choice.
+- Objective: Select and document the first local read-only transport for the
+  stable `1.0` contract without implementing a listener.
+- Why this is next: API Contract Readiness is complete. Transport choice is now
+  the first unresolved boundary, especially how a trusted local host establishes
+  subject, client, origin, and scopes.
+- Expected scope: Medium; compare in-process plugin calls, Unix-domain IPC, and
+  loopback HTTP against desktop/CLI/agent needs; define threat assumptions,
+  identity mapping, lifecycle, error mapping, and deployment consequences.
+- Risks: Treating loopback as authentication, choosing a web framework before
+  lifecycle requirements, or coupling the stable contract to one client.
+- Success criteria: an accepted transport ADR, explicit threat/trust model,
+  implementation sequence, and a go/no-go for a minimal read-only adapter. No
+  write route, agent runtime, or instrument control is authorized.
 
 ## AI Context Window
 

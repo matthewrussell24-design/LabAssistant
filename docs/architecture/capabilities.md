@@ -164,6 +164,9 @@ whitelist while preserving every registered Python handler.
 Task 059 replaced its trusted boolean with a scoped local access policy and
 added explicit collection bounds. Loopback is not identity, and this policy is
 not a remote authentication mechanism.
+Task 061 stabilized the external seven-read contract at `1.0`, with public-only
+discovery and independent versioning; the internal 42-capability registry and
+its draft DTO versions remain unchanged.
 
 ## Describe Platform
 

@@ -41,3 +41,11 @@ The first freeze review remains at `0.1-draft`. Golden fixtures are in place,
 but `describe_platform` still exposes the full in-process registry and external
 envelope versions are not separated from nested application DTO versions.
 Those are release blockers, not reasons to weaken the seven-read boundary.
+
+## Task 061 Review
+
+The two blockers were resolved without changing the internal registry:
+public discovery now exposes exactly seven reads, and the external envelope uses
+an independent `PUBLIC_READ_CONTRACT_VERSION`. The repeated golden review
+promoted the external read contract to stable `1.0`. This does not approve a
+transport, remote authentication, agent runtime, or write capability.

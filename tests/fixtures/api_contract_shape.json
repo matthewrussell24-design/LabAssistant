@@ -2,34 +2,35 @@
   "success": {
     "describe_platform": {
       "": ["api_version", "capability", "data", "ok"],
-      "data": ["agent_access", "capabilities", "direction", "name", "primary_surface"]
+      "data": ["capabilities", "contract_status", "contract_version", "direction", "name", "primary_surface"],
+      "data.capabilities.0": ["access", "contract_version", "name", "purpose", "request_parameters", "required_scope"]
     },
     "describe_agent_access": {
       "": ["api_version", "capability", "data", "ok"],
-      "data": ["api_version", "current_non_goals", "intended_clients", "stable_inputs", "stable_outputs", "status"]
+      "data": ["access_model", "contract_version", "protected_capabilities", "public_capabilities", "remote_authentication", "scopes", "status", "writes_allowed"]
     },
     "list_experiments": {
       "": ["api_version", "capability", "data", "ok"],
-      "data": ["api_version", "items", "pagination"],
+      "data": ["items", "pagination"],
       "data.pagination": ["has_more", "limit", "offset", "returned", "total"]
     },
     "retrieve_history_overview": {
       "": ["api_version", "capability", "data", "ok"],
-      "data": ["api_version", "pagination", "summaries", "trend_points"],
+      "data": ["pagination", "summaries", "trend_points"],
       "data.pagination": ["summaries", "trend_points"]
     },
     "retrieve_experiment": {
       "": ["api_version", "capability", "data", "ok"],
-      "data": ["api_version", "label", "measurement_count", "record_id", "saved_at"]
+      "data": ["label", "measurement_count", "record_id", "saved_at"]
     },
     "retrieve_related_context": {
       "": ["api_version", "capability", "data", "ok"],
-      "data": ["api_version", "caveats", "confidence", "hypotheses", "missing_information", "pagination", "question", "recommendations", "related_notes", "relevant_experiments", "relevant_observations", "source_files", "supporting_evidence"],
+      "data": ["caveats", "confidence", "hypotheses", "missing_information", "pagination", "question", "recommendations", "related_notes", "relevant_experiments", "relevant_observations", "source_files", "supporting_evidence"],
       "data.pagination": ["caveats", "hypotheses", "missing_information", "recommendations", "related_notes", "relevant_experiments", "relevant_observations", "source_files", "supporting_evidence"]
     },
     "retrieve_research_journal": {
       "": ["api_version", "capability", "data", "ok"],
-      "data": ["api_version", "entries", "instrument", "keyword", "markdown", "pagination", "sample", "tag"],
+      "data": ["entries", "instrument", "keyword", "markdown", "pagination", "sample", "tag"],
       "data.pagination": ["has_more", "limit", "offset", "returned", "total"]
     }
   },
