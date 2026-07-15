@@ -71,7 +71,11 @@ changing scientific behavior.
 Status: delivered in task 009. Task 010 added a versioned `list_experiments`
 application query and wired the desktop History timeline plus "Open Existing
 Experiment" to browse and restore persisted records through the application
-boundary. Desktop packaging remains a separate future task.
+boundary. Task 067 selected arm64 py2app with an ad-hoc local qualification
+stage followed by Developer ID signing, hardened runtime, and notarization for
+direct distribution. Sandbox, Mac App Store, universal2, and packaged local-read
+sharing remain separate qualification tracks; runtime paths and dependency
+reproducibility come before the first bundle.
 
 ## Phase 1: Rename The Product Concepts
 

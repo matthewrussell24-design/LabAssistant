@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Implemented explicit per-launch desktop ownership of
-  the local read broker with deterministic Cocoa cleanup (task 066).
-- Working Tree: Task 066 is committed locally; inspect `git status --short`
+- Latest Completed Change: Selected the first arm64 Developer ID/notarized
+  macOS packaging target and qualification gates (task 067).
+- Working Tree: Task 067 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `265 passed in 3.02s` from `scripts/test -q` on
+- Last Successful Test: `265 passed in 3.69s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 066.
+- Last Updated: 2026-07-15 for task 067.
 
 ## North Star
 
@@ -65,9 +65,10 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: Desktop Broker Lifecycle
+- Milestone: macOS Packaging Readiness
 - Status: Complete
-- Goal: Serve stable local reads during an explicitly opted-in desktop session.
+- Goal: Define an honest reproducible path from development runtime to a
+  distributable native macOS application.
 - Current evidence: Task 057 audited all 42 registry entries, selected seven
   candidate reads, defined draft-to-stable versioning, and recorded a no-go for
   HTTP or agent transports until shared envelopes, stable errors, access
@@ -90,6 +91,9 @@ are future platform capabilities and are not automatically the next task.
   Task 066 implemented that lifecycle, including cooperative broker stop,
   typed external collision probing, Cocoa termination cleanup, and a real native
   launch/read/shutdown smoke.
+  Task 067 selected arm64 py2app, direct Developer ID distribution, hardened
+  runtime, notarization, and no App Sandbox as the first target. Local ad-hoc
+  bundles remain qualification-only; signing is blocked on an identity.
 
 ## Five-Minute Rule
 
@@ -221,6 +225,8 @@ non-goals.
   context derived by the broker rather than accepted from requests.
 - Native desktop ownership of that broker must remain default-off and require
   explicit per-launch consent; compatible external brokers remain externally owned.
+- The first macOS distribution is arm64, Developer ID signed, hardened,
+  notarized, and non-sandboxed; local ad-hoc bundles are not releases.
 
 This is a concise captain's log, not a replacement for formal decision records.
 Keep only the most recent strategic choices here and preserve full rationale in
@@ -435,6 +441,8 @@ architecture rationale.
   ownership, collision, shutdown, and packaging rules (task 065).
 - Implemented the default-off desktop sharing flag, lifecycle owner, cooperative
   shutdown, and Cocoa termination cleanup (task 066).
+- Audited macOS packaging and selected the first distribution target, runtime
+  layout, signing/sandbox boundary, and verification gates (task 067).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -450,8 +458,8 @@ architecture rationale.
 
 ## Active Work
 
-- Desktop broker lifecycle task 066 is complete; packaged enablement remains off.
-- The working tree was clean when task 066 began.
+- macOS packaging audit task 067 is complete; no bundle or release was created.
+- The working tree was clean when task 067 began.
 
 ## Known Risks
 
@@ -463,6 +471,8 @@ architecture rationale.
   care until stronger persistence requirements justify a change.
 - `requirements.txt` is unpinned, so environment resolution is not fully
   reproducible.
+- History and memory defaults are CWD-relative, which is unsafe for Finder-launched
+  packaged apps and must be resolved before bundling.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
 - AppKit/WebKit proves native shell independence but is not yet packaged,
@@ -488,7 +498,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `265 passed in 3.02s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `265 passed in 3.69s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -507,24 +517,23 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Audit macOS packaging readiness and select the first supported
-  signing, sandbox, runtime-location, and distribution model without packaging
-  the app yet.
-- Why this is next: Human desktop, stable local reads, and explicit lifecycle
-  ownership now work in development. Packaging is the next unresolved boundary,
-  and local sharing must stay disabled until its sandbox/entitlement behavior is
-  understood.
-- Expected scope: Medium; inventory PyObjC/WebKit/data-file/runtime requirements,
-  compare unsigned development bundle, Developer ID/notarized distribution, and
-  sandboxed distribution, define socket/data locations and entitlement impact,
-  and record a reproducible packaging implementation gate.
-- Risks: Bundling unpinned dependencies, breaking WebKit resources or importers,
-  placing mutable data inside the bundle, assuming sandbox IPC visibility, or
-  conflating a development bundle with a distributable product.
-- Success criteria: an accepted packaging ADR, explicit supported first target,
-  resource/runtime layout, signing/notarization/sandbox decision, verification
-  matrix, and go/no-go implementation sequence. No installer, release upload,
-  hidden service, write API, remote transport, or autonomous runtime.
+- Objective: Centralize runtime paths for Application Support, Caches, history,
+  memory, and local IPC, with an explicit legacy CWD-data migration policy.
+- Why this is next: ADR 006 makes correct mutable-state placement the first
+  packaging gate. Finder launches cannot depend on the repository or current
+  working directory.
+- Expected scope: Medium; add a platform-aware immutable path layout, route
+  default history/memory/socket access through it, preserve explicit test/CLI
+  injection, define one-time legacy discovery/import behavior, and test fresh,
+  existing, read-only, and overridden locations.
+- Risks: Silently moving user data, changing development behavior without a
+  compatibility path, importing from an untrusted CWD, or coupling core modules
+  directly to Foundation/PyObjC.
+- Success criteria: packaged defaults resolve beneath Application Support and
+  Caches without UI dependencies; explicit paths remain authoritative; legacy
+  data is detected and migrated only through a reviewed safe rule; all shells,
+  persistence tests, and opt-in IPC continue to pass. No bundle, dependency
+  lock, signing, notarization, release upload, or sandbox enablement yet.
 
 ## AI Context Window
 
