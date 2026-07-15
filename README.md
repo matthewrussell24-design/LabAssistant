@@ -99,6 +99,21 @@ opens a network port. Stop it with `Ctrl-C`. Its first trust boundary is the
 current local OS user; it is not remote authentication and does not expose
 writes.
 
+Python clients can use immutable typed results without parsing transport or
+application envelopes:
+
+```python
+from labassistant import LocalReadClient
+
+client = LocalReadClient()
+experiments = client.list_experiments(limit=5)
+for item in experiments.data.items:
+    print(item.record_id, item.label)
+```
+
+The client does not start the broker. Connection, transport, protocol, and
+stable application failures use distinct `LocalRead*Error` types.
+
 ## Product Direction
 
 LabAssistant should eventually support multiple analytical techniques:

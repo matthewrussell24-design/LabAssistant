@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Implemented the foreground owner-only Unix-domain
-  read broker and diagnostic client (task 063).
-- Working Tree: Task 063 is committed locally; inspect `git status --short`
+- Latest Completed Change: Added the typed immutable local read client SDK over
+  all seven broker capabilities (task 064).
+- Working Tree: Task 064 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `248 passed in 2.53s` from `scripts/test -q` on
+- Last Successful Test: `256 passed in 2.51s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 062.
+- Last Updated: 2026-07-15 for task 064.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 237 passing.
+- Tests: 🟢 Healthy — 256 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -36,7 +36,8 @@ full traceability.
   reusable human workflows cross typed application contracts.
 - API Layer: 🟢 Local Transport Available — seven stable `1.0` reads are exposed
   through a bounded, same-user Unix-domain broker; no remote or write API exists.
-- Agent SDK: ⚪ Planned — read-only application contracts come first.
+- Agent SDK: 🟢 Read Client Available — typed local reads exist without an
+  autonomous runtime or write access.
 
 Health labels summarize the evidence in the detailed sections below. Update a
 label only when that evidence changes; do not use green to hide a known risk or
@@ -52,7 +53,7 @@ use planned work to imply an active implementation commitment.
 - ✅ Capability catalog and registry
 - ✅ Mature application layer
 - ✅ API layer
-- ⬜ Agent SDK
+- ✅ Agent SDK
 - ⬜ Authentication
 - ✅ Desktop prototype
 - ✅ Polished desktop workspace
@@ -64,9 +65,9 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: Local Read Transport
+- Milestone: Typed Local Read SDK
 - Status: Complete
-- Goal: Prove an independent local client can use exactly the stable read surface.
+- Goal: Give independent Python callers typed access to the stable read surface.
 - Current evidence: Task 057 audited all 42 registry entries, selected seven
   candidate reads, defined draft-to-stable versioning, and recorded a no-go for
   HTTP or agent transports until shared envelopes, stable errors, access
@@ -82,6 +83,8 @@ are future platform capabilities and are not automatically the next task.
   made peer-credential verification the implementation gate. Task 063 passed
   that gate on macOS/Python 3.12 and implemented bounded framing, broker-owned
   access mapping, safe socket lifecycle, and a diagnostic client.
+  Task 064 added immutable capability-specific results and kept connection,
+  transport, protocol, and stable application failures distinct.
 
 ## Five-Minute Rule
 
@@ -151,6 +154,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
 - `labassistant.local_read_transport` exposes only the stable seven-read
   projection through foreground owner-only Unix-domain IPC and derives access
   context from verified macOS peer credentials.
+- `labassistant.local_read_client` exposes typed immutable methods for those
+  seven reads; it does not start the broker or add autonomous behavior.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -415,6 +420,8 @@ architecture rationale.
   threat assumptions, framing, lifecycle, and implementation gates (task 062).
 - Implemented the bounded foreground Unix-domain broker, diagnostic CLI, and
   same-user peer verification for all seven stable reads (task 063).
+- Added the typed immutable local read client SDK with layered failures and
+  seven capability-specific methods (task 064).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -430,8 +437,9 @@ architecture rationale.
 
 ## Active Work
 
-- Local broker task 063 is complete; no remote listener or write route was added.
-- The working tree was clean when task 063 began.
+- Typed local client task 064 is complete; no agent runtime or write route was
+  added.
+- The working tree was clean when task 064 began.
 
 ## Known Risks
 
@@ -468,7 +476,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `248 passed in 2.53s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `256 passed in 2.51s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -487,20 +495,20 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Define and implement the first typed local read client SDK over the
-  stable broker without adding an autonomous agent runtime.
-- Why this is next: Independent transport is proven, but callers currently
-  receive raw dictionaries. A small typed client is the remaining reusable
-  boundary before any future agent or additional shell integration.
-- Expected scope: Medium; define client result/error types, connection and
-  contract-version behavior, capability-specific read methods, and compatibility
-  tests against the foreground broker while retaining the diagnostic CLI.
-- Risks: Duplicating stable schemas, hiding application errors as transport
-  failures, automatic broker startup, or implying write/remote support.
-- Success criteria: typed client calls cover exactly seven reads, preserve
-  stable application errors and transport failures distinctly, and pass an
-  independent-process compatibility smoke. No autonomous runtime, writes,
-  background service, remote transport, or desktop lifecycle coupling.
+- Objective: Decide and document whether the native desktop should explicitly
+  own the local read broker lifecycle; do not implement hidden startup.
+- Why this is next: The manual broker and typed client are complete. Desktop
+  ownership is the next unresolved product boundary for making local reads
+  available during normal human use without creating a surprise background
+  service.
+- Expected scope: Medium; compare explicit launch flag, in-app opt-in, and
+  separate broker ownership; define consent, status/diagnostics, shutdown,
+  collision recovery, sandbox/packaging consequences, and implementation gate.
+- Risks: Starting a listener without user intent, blocking AppKit shutdown,
+  weakening socket ownership, or coupling scientific reads to window state.
+- Success criteria: an accepted lifecycle decision and bounded implementation
+  sequence that preserves foreground/manual operation and same-user trust. No
+  hidden daemon, writes, remote transport, autonomous runtime, or instrument control.
 
 ## AI Context Window
 

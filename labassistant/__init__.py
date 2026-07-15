@@ -89,6 +89,13 @@ __all__ = [
     "InvestigatorReport",
     "KnowledgeItem",
     "KnowledgeStore",
+    "LocalReadApplicationError",
+    "LocalReadClient",
+    "LocalReadClientError",
+    "LocalReadConnectionError",
+    "LocalReadProtocolError",
+    "LocalReadResult",
+    "LocalReadTransportError",
     "ResearchJournal",
     "ResearchJournalEntry",
     "MassBalanceAssessment",
@@ -114,3 +121,26 @@ __all__ = [
     "retrieve_experiment",
     "save_experiment_to_memory",
 ]
+
+
+_LAZY_CLIENT_EXPORTS = frozenset(
+    {
+        "LocalReadApplicationError",
+        "LocalReadClient",
+        "LocalReadClientError",
+        "LocalReadConnectionError",
+        "LocalReadProtocolError",
+        "LocalReadResult",
+        "LocalReadTransportError",
+    }
+)
+
+
+def __getattr__(name: str):
+    if name in _LAZY_CLIENT_EXPORTS:
+        from labassistant import local_read_client
+
+        value = getattr(local_read_client, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

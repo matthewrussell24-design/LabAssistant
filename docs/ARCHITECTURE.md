@@ -29,6 +29,10 @@ stable seven-read `1.0` contract. Task 063 implemented that broker with verified
 same-user macOS peer credentials and bounded Unix-domain framing. It does not
 bind a network port or authorize writes or remote clients.
 
+`labassistant.local_read_client` is the typed Python consumer boundary for that
+broker. It exposes seven immutable read methods and layered errors without
+introducing an agent loop or making client code understand raw envelopes.
+
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
 

@@ -187,6 +187,14 @@ Task 063 implemented ADR 004 in `labassistant.local_read_transport`:
 The implementation remains a same-local-user boundary. It does not distinguish
 two processes owned by that user, run as a daemon, bind TCP, or expose writes.
 
+Task 064 added `labassistant.local_read_client` as the first typed SDK over this
+boundary. Its seven capability-specific methods return immutable dataclasses;
+nested open-ended scientific records are recursively frozen rather than copied
+into a competing domain model. The client verifies request correlation,
+transport version, contract version, capability, envelope status, and required
+payload fields. Connection, transport, protocol, and stable application errors
+remain distinct. It never starts or manages the broker.
+
 ## Go/No-Go
 
 **The minimal foreground Unix-domain read broker is implemented.**
