@@ -9,14 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Migrated saved DLS workspace restoration behind a
-  technique-aware copy-on-access application workflow (task 045).
-- Working Tree: Task 045 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted reviewed DLS and chromatography
+  scientific-memory saves behind application inputs and immutable receipts
+  (task 046).
+- Working Tree: Task 046 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `215 passed in 2.00s` from `scripts/test -q` on
+- Last Successful Test: `218 passed in 2.23s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 045.
+- Last Updated: 2026-07-15 for task 046.
 
 ## North Star
 
@@ -340,6 +341,9 @@ architecture rationale.
 - Migrated saved DLS workspace restoration into a technique-aware,
   copy-on-access application workflow while keeping the native analysis result
   read-only and preserving Streamlit session behavior (task 045).
+- Promoted reviewed DLS and chromatography scientific-memory saves into a
+  mutation-safe application command with immutable receipts while keeping
+  selection, labels, project tags, notes, and confirmation in Streamlit (task 046).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -355,8 +359,8 @@ architecture rationale.
 
 ## Active Work
 
-- Saved DLS workspace-restore task 045 is complete.
-- The working tree was clean when task 045 began.
+- Reviewed scientific-memory save task 046 is complete.
+- The working tree was clean when task 046 began.
 
 ## Known Risks
 
@@ -391,9 +395,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `215 passed in 2.00s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `218 passed in 2.23s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  045.
+  046.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -410,21 +414,20 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote reviewed scientific-memory saves so Streamlit submits
-  current DLS samples or a chromatography analysis result without assembling
-  and mutating domain `Experiment` objects in the shell.
-- Why this is next: Active DLS evidence no longer requires direct measurement
-  access in Streamlit, but the memory panel still builds a DLS experiment,
-  restores a chromatography experiment, mutates the selected label, and passes
-  that domain object to the persistence command.
-- Expected scope: Medium; preserve explicit save action, DLS and chromatography
-  selection, label fallback, project tag, human notes, technique tags,
-  observations, source provenance, receipts, and existing generic callers.
-- Risks: Mutating active analysis evidence, duplicating experiment assembly, or
-  narrowing the generic memory command's established compatibility.
-- Success criteria: Streamlit saves reviewed DLS and chromatography evidence to
-  scientific memory through application inputs without constructing or mutating
-  `Experiment` objects.
+- Objective: Let the DLS Experiment Brief accept parsed samples directly so
+  Streamlit does not assemble a domain `Experiment` before requesting the
+  immutable report preview.
+- Why this is next: `render_experiment_brief` is now the final Streamlit caller
+  of `dls_experiment_from_samples`; all other active DLS experiment assembly for
+  saved workspaces and scientific-memory writes is application-owned.
+- Expected scope: Small; preserve the current DLS label, normalized
+  observations, section ordering, completeness and interpretability fields,
+  display text, and established generic `Experiment` callers.
+- Risks: Narrowing the generic Experiment-first report contract or changing
+  observation generation and experiment identity semantics.
+- Success criteria: Streamlit requests the DLS Experiment Brief from parsed
+  samples through the application layer without importing or calling
+  `dls_experiment_from_samples`.
 
 ## AI Context Window
 

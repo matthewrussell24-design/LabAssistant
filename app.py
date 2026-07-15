@@ -80,7 +80,6 @@ from labassistant.filtration import (
     normalize_pressure,
     validate_difficulty_score,
 )
-from labassistant.models import Experiment
 from labassistant.trend_analysis import (
     CIRCULATION_TIME_UNITS_TO_MINUTES,
     RelationshipAnalysis,
@@ -376,37 +375,51 @@ def render_context_packet(packet) -> None:
 
 def render_memory_panel(
     *,
-    dls_experiment: Experiment | None = None,
-    chromatography_experiment: Experiment | None = None,
+    dls_samples: list[ParsedSample] | None = None,
+    dls_label: str = "",
+    dls_source_files: list[str] | None = None,
+    chromatography_result: ChromatographyAnalysisResult | None = None,
 ) -> None:
     available = []
-    if dls_experiment is not None:
-        available.append(("DLS", dls_experiment))
-    if chromatography_experiment is not None:
-        available.append(("Chromatography", chromatography_experiment))
+    if dls_samples:
+        available.append(
+            ("DLS", dls_samples, dls_label.strip() or "DLS experiment", "DLS")
+        )
+    if chromatography_result is not None:
+        available.append(
+            (
+                "Chromatography",
+                chromatography_result,
+                chromatography_result.experiment.label,
+                chromatography_result.experiment.technique or "HPLC",
+            )
+        )
 
     with st.expander("LabAssistant Memory", expanded=False):
         st.caption("Save selected outputs to local memory, then retrieve compact context. No LLM or chat is used.")
         if available:
-            labels = [label for label, _ in available]
+            labels = [item[0] for item in available]
             selected_label = st.selectbox("Experiment to save", labels, key="memory_experiment_choice")
-            selected_experiment = next(experiment for label, experiment in available if label == selected_label)
+            _, selected_evidence, default_label, technique = next(
+                item for item in available if item[0] == selected_label
+            )
             memory_label = st.text_input(
                 "Memory label",
-                value=selected_experiment.label,
+                value=default_label,
                 key="memory_label",
             )
             project_id = st.text_input("Project tag", value="", key="memory_project")
             human_note = st.text_area("Human notes", value="", key="memory_human_note")
             if st.button("Save to LabAssistant Memory", use_container_width=True):
-                selected_experiment.label = memory_label.strip() or selected_experiment.label
-                save_experiment_to_memory(
-                    selected_experiment,
+                receipt = save_experiment_to_memory(
+                    selected_evidence,
+                    label=memory_label,
+                    source_files=dls_source_files if selected_label == "DLS" else None,
                     human_note=human_note,
                     project_id=project_id.strip() or None,
-                    tags=[selected_label, selected_experiment.technique or ""],
+                    tags=[selected_label, technique],
                 )
-                st.success(f"Saved {selected_experiment.label} to local LabAssistant Memory.")
+                st.success(f"Saved {receipt.label} to local LabAssistant Memory.")
         else:
             st.info("Import DLS or chromatography data before saving to memory.")
 
@@ -2458,7 +2471,7 @@ def main() -> None:
         if chromatography_preview is not None:
             render_chromatography_preview(chromatography_preview)
             render_memory_panel(
-                chromatography_experiment=chromatography_preview.restore_experiment()
+                chromatography_result=chromatography_preview
             )
         else:
             render_memory_panel()
@@ -2540,17 +2553,6 @@ def main() -> None:
 
     metrics = dls_metrics_dataframe(retrieve_dls_metrics(samples))
     source_file_names = [uploaded_file.name for uploaded_file in uploaded_files] if uploaded_files else [sample.file_name for sample in samples if sample.file_name]
-    dls_memory_experiment = dls_experiment_from_samples(
-        samples,
-        label=history_label or "DLS experiment",
-        source_files=source_file_names,
-    )
-    chromatography_memory_experiment = (
-        chromatography_preview.restore_experiment()
-        if chromatography_preview is not None
-        else None
-    )
-
     narrative = compose_dls_narrative(samples)
     diagnostics = analyze_dls_trend_diagnostics(samples)
     sample_summaries = summarize_dls_samples(samples)
@@ -2573,8 +2575,10 @@ def main() -> None:
         render_import_details(preview, import_errors)
     render_history_panel(samples)
     render_memory_panel(
-        dls_experiment=dls_memory_experiment,
-        chromatography_experiment=chromatography_memory_experiment,
+        dls_samples=samples,
+        dls_label=history_label,
+        dls_source_files=source_file_names,
+        chromatography_result=chromatography_preview,
     )
     render_research_journal_panel()
 

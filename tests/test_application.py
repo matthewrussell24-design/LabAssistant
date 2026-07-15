@@ -45,6 +45,7 @@ from labassistant.application import (
     RelatedScientificContext,
     ResearchJournalRead,
     ScientificNoteReceipt,
+    ScientificMemorySaveReceipt,
     add_scientific_note,
     analyze_dls_dataset,
     analyze_dls_trend_diagnostics,
@@ -2115,18 +2116,88 @@ def test_save_experiment_to_memory_can_use_injected_store():
     )
     store = RecordingStore()
 
-    save_experiment_to_memory(
+    receipt = save_experiment_to_memory(
         experiment,
+        label="  Reviewed stress study  ",
         human_note="Discuss with analytical team.",
         project_id="project-1",
         tags=["screening"],
         store=store,
     )
 
-    assert store.experiments == [(experiment, "project-1", ["screening"])]
+    saved_experiment = store.experiments[0][0]
+    assert saved_experiment is not experiment
+    assert saved_experiment.label == "Reviewed stress study"
+    assert experiment.label == "Stress study"
+    assert store.experiments == [(saved_experiment, "project-1", ["screening"])]
     assert store.hypotheses[0][0] == "Degradation pathway"
     assert store.recommendations[0][0] == "Run orthogonal purity method"
     assert store.notes[0][0] == "Discuss with analytical team."
+    assert receipt == ScientificMemorySaveReceipt(
+        experiment_id="exp-1",
+        label="Reviewed stress study",
+        technique="HPLC",
+        measurement_count=0,
+        project_id="project-1",
+    )
+    assert receipt.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        receipt.label = "Changed"
+
+
+def test_save_experiment_to_memory_accepts_parsed_dls_samples_without_mutation():
+    sample = _decision_sample("Lot 1", 0.21, [])
+    sample.measurement.metadata.source_files = ["lot-1.xlsx"]
+    store = RecordingStore()
+
+    receipt = save_experiment_to_memory(
+        [sample],
+        label="  DLS memory  ",
+        tags=["DLS"],
+        store=store,
+    )
+
+    saved_experiment = store.experiments[0][0]
+    assert receipt.label == "DLS memory"
+    assert receipt.technique == "DLS"
+    assert receipt.measurement_count == 1
+    assert saved_experiment.metadata["source_files"] == ["lot-1.xlsx"]
+    assert saved_experiment.measurements[0] is not sample.measurement
+    assert sample.measurement.metadata.sample_name == "Lot 1"
+
+
+def test_save_experiment_to_memory_accepts_chromatography_result_without_mutation():
+    source = (
+        Path(__file__).parents[1]
+        / "sample_data"
+        / "chromatography"
+        / "mass_balance_demo.csv"
+    )
+    result = analyze_chromatography_source(source, label="Original run")
+    store = RecordingStore()
+
+    receipt = save_experiment_to_memory(
+        result,
+        label="Reviewed chromatography",
+        tags=["Chromatography", "HPLC"],
+        store=store,
+    )
+
+    saved_experiment = store.experiments[0][0]
+    assert receipt.label == "Reviewed chromatography"
+    assert receipt.technique == "HPLC"
+    assert saved_experiment.label == "Reviewed chromatography"
+    assert result.restore_experiment().label == "Original run"
+    assert saved_experiment.metadata["hypotheses"]
+
+
+def test_save_experiment_to_memory_validates_reviewed_evidence():
+    with raises(ValueError, match="At least one parsed DLS sample"):
+        save_experiment_to_memory([])
+    with raises(TypeError, match="must contain parsed samples"):
+        save_experiment_to_memory([object()])
+    with raises(TypeError, match="must be an Experiment"):
+        save_experiment_to_memory(object())
 
 
 def test_capability_registry_exposes_stable_scientific_workflow_names():
@@ -2188,10 +2259,15 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
             "set_dls_circulation_time",
             "set_dls_filtration_measurement",
             "attach_dls_filtration_measurements",
+            "save_scientific_memory",
         }
     )
     assert get_capability("add_scientific_note").caller_types == ("Human UI", "CLI")
     assert get_capability("save_experiment_history").caller_types == ("Human UI", "CLI")
+    assert get_capability("save_scientific_memory").caller_types == (
+        "Human UI",
+        "CLI",
+    )
     assert get_capability("set_dls_circulation_time").caller_types == (
         "Human UI",
         "CLI",

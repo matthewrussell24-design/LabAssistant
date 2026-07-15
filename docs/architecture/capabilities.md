@@ -173,7 +173,9 @@ source name. The `.csv` and `.olax` suffixes select the supported adapter.
 experiment snapshot, immutable injection summaries, normalized observation
 evidence, hypotheses, limitations, optional mass-balance assessment and trend
 points, and archive summary counts. It contains no pandas DataFrames or mutable
-measurements. `restore_experiment()` returns a fresh copy for an explicit memory save.
+measurements. The reviewed scientific-memory command accepts this result
+directly; `restore_experiment()` remains available for established application
+callers that explicitly need a fresh domain copy.
 
 **Expected Errors:** `ValueError` for unsupported suffixes or invalid/empty CSV
 evidence, `FileNotFoundError` for missing paths, and existing parser/archive
@@ -910,13 +912,20 @@ because this is an explicit reviewed write. Streamlit is the first caller.
 **Purpose:** Persist an experiment and its related hypotheses,
 recommendations, tags, and optional human note as scientific memory.
 
-**Inputs:** `Experiment`, optional human note, project identifier, tags, and an
-optional injected `KnowledgeStore`.
+**Inputs:** An established `Experiment`, parsed DLS samples, or a
+`ChromatographyAnalysisResult`; an optional reviewed label, DLS source-file
+names, human note, project identifier, tags, and an optional injected
+`KnowledgeStore`. Direct experiments are defensively copied, DLS experiments
+are assembled from copied samples, and chromatography results restore a fresh
+domain copy before label changes or persistence.
 
-**Outputs:** None. Success means all requested records were accepted by the
-store.
+**Outputs:** A frozen, versioned `ScientificMemorySaveReceipt` containing the
+experiment identity, normalized or fallback label, technique, measurement
+count, and optional project identifier. Success means all requested records
+were accepted by the store.
 
-**Expected Errors:** Invalid experiment errors and local persistence/database
+**Expected Errors:** `ValueError` for empty DLS evidence, `TypeError` for
+unsupported or malformed reviewed inputs, and local persistence/database
 errors. Atomicity and application-level error normalization remain undefined;
 callers must not imply a successful save after an exception.
 

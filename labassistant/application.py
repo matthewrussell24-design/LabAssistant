@@ -1685,6 +1685,21 @@ class ScientificNoteReceipt:
 
 
 @dataclass(frozen=True)
+class ScientificMemorySaveReceipt:
+    """Immutable metadata for one explicitly reviewed scientific-memory save."""
+
+    experiment_id: str
+    label: str
+    technique: str | None
+    measurement_count: int
+    project_id: str | None
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ExperimentSaveReceipt:
     """Immutable metadata for one append-only experiment-history write."""
 
@@ -3571,14 +3586,22 @@ def _chromatography_measurement_summaries(
 
 
 def save_experiment_to_memory(
-    experiment: Experiment,
+    evidence: Any,
     *,
+    label: str = "",
+    source_files: list[str] | None = None,
     human_note: str = "",
     project_id: str | None = None,
     tags: list[str] | None = None,
     store: KnowledgeStore | None = None,
-) -> None:
-    """Persist an Experiment and its scientific context to the knowledge store."""
+) -> ScientificMemorySaveReceipt:
+    """Persist reviewed experiment evidence and its scientific context."""
+
+    experiment = _experiment_for_scientific_memory(
+        evidence,
+        label=label,
+        source_files=source_files,
+    )
 
     knowledge_store = store or KnowledgeStore()
     knowledge_store.add_experiment(experiment, project_id=project_id, tags=tags or [])
@@ -3607,6 +3630,61 @@ def save_experiment_to_memory(
             instrument_id=experiment.instrument,
             tags=[experiment.technique or "", "human_note"],
         )
+    return ScientificMemorySaveReceipt(
+        experiment_id=experiment.experiment_id,
+        label=experiment.label,
+        technique=experiment.technique,
+        measurement_count=len(experiment.measurements),
+        project_id=project_id,
+    )
+
+
+def _experiment_for_scientific_memory(
+    evidence: Any,
+    *,
+    label: str,
+    source_files: list[str] | None,
+) -> Experiment:
+    """Resolve supported reviewed inputs without mutating active evidence."""
+
+    if isinstance(evidence, Experiment):
+        experiment = deepcopy(evidence)
+    elif isinstance(evidence, ChromatographyAnalysisResult):
+        experiment = evidence.restore_experiment()
+    elif isinstance(evidence, (list, tuple)):
+        if not evidence:
+            raise ValueError("At least one parsed DLS sample is required")
+        samples = deepcopy(list(evidence))
+        if any(
+            not hasattr(sample, "name") or not hasattr(sample, "measurement")
+            for sample in samples
+        ):
+            raise TypeError(
+                "Scientific-memory DLS evidence must contain parsed samples"
+            )
+        resolved_source_files = source_files
+        if resolved_source_files is None:
+            resolved_source_files = list(
+                dict.fromkeys(
+                    source
+                    for sample in samples
+                    for source in sample.measurement.metadata.source_files
+                )
+            )
+        experiment = dls_experiment_from_samples(
+            samples,
+            source_files=list(resolved_source_files),
+        )
+    else:
+        raise TypeError(
+            "Scientific-memory evidence must be an Experiment, "
+            "ChromatographyAnalysisResult, or parsed DLS samples"
+        )
+
+    normalized_label = label.strip()
+    if normalized_label:
+        experiment.label = normalized_label
+    return experiment
 
 
 def app_manifest() -> dict[str, Any]:
@@ -3855,6 +3933,7 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="save_scientific_memory",
         purpose="Persist an experiment and its scientific context.",
         handler=save_experiment_to_memory,
+        caller_types=("Human UI", "CLI"),
     ),
 )
 
