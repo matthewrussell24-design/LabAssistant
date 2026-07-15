@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Introduced a neutral structural DLS evidence
-  contract and removed reusable-core imports of the view-model module (task 050).
-- Working Tree: Task 050 is committed locally; inspect `git status --short`
+- Latest Completed Change: Routed shared DLS metrics and status through a
+  frozen, Measurement-first projection (task 051).
+- Working Tree: Task 051 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `225 passed in 2.60s` from `scripts/test -q` on
+- Last Successful Test: `227 passed in 2.81s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 050.
+- Last Updated: 2026-07-15 for task 051.
 
 ## North Star
 
@@ -28,12 +28,12 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 225 passing.
+- Tests: 🟢 Healthy — 227 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — current human workflows cross application
-  contracts and use neutral DLS structural typing, but compatibility metrics and
-  pandas-backed workspace evidence are not transport-neutral.
+  contracts; shared metrics/status are Measurement-first, while narrative and
+  distribution paths still use compatibility workspace fields.
 - API Layer: ⚪ Not Started — intentionally deferred until the application
   boundary is mature.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
@@ -68,10 +68,10 @@ are future platform capabilities and are not automatically the next task.
 - Status: In Progress
 - Goal: Replace UI-shaped compatibility inputs with authoritative scientific
   evidence contracts incrementally while preserving existing shells.
-- Current evidence: Task 050 removed reusable-core imports of
-  `labassistant.view_models` through `DLSSampleEvidence` and a backwards-
-  compatible workspace adapter. Measurement-first projections remain before
-  the layer is transport-neutral.
+- Current evidence: Task 050 removed reusable-core view-model imports through
+  `DLSSampleEvidence`; task 051 made shared metrics/status Measurement-first.
+  Narrative, sample-summary, and distribution compatibility projections remain
+  before the layer is transport-neutral.
 
 ## Five-Minute Rule
 
@@ -123,9 +123,10 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   and transitional `ParsedSample` workspace typing. The dependency inventory
   is recorded in `docs/architecture/capabilities.md`.
 - `labassistant.dls_evidence` owns the structural DLS sample protocol, mutable
-  local workspace adapter, and compatibility projections. `ParsedSample`
-  remains an alias exposed by `labassistant.view_models`; reusable core modules
-  no longer import that presentation facade.
+  local workspace adapter, frozen Measurement metrics/status projection, and
+  compatibility tables. `ParsedSample` remains an alias exposed by
+  `labassistant.view_models`; reusable core modules no longer import that
+  presentation facade.
 - `labassistant.desktop` owns native startup and application invocation;
   `labassistant.ui` owns the pure presenter, local workspace document, and
   AppKit/WebKit controller.
@@ -365,6 +366,8 @@ architecture rationale.
 - Introduced the structural `DLSSampleEvidence` contract and retained
   `ParsedSample` as a compatibility alias without reusable-core view-model
   imports (task 050).
+- Routed the immutable application metrics read and compatibility dataframe
+  through a frozen Measurement-first metrics/status projection (task 051).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -380,8 +383,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS evidence contract stabilization task 050 is complete.
-- The working tree was clean when task 050 began.
+- DLS Measurement-first metrics projection task 051 is complete.
+- The working tree was clean when task 051 began.
 
 ## Known Risks
 
@@ -416,9 +419,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `225 passed in 2.60s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `227 passed in 2.81s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  050.
+  051.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -435,21 +438,20 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Make the shared DLS metrics/status projection derive from
-  authoritative `Measurement` evidence instead of the workspace metrics
-  dictionary while retaining existing output and compatibility callers.
-- Why this is next: Task 050 removed the presentation-module dependency, but the
-  neutral protocol still exposes compatibility `metrics` and pandas-backed
-  `data`. Metrics/status is a bounded, widely reused path that can prove the
-  Measurement-first direction before larger narrative and trend migrations.
-- Expected scope: Medium; add pure Measurement-to-metric/status projection,
-  route application metrics and shared table compatibility through it, and
-  preserve column order, warning behavior, and immutable read outputs.
-- Risks: Changing legacy fallback semantics, warning-derived status, column
-  ordering, or metrics reconstructed from restored measurements.
-- Success criteria: `retrieve_dls_metrics` and shared metrics-table generation
-  no longer read `sample.metrics`, existing Streamlit/tests remain unchanged,
-  and pandas stays outside the public application result.
+- Objective: Route DLS review-evidence formatting and immutable per-sample
+  summaries through `DLSMeasurementMetrics` instead of `sample.metrics`.
+- Why this is next: Task 051 proved the Measurement-first projection while
+  preserving the shared metrics table. `summarize_dls_samples` and
+  `review_evidence` are the next bounded application/narrative consumers of the
+  same values and warning evidence.
+- Expected scope: Small to medium; add Measurement-first review-evidence
+  formatting, route sample summary display rows through the projection, and
+  preserve exact wording and optional-row behavior.
+- Risks: Changing PDI/peak/tail formatting, warning order, or whether missing
+  optional values render or disappear.
+- Success criteria: `summarize_dls_samples` and its review-evidence helper no
+  longer read `sample.metrics`, existing output assertions remain unchanged,
+  and compatibility-only distribution fields remain explicitly bounded.
 
 ## AI Context Window
 

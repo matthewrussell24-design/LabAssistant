@@ -1,6 +1,6 @@
 import pandas as pd
 
-from labassistant.models import Measurement, MeasurementMetadata
+from labassistant.models import Measurement, MeasurementFlag, MeasurementMetadata
 from labassistant.observations import (
     build_experiment_brief_from_observations,
     observation_table,
@@ -31,6 +31,7 @@ def make_sample(name: str, warnings: list[str], metrics: dict | None = None, pro
         source_text="",
         measurement=Measurement(
             metadata=MeasurementMetadata(sample_name=name),
+            flags=[MeasurementFlag(label=warning) for warning in warnings],
             provenance=provenance or {},
         ),
     )

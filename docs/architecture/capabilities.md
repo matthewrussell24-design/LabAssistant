@@ -81,12 +81,14 @@ and trend modules now import that neutral contract; `labassistant.view_models`
 is a compatibility facade whose `ParsedSample` name aliases the workspace
 adapter for existing Streamlit and test callers.
 
-The protocol deliberately treats tabular `data` as opaque, but the local
-adapter and several established scientific helpers remain pandas-backed and
-depend on the compatibility metrics dictionary. The boundary is therefore no
-longer coupled to a presentation module, but it is not yet a transport contract.
-The next stabilization step should make one coherent DLS read path derive from
-`Measurement` evidence directly while retaining the workspace adapter.
+The protocol deliberately treats tabular `data` as opaque. Task 051 added the
+frozen, pandas-free `DLSMeasurementMetrics` projection over authoritative
+summary metrics, derived metrics, metadata, flags, and provenance. Both the
+immutable `retrieve_dls_metrics` application read and the legacy pandas metrics
+table now use that projection, so mutable workspace metric overrides cannot
+change their results. The workspace adapter still carries its compatibility
+metrics dictionary for narrative, sample-summary, and distribution callers, so
+the boundary is not yet a transport contract.
 
 ## Implemented Capability Catalog
 
@@ -1144,8 +1146,7 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Migrate the shared DLS metrics/status projection to derive from authoritative
-`Measurement` evidence rather than the workspace metrics dictionary, while
-retaining `DLSWorkspaceEvidence` as a compatibility adapter. This is the
-smallest next step toward Measurement-first application inputs without mixing
-in desktop packaging, HTTP transport, or presentation redesign.
+Migrate DLS review-evidence formatting and the immutable per-sample summary to
+the shared `DLSMeasurementMetrics` projection. Preserve wording and optional-row
+behavior while removing the next application read path's dependency on the
+workspace metrics dictionary; keep distribution-table migration separate.

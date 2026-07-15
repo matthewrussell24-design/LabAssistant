@@ -1,6 +1,12 @@
+from dataclasses import FrozenInstanceError
+
+from pytest import raises
+
 from labassistant.dls_evidence import (
+    DLSMeasurementMetrics,
     DLSSampleEvidence,
     DLSWorkspaceEvidence,
+    measurement_metrics,
 )
 from labassistant.view_models import (
     ParsedSample,
@@ -62,3 +68,21 @@ def test_parsed_sample_remains_a_compatible_dls_evidence_alias():
 
     assert ParsedSample is DLSWorkspaceEvidence
     assert isinstance(sample, DLSSampleEvidence)
+
+
+def test_measurement_metrics_are_frozen_and_measurement_first():
+    sample = parse_uploaded_file(
+        FakeUpload(
+            "sample_a.csv",
+            "Sample Name,Sample A\nPDI,0.31\nZ-Average (nm),125\n",
+        )
+    )
+
+    projected = measurement_metrics(sample.measurement)
+
+    assert isinstance(projected, DLSMeasurementMetrics)
+    assert projected.pdi == 0.31
+    assert projected.z_average_nm == 125.0
+    assert projected.status == "Watch"
+    with raises(FrozenInstanceError):
+        projected.pdi = 0.1

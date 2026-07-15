@@ -26,7 +26,12 @@ from labassistant.context_engine import (
     ResearchJournalEntry,
 )
 from labassistant.measurements import measurement_from_dls_result
-from labassistant.dls_evidence import DLSSampleEvidence, DLSWorkspaceEvidence
+from labassistant.dls_evidence import (
+    DLSMeasurementMetrics,
+    DLSSampleEvidence,
+    DLSWorkspaceEvidence,
+    measurement_metrics,
+)
 from labassistant.aggregation import (
     DualAngleAggregation,
     assess_dual_angle_aggregation,
@@ -65,6 +70,7 @@ __all__ = [
     "AgentAccessPolicy",
     "CapabilityContract",
     "DLSAnalysisResult",
+    "DLSMeasurementMetrics",
     "DLSSampleEvidence",
     "DLSMeasurementSummary",
     "DLSWorkspaceEvidence",
@@ -104,6 +110,7 @@ __all__ = [
     "investigate_observations",
     "list_capabilities",
     "measurement_from_dls_result",
+    "measurement_metrics",
     "retrieve_experiment",
     "save_experiment_to_memory",
 ]

@@ -47,6 +47,38 @@ class DLSWorkspaceEvidence:
     measurement: Measurement
 
 
+@dataclass(frozen=True)
+class DLSMeasurementMetrics:
+    """Pandas-free metric and status projection from one DLS Measurement."""
+
+    data_type: str
+    z_average_nm: float | None
+    pdi: float | None
+    max_z_average_nm: float | None
+    max_pdi: float | None
+    measurement_count: int | None
+    scattering_angles: str | None
+    primary_peak_nm: float | None
+    secondary_peak_nm: float | None
+    peak_count: int | None
+    peak_width_ratio: float | None
+    peak_symmetry: float | None
+    count_rate: float | None
+    tail_index_percent: float | None
+    width_ratio: float | None
+    skewness: float | None
+    aggregation_risk: str | None
+    aggregation_index: float | None
+    quality_score: float | None
+    d10_nm: float | None
+    d50_nm: float | None
+    d90_nm: float | None
+    measurement_date: str | None
+    correlogram_noise_score: float | None
+    warnings: tuple[str, ...]
+    status: str
+
+
 def parse_uploaded_file(uploaded_file: Any) -> DLSWorkspaceEvidence:
     parsed_dls = parse_dls_upload(uploaded_file)
     return DLSWorkspaceEvidence(
@@ -62,6 +94,7 @@ def parse_uploaded_file(uploaded_file: Any) -> DLSWorkspaceEvidence:
 
 
 def sample_from_measurement(measurement: Measurement) -> DLSWorkspaceEvidence:
+    measurement.provenance["workspace_data_type"] = "Multi-file Measurement"
     distribution = _primary_distribution(measurement)
     data = _distribution_dataframe(distribution)
     warnings = [flag.label for flag in measurement.flags]
@@ -112,41 +145,82 @@ def sample_from_measurement(measurement: Measurement) -> DLSWorkspaceEvidence:
 
 
 def sample_status(sample: DLSSampleEvidence) -> str:
-    return status_from_warnings(sample.warnings)
+    return measurement_metrics(sample.measurement).status
+
+
+def measurement_metrics(measurement: Measurement) -> DLSMeasurementMetrics:
+    """Project authoritative Measurement fields into established DLS metrics."""
+
+    if not isinstance(measurement, Measurement):
+        raise TypeError("DLS metrics require a Measurement")
+    warnings = tuple(str(flag.label) for flag in measurement.flags)
+    return DLSMeasurementMetrics(
+        data_type=str(
+            measurement.provenance.get("workspace_data_type")
+            or measurement.provenance.get("data_type")
+            or "Multi-file Measurement"
+        ),
+        z_average_nm=measurement.summary_metrics.z_average,
+        pdi=measurement.summary_metrics.pdi,
+        max_z_average_nm=measurement.summary_metrics.max_z_average,
+        max_pdi=measurement.summary_metrics.max_pdi,
+        measurement_count=measurement.summary_metrics.measurement_count,
+        scattering_angles=_scattering_angles_label(measurement),
+        primary_peak_nm=measurement.derived_metrics.primary_peak_nm,
+        secondary_peak_nm=measurement.derived_metrics.secondary_peak_nm,
+        peak_count=measurement.derived_metrics.peak_count,
+        peak_width_ratio=measurement.derived_metrics.peak_width_ratio,
+        peak_symmetry=measurement.derived_metrics.peak_symmetry,
+        count_rate=measurement.summary_metrics.count_rate,
+        tail_index_percent=measurement.derived_metrics.tail_index_percent,
+        width_ratio=measurement.derived_metrics.width_ratio,
+        skewness=measurement.derived_metrics.skewness,
+        aggregation_risk=measurement.derived_metrics.aggregation_risk,
+        aggregation_index=measurement.derived_metrics.aggregation_index,
+        quality_score=measurement.derived_metrics.quality_score,
+        d10_nm=measurement.derived_metrics.d10_nm,
+        d50_nm=measurement.derived_metrics.d50_nm,
+        d90_nm=measurement.derived_metrics.d90_nm,
+        measurement_date=measurement.metadata.measurement_datetime,
+        correlogram_noise_score=measurement.derived_metrics.correlogram_noise_score,
+        warnings=warnings,
+        status=status_from_warnings(list(warnings)),
+    )
 
 
 def build_metrics_table(samples: list[DLSSampleEvidence]) -> pd.DataFrame:
     rows = []
     for sample in samples:
+        projected = measurement_metrics(sample.measurement)
         rows.append(
             {
                 "Sample": sample.name,
-                "Status": sample_status(sample),
-                "Data Type": sample.metrics["Data Type"],
-                "Z-Average": sample.metrics["Z-Average"],
-                "PDI": sample.metrics["PDI"],
-                "Max Z-Average": sample.metrics["Max Z-Average"],
-                "Max PDI": sample.metrics["Max PDI"],
-                "Measurement Count": sample.metrics["Measurement Count"],
-                "Scattering Angles": sample.metrics["Scattering Angles"],
-                "Primary Peak": sample.metrics["Primary Peak"],
-                "Secondary Peak": sample.metrics["Secondary Peak"],
-                "Peak Count": sample.metrics.get("Peak Count"),
-                "Peak Width Ratio": sample.metrics.get("Peak Width Ratio"),
-                "Peak Symmetry": sample.metrics.get("Peak Symmetry"),
-                "Count Rate": sample.metrics["Count Rate"],
-                "Tail Index": sample.metrics["Tail Index"],
-                "Width Ratio": sample.metrics["Width Ratio"],
-                "Skewness": sample.metrics.get("Skewness"),
-                "Aggregation Risk": sample.metrics.get("Aggregation Risk"),
-                "Aggregation Index": sample.metrics.get("Aggregation Index"),
-                "Quality Score": sample.metrics.get("Quality Score"),
-                "D10": sample.metrics["D10"],
-                "D50": sample.metrics["D50"],
-                "D90": sample.metrics["D90"],
-                "Measurement Date": sample.metrics["Measurement Date"],
-                "Correlogram Noise": sample.metrics.get("Correlogram Noise"),
-                "Warnings": ", ".join(sample.warnings) if sample.warnings else "None",
+                "Status": projected.status,
+                "Data Type": projected.data_type,
+                "Z-Average": projected.z_average_nm,
+                "PDI": projected.pdi,
+                "Max Z-Average": projected.max_z_average_nm,
+                "Max PDI": projected.max_pdi,
+                "Measurement Count": projected.measurement_count,
+                "Scattering Angles": projected.scattering_angles,
+                "Primary Peak": projected.primary_peak_nm,
+                "Secondary Peak": projected.secondary_peak_nm,
+                "Peak Count": projected.peak_count,
+                "Peak Width Ratio": projected.peak_width_ratio,
+                "Peak Symmetry": projected.peak_symmetry,
+                "Count Rate": projected.count_rate,
+                "Tail Index": projected.tail_index_percent,
+                "Width Ratio": projected.width_ratio,
+                "Skewness": projected.skewness,
+                "Aggregation Risk": projected.aggregation_risk,
+                "Aggregation Index": projected.aggregation_index,
+                "Quality Score": projected.quality_score,
+                "D10": projected.d10_nm,
+                "D50": projected.d50_nm,
+                "D90": projected.d90_nm,
+                "Measurement Date": projected.measurement_date,
+                "Correlogram Noise": projected.correlogram_noise_score,
+                "Warnings": ", ".join(projected.warnings) if projected.warnings else "None",
             }
         )
     return pd.DataFrame(rows)

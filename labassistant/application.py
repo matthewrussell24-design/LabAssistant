@@ -17,6 +17,7 @@ from labassistant.context_engine import (
 from labassistant.dls_evidence import (
     DLSSampleEvidence,
     build_metrics_table,
+    measurement_metrics,
     sample_from_measurement,
     sample_status,
 )
@@ -2405,6 +2406,7 @@ def rank_dls_decisions(samples: list[DLSSampleEvidence]) -> DLSDecisionRanking:
         not hasattr(sample, "name")
         or not hasattr(sample, "metrics")
         or not hasattr(sample, "warnings")
+        or not isinstance(getattr(sample, "measurement", None), Measurement)
         for sample in samples
     ):
         raise TypeError("DLS decision ranking requires parsed samples")
@@ -2441,6 +2443,7 @@ def compose_dls_narrative(samples: list[DLSSampleEvidence]) -> DLSNarrative:
         not hasattr(sample, "name")
         or not hasattr(sample, "metrics")
         or not hasattr(sample, "warnings")
+        or not isinstance(getattr(sample, "measurement", None), Measurement)
         for sample in samples
     ):
         raise TypeError("DLS narrative composition requires parsed samples")
@@ -2939,45 +2942,46 @@ def retrieve_dls_metrics(
         raise ValueError("At least one parsed DLS sample is required for metrics")
     if any(
         not hasattr(sample, "name")
-        or not hasattr(sample, "metrics")
-        or not hasattr(sample, "warnings")
+        or not isinstance(getattr(sample, "measurement", None), Measurement)
         for sample in samples
     ):
         raise TypeError("DLS metrics require parsed samples")
 
-    rows = tuple(
-        DLSMetricRow(
-            sample_name=sample.name,
-            status=sample_status(sample),
-            data_type=sample.metrics["Data Type"],
-            z_average_nm=sample.metrics["Z-Average"],
-            pdi=sample.metrics["PDI"],
-            max_z_average_nm=sample.metrics["Max Z-Average"],
-            max_pdi=sample.metrics["Max PDI"],
-            measurement_count=sample.metrics["Measurement Count"],
-            scattering_angles=sample.metrics["Scattering Angles"],
-            primary_peak_nm=sample.metrics["Primary Peak"],
-            secondary_peak_nm=sample.metrics["Secondary Peak"],
-            peak_count=sample.metrics.get("Peak Count"),
-            peak_width_ratio=sample.metrics.get("Peak Width Ratio"),
-            peak_symmetry=sample.metrics.get("Peak Symmetry"),
-            count_rate=sample.metrics["Count Rate"],
-            tail_index_percent=sample.metrics["Tail Index"],
-            width_ratio=sample.metrics["Width Ratio"],
-            skewness=sample.metrics.get("Skewness"),
-            aggregation_risk=sample.metrics.get("Aggregation Risk"),
-            aggregation_index=sample.metrics.get("Aggregation Index"),
-            quality_score=sample.metrics.get("Quality Score"),
-            d10_nm=sample.metrics["D10"],
-            d50_nm=sample.metrics["D50"],
-            d90_nm=sample.metrics["D90"],
-            measurement_date=sample.metrics["Measurement Date"],
-            correlogram_noise_score=sample.metrics.get("Correlogram Noise"),
-            warnings=tuple(str(warning) for warning in sample.warnings),
+    rows = []
+    for sample in samples:
+        projected = measurement_metrics(sample.measurement)
+        rows.append(
+            DLSMetricRow(
+                sample_name=sample.name,
+                status=projected.status,
+                data_type=projected.data_type,
+                z_average_nm=projected.z_average_nm,
+                pdi=projected.pdi,
+                max_z_average_nm=projected.max_z_average_nm,
+                max_pdi=projected.max_pdi,
+                measurement_count=projected.measurement_count,
+                scattering_angles=projected.scattering_angles,
+                primary_peak_nm=projected.primary_peak_nm,
+                secondary_peak_nm=projected.secondary_peak_nm,
+                peak_count=projected.peak_count,
+                peak_width_ratio=projected.peak_width_ratio,
+                peak_symmetry=projected.peak_symmetry,
+                count_rate=projected.count_rate,
+                tail_index_percent=projected.tail_index_percent,
+                width_ratio=projected.width_ratio,
+                skewness=projected.skewness,
+                aggregation_risk=projected.aggregation_risk,
+                aggregation_index=projected.aggregation_index,
+                quality_score=projected.quality_score,
+                d10_nm=projected.d10_nm,
+                d50_nm=projected.d50_nm,
+                d90_nm=projected.d90_nm,
+                measurement_date=projected.measurement_date,
+                correlogram_noise_score=projected.correlogram_noise_score,
+                warnings=projected.warnings,
+            )
         )
-        for sample in samples
-    )
-    return DLSMetricsProjection(rows=rows)
+    return DLSMetricsProjection(rows=tuple(rows))
 
 
 def retrieve_dls_distributions(

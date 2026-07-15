@@ -1,6 +1,13 @@
 import pandas as pd
 
-from labassistant.models import AngleSummary, FiltrationMeasurement, Measurement, MeasurementMetadata, SummaryMetrics
+from labassistant.models import (
+    AngleSummary,
+    DerivedMetrics,
+    FiltrationMeasurement,
+    Measurement,
+    MeasurementMetadata,
+    SummaryMetrics,
+)
 from labassistant.trend_analysis import (
     apply_circulation_time,
     apply_filtration_measurement,
@@ -46,7 +53,19 @@ def make_sample(name: str, z_average: float, pdi: float, replicate_z: list[float
     measurement = Measurement(
         metadata=MeasurementMetadata(sample_name=name),
         summary_metrics=SummaryMetrics(z_average=z_average, pdi=pdi),
-        provenance={"replicate_metrics": {"Z-Average": replicate_z}},
+        derived_metrics=DerivedMetrics(
+            primary_peak_nm=z_average,
+            tail_index_percent=0.0,
+            width_ratio=3.0,
+            quality_score=95.0,
+            d10_nm=80.0,
+            d50_nm=z_average,
+            d90_nm=140.0,
+        ),
+        provenance={
+            "data_type": "Measurement Summary",
+            "replicate_metrics": {"Z-Average": replicate_z},
+        },
     )
     metrics = {
         "Data Type": "Measurement Summary",

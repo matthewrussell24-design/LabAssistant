@@ -1,11 +1,31 @@
 import pandas as pd
 
 from labassistant.interpretation import build_ai_summary, build_decision_brief, review_evidence
-from labassistant.models import Measurement, MeasurementMetadata
+from labassistant.models import (
+    DerivedMetrics,
+    Measurement,
+    MeasurementFlag,
+    MeasurementMetadata,
+    SummaryMetrics,
+)
 from labassistant.view_models import ParsedSample, build_metrics_table
 
 
 def make_sample(name: str, pdi: float, warnings: list[str]) -> ParsedSample:
+    measurement = Measurement(
+        metadata=MeasurementMetadata(sample_name=name),
+        summary_metrics=SummaryMetrics(z_average=100.0, pdi=pdi),
+        derived_metrics=DerivedMetrics(
+            primary_peak_nm=100.0,
+            tail_index_percent=0.0,
+            width_ratio=3.0,
+            d10_nm=50.0,
+            d50_nm=100.0,
+            d90_nm=150.0,
+        ),
+        flags=[MeasurementFlag(label=warning) for warning in warnings],
+        provenance={"data_type": "Distribution Curve"},
+    )
     return ParsedSample(
         name=name,
         file_name=f"{name}.csv",
@@ -39,7 +59,7 @@ def make_sample(name: str, pdi: float, warnings: list[str]) -> ParsedSample:
         },
         warnings=warnings,
         source_text="",
-        measurement=Measurement(metadata=MeasurementMetadata(sample_name=name)),
+        measurement=measurement,
     )
 
 

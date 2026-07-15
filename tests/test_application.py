@@ -98,12 +98,15 @@ from labassistant.models import (
     ChromatogramTrace,
     ChromatographyMeasurement,
     ChromatographyPeak,
+    DerivedMetrics,
     DistributionData,
     Experiment,
     FiltrationMeasurement,
     MassBalanceAssessment,
     Measurement,
+    MeasurementFlag,
     MeasurementMetadata,
+    SummaryMetrics,
     AngleSummary,
     Observation,
 )
@@ -545,7 +548,10 @@ def test_save_experiment_history_accepts_parsed_samples_without_mutating_them(tm
     assert receipt.label == "Follow-up"
     assert receipt.measurement_count == 1
     assert receipt.loaded_from_record_id == first_receipt.record_id
-    assert sample.measurement.provenance == {"session_marker": "keep"}
+    assert sample.measurement.provenance == {
+        "data_type": "Distribution Curve",
+        "session_marker": "keep",
+    }
     saved = [
         json.loads(line)
         for line in history_path.read_text(encoding="utf-8").splitlines()
@@ -557,6 +563,7 @@ def test_save_experiment_history_accepts_parsed_samples_without_mutating_them(tm
     ]
     assert saved[1]["measurements"][0]["metadata"]["sample_name"] == "Lot 1"
     assert saved[1]["measurements"][0]["provenance"] == {
+        "data_type": "Distribution Curve",
         "session_marker": "keep",
         "history_lineage": {
             "loaded_from_record_id": first_receipt.record_id,
@@ -1114,6 +1121,20 @@ def test_analyze_dls_uploads_validates_generic_seekable_sources():
 
 
 def _decision_sample(name: str, pdi: float, warnings: list[str]) -> ParsedSample:
+    measurement = Measurement(
+        metadata=MeasurementMetadata(sample_name=name),
+        summary_metrics=SummaryMetrics(z_average=100.0, pdi=pdi),
+        derived_metrics=DerivedMetrics(
+            primary_peak_nm=100.0,
+            tail_index_percent=0.0,
+            width_ratio=3.0,
+            d10_nm=50.0,
+            d50_nm=100.0,
+            d90_nm=150.0,
+        ),
+        flags=[MeasurementFlag(label=warning) for warning in warnings],
+        provenance={"data_type": "Distribution Curve"},
+    )
     return ParsedSample(
         name=name,
         file_name=f"{name}.csv",
@@ -1141,7 +1162,7 @@ def _decision_sample(name: str, pdi: float, warnings: list[str]) -> ParsedSample
         },
         warnings=warnings,
         source_text="",
-        measurement=Measurement(metadata=MeasurementMetadata(sample_name=name)),
+        measurement=measurement,
     )
 
 
@@ -1259,6 +1280,8 @@ def test_summarize_dls_health_validates_parsed_samples():
     missing = _decision_sample("missing", 0.12, [])
     missing.metrics["Z-Average"] = None
     missing.metrics["Tail Index"] = None
+    missing.measurement.summary_metrics.z_average = None
+    missing.measurement.derived_metrics.tail_index_percent = None
     result = summarize_dls_health([missing])
     assert result.median_z_average_nm is None
     assert result.median_tail_percent is None
@@ -1276,6 +1299,7 @@ def test_analyze_dls_trend_diagnostics_preserves_rows_and_order_without_pandas()
         ([99, 100, 101], [106, 110, 121], [120, 126, 129]),
     ):
         sample.metrics["Z-Average"] = z_average
+        sample.measurement.summary_metrics.z_average = z_average
         sample.measurement.provenance["replicate_metrics"] = {
             "Z-Average": replicates
         }
@@ -1862,6 +1886,14 @@ def test_retrieve_dls_metrics_preserves_established_projection_exactly():
             "Correlogram Noise": 0.02,
         }
     )
+    flagged.measurement.derived_metrics.peak_count = 2
+    flagged.measurement.derived_metrics.peak_width_ratio = 1.25
+    flagged.measurement.derived_metrics.peak_symmetry = 0.9
+    flagged.measurement.derived_metrics.skewness = 0.4
+    flagged.measurement.derived_metrics.aggregation_risk = "Watch"
+    flagged.measurement.derived_metrics.aggregation_index = 0.3
+    flagged.measurement.derived_metrics.quality_score = 82.0
+    flagged.measurement.derived_metrics.correlogram_noise_score = 0.02
 
     result = retrieve_dls_metrics([clean, flagged])
 
@@ -1874,6 +1906,18 @@ def test_retrieve_dls_metrics_preserves_established_projection_exactly():
     assert result.to_dict()["api_version"] == AGENT_API_VERSION
     with raises(FrozenInstanceError):
         result.rows[0].status = "Changed"
+
+
+def test_retrieve_dls_metrics_ignores_mutable_workspace_metric_overrides():
+    sample = _decision_sample("authoritative", 0.21, [])
+    sample.metrics["PDI"] = 9.99
+    sample.metrics["Z-Average"] = 9999.0
+
+    result = retrieve_dls_metrics([sample])
+
+    assert result.rows[0].pdi == 0.21
+    assert result.rows[0].z_average_nm == 100.0
+    assert build_metrics_table([sample]).loc[0, "PDI"] == 0.21
 
 
 def test_retrieve_dls_metrics_validates_parsed_samples():
