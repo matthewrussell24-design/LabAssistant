@@ -12,6 +12,7 @@ from pathlib import Path
 import socket
 import stat
 import sys
+import threading
 from typing import Any, Callable
 
 from labassistant.api_readiness import (
@@ -48,6 +49,10 @@ class TransportUnavailableError(RuntimeError):
 
 class UnsafeSocketPathError(RuntimeError):
     """Raised when a socket or runtime path cannot be managed safely."""
+
+
+class BrokerAlreadyRunningError(UnsafeSocketPathError):
+    """Raised when a live broker already owns the requested socket."""
 
 
 @dataclass(frozen=True)
@@ -175,9 +180,10 @@ class LocalReadBroker:
         self._unlink_owned_socket()
 
     def serve_once(self) -> None:
-        if self._listener is None:
+        listener = self._listener
+        if listener is None:
             raise RuntimeError("broker is not started")
-        connection, _ = self._listener.accept()
+        connection, _ = listener.accept()
         with connection:
             connection.settimeout(SOCKET_TIMEOUT_SECONDS)
             response = self._handle_connection(connection)
@@ -188,13 +194,34 @@ class LocalReadBroker:
 
     def serve_forever(self) -> None:
         self.start()
+        stop_event = threading.Event()
         try:
-            while True:
-                self.serve_once()
+            self.serve_until(stop_event)
         except KeyboardInterrupt:
             pass
         finally:
             self.close()
+
+    def serve_until(
+        self,
+        stop_event: threading.Event,
+        *,
+        poll_interval: float = 0.2,
+    ) -> None:
+        """Serve an already-started broker until cooperative stop is requested."""
+        listener = self._listener
+        if listener is None:
+            raise RuntimeError("broker is not started")
+        listener.settimeout(poll_interval)
+        while not stop_event.is_set():
+            try:
+                self.serve_once()
+            except socket.timeout:
+                continue
+            except OSError:
+                if stop_event.is_set() or self._listener is None:
+                    return
+                raise
 
     def _handle_connection(self, connection: socket.socket) -> bytes:
         try:
@@ -262,7 +289,7 @@ class LocalReadBroker:
         except (ConnectionRefusedError, FileNotFoundError):
             self.socket_path.unlink(missing_ok=True)
         else:
-            raise UnsafeSocketPathError("read broker is already running")
+            raise BrokerAlreadyRunningError("read broker is already running")
         finally:
             probe.close()
 

@@ -196,11 +196,19 @@ payload fields. Connection, transport, protocol, and stable application errors
 remain distinct. It never starts or manages the broker.
 
 ADR 005 approves a first desktop lifecycle integration, but does not implement
-it. The native desktop remains listener-free by default and may own the broker
+it automatically. Task 066 implemented the explicit integration. The native
+desktop remains listener-free by default and may own the broker
 only for a launch explicitly containing `--share-local-reads`. Ownership must
 run outside AppKit state, close in an outer `try/finally`, distinguish owned
 from compatible external brokers, and remain disabled in packaged builds until
 sandbox and entitlement behavior is validated.
+
+The implementation adds an AppKit-independent owner, cooperative accept-loop
+shutdown, compatible external discovery, safe status categories, and separate
+argument parsing. Cocoa termination invokes the idempotent owner cleanup through
+the application delegate; Python exceptions retain outer `try/finally` and
+`atexit` coverage. A signal wakeup bridge converts terminal signals into normal
+Cocoa termination so cleanup runs before process exit.
 
 ## Go/No-Go
 

@@ -81,6 +81,17 @@ the summary, intensity-distribution, and correlogram files that make up an
 existing supported DLS dataset. The native AppKit/WebKit runtime is installed
 through the pinned PyObjC packages in `requirements.txt`.
 
+To make the stable local reads available only for that desktop session, opt in
+explicitly:
+
+```bash
+scripts/run-desktop --share-local-reads
+```
+
+Normal desktop startup remains listener-free. The opted-in broker stops with
+the app and removes only its owned socket; a compatible separately started
+broker remains externally owned.
+
 The desktop app opens into a research workspace with reusable experiment,
 metric, analysis, and session-history cards. Streamlit remains available for
 the broader compatibility workflow.

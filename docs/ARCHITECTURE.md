@@ -34,9 +34,9 @@ broker. It exposes seven immutable read methods and layered errors without
 introducing an agent loop or making client code understand raw envelopes.
 
 ADR 005 keeps the native desktop listener-free by default and approves only an
-explicit per-launch opt-in for future broker ownership. That lifecycle must sit
-around the AppKit run loop, not inside window or WebKit state, and remains
-disabled for packaged builds until sandbox behavior is proven.
+explicit per-launch opt-in for broker ownership. Task 066 implemented that
+lifecycle around the AppKit run loop, not inside window or WebKit state. It
+remains disabled for packaged builds until sandbox behavior is proven.
 
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.

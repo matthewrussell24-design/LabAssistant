@@ -245,3 +245,22 @@ def test_socket_path_length_fails_before_bind(tmp_path):
     socket_path = tmp_path / ("x" * transport.MAX_SOCKET_PATH_BYTES)
     with pytest.raises(transport.UnsafeSocketPathError, match="platform limit"):
         transport.LocalReadBroker(socket_path).start()
+
+
+def test_cooperative_serve_loop_stops_after_listener_close(short_socket_path):
+    broker = transport.LocalReadBroker(
+        short_socket_path, credential_resolver=lambda _: OWNER
+    )
+    broker.start()
+    stop_event = threading.Event()
+    worker = threading.Thread(
+        target=broker.serve_until,
+        args=(stop_event,),
+        kwargs={"poll_interval": 0.01},
+    )
+    worker.start()
+    stop_event.set()
+    broker.close()
+    worker.join(timeout=1)
+    assert not worker.is_alive()
+    assert not short_socket_path.exists()

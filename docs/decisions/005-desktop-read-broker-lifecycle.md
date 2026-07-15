@@ -133,3 +133,13 @@ separate gates are satisfied.
 - Desktop UI state and scientific core boundaries remain independent of IPC.
 - Hidden startup, persistent services, remote transport, writes, autonomous
   agents, and instrument control remain excluded.
+
+## Task 066 Implementation
+
+The opt-in lifecycle is implemented with an AppKit-independent owner and a
+cooperative broker worker. The default launch remains socket-free. Compatible
+external brokers are detected through typed discovery and never closed by the
+desktop. Cocoa's termination path does not reliably return through the Python
+run-loop call, so the application delegate invokes the same idempotent cleanup
+used by the outer `try/finally`; an `atexit` registration provides another safe
+Python exit path. Terminal signals are bridged into normal Cocoa termination.

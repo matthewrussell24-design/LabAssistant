@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Accepted explicit per-launch desktop ownership of the
-  local read broker, default off (task 065).
-- Working Tree: Task 065 is committed locally; inspect `git status --short`
+- Latest Completed Change: Implemented explicit per-launch desktop ownership of
+  the local read broker with deterministic Cocoa cleanup (task 066).
+- Working Tree: Task 066 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `256 passed in 2.99s` from `scripts/test -q` on
+- Last Successful Test: `265 passed in 3.02s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 065.
+- Last Updated: 2026-07-15 for task 066.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 256 passing.
+- Tests: 🟢 Healthy — 265 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -65,9 +65,9 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: Desktop Broker Lifecycle Design
+- Milestone: Desktop Broker Lifecycle
 - Status: Complete
-- Goal: Define explicit desktop broker ownership without hidden IPC startup.
+- Goal: Serve stable local reads during an explicitly opted-in desktop session.
 - Current evidence: Task 057 audited all 42 registry entries, selected seven
   candidate reads, defined draft-to-stable versioning, and recorded a no-go for
   HTTP or agent transports until shared envelopes, stable errors, access
@@ -87,6 +87,9 @@ are future platform capabilities and are not automatically the next task.
   transport, protocol, and stable application failures distinct.
   Task 065 selected a non-persistent `--share-local-reads` launch opt-in and
   defined ownership, collision, thread, shutdown, and packaging gates.
+  Task 066 implemented that lifecycle, including cooperative broker stop,
+  typed external collision probing, Cocoa termination cleanup, and a real native
+  launch/read/shutdown smoke.
 
 ## Five-Minute Rule
 
@@ -158,6 +161,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   context from verified macOS peer credentials.
 - `labassistant.local_read_client` exposes typed immutable methods for those
   seven reads; it does not start the broker or add autonomous behavior.
+- `labassistant.desktop_read_sharing` owns optional process-bounded desktop
+  sharing independently of AppKit state; normal desktop launch remains socket-free.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -428,6 +433,8 @@ architecture rationale.
   seven capability-specific methods (task 064).
 - Accepted a default-off, explicit-launch desktop broker lifecycle with bounded
   ownership, collision, shutdown, and packaging rules (task 065).
+- Implemented the default-off desktop sharing flag, lifecycle owner, cooperative
+  shutdown, and Cocoa termination cleanup (task 066).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -443,9 +450,8 @@ architecture rationale.
 
 ## Active Work
 
-- Desktop broker lifecycle decision task 065 is complete; no runtime behavior
-  changed.
-- The working tree was clean when task 065 began.
+- Desktop broker lifecycle task 066 is complete; packaged enablement remains off.
+- The working tree was clean when task 066 began.
 
 ## Known Risks
 
@@ -482,7 +488,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `256 passed in 2.99s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `265 passed in 3.02s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -501,21 +507,24 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Implement ADR 005's explicit `--share-local-reads` desktop
-  lifecycle with cooperative broker shutdown and default-off behavior.
-- Why this is next: Consent and ownership rules are now decided. The smallest
-  implementation can make reads available during an opted-in desktop session
-  without changing the default app or adding a persistent service.
-- Expected scope: Medium; add an AppKit-independent lifecycle owner, cooperative
-  broker stop/unblock, desktop argument parsing, compatible collision probing,
-  safe stderr status, and lifecycle/integration tests.
-- Risks: Accept-loop shutdown races, closing an externally owned broker,
-  blocking AppKit termination, leaking diagnostics, or treating the flag as a
-  persisted preference.
-- Success criteria: default desktop launch creates no socket; explicit opt-in
-  serves typed reads, handles compatible and unsafe collisions correctly, and
-  removes only its owned socket on every exit path. No hidden daemon, packaged
-  enablement, writes, remote transport, autonomous runtime, or instrument control.
+- Objective: Audit macOS packaging readiness and select the first supported
+  signing, sandbox, runtime-location, and distribution model without packaging
+  the app yet.
+- Why this is next: Human desktop, stable local reads, and explicit lifecycle
+  ownership now work in development. Packaging is the next unresolved boundary,
+  and local sharing must stay disabled until its sandbox/entitlement behavior is
+  understood.
+- Expected scope: Medium; inventory PyObjC/WebKit/data-file/runtime requirements,
+  compare unsigned development bundle, Developer ID/notarized distribution, and
+  sandboxed distribution, define socket/data locations and entitlement impact,
+  and record a reproducible packaging implementation gate.
+- Risks: Bundling unpinned dependencies, breaking WebKit resources or importers,
+  placing mutable data inside the bundle, assuming sandbox IPC visibility, or
+  conflating a development bundle with a distributable product.
+- Success criteria: an accepted packaging ADR, explicit supported first target,
+  resource/runtime layout, signing/notarization/sandbox decision, verification
+  matrix, and go/no-go implementation sequence. No installer, release upload,
+  hidden service, write API, remote transport, or autonomous runtime.
 
 ## AI Context Window
 

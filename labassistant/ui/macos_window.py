@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
+import select
+import signal
+import threading
 from collections.abc import Callable, Sequence
 
 import objc
@@ -22,6 +26,7 @@ from AppKit import (
     NSWindowStyleMaskTitled,
 )
 from Foundation import NSURL
+from CoreFoundation import CFRunLoopGetMain, CFRunLoopWakeUp
 from WebKit import WKWebView, WKWebViewConfiguration
 
 from labassistant.application import DLSAnalysisResult, list_experiments, restore_dls_experiment
@@ -97,17 +102,31 @@ class WorkspaceController(NSObject):
 
 
 class ApplicationDelegate(NSObject):
+    def initWithTerminationCallback_(self, callback):
+        self = objc.super(ApplicationDelegate, self).init()
+        if self is None:
+            return None
+        self.termination_callback = callback
+        return self
+
     def applicationShouldTerminateAfterLastWindowClosed_(self, application):
         return True
+
+    def applicationWillTerminate_(self, notification):
+        if self.termination_callback is not None:
+            self.termination_callback()
 
 
 def run_native_workspace(
     analyze_dataset: Callable[[Sequence[str]], DLSAnalysisResult],
     initial_paths: Sequence[str] = (),
+    termination_callback: Callable[[], None] | None = None,
 ) -> None:
     application = NSApplication.sharedApplication()
     application.setActivationPolicy_(NSApplicationActivationPolicyRegular)
-    delegate = ApplicationDelegate.alloc().init()
+    delegate = ApplicationDelegate.alloc().initWithTerminationCallback_(
+        termination_callback
+    )
     application.setDelegate_(delegate)
 
     style = (
@@ -135,7 +154,80 @@ def run_native_workspace(
     webview.loadHTMLString_baseURL_(WORKSPACE_HTML, NSURL.fileURLWithPath_("/"))
     window.makeKeyAndOrderFront_(None)
     application.activateIgnoringOtherApps_(True)
-    application.run()
+    signal_bridge = _AppSignalBridge(application)
+    try:
+        signal_bridge.start()
+        application.run()
+    finally:
+        signal_bridge.close()
 
     # Retain native objects for the duration of the run loop.
     _ = (window, webview, controller, delegate)
+
+
+class _AppSignalBridge:
+    """Wake the Cocoa run loop when terminal signals arrive during objc calls."""
+
+    def __init__(self, application) -> None:
+        self.application = application
+        self.signals = (signal.SIGINT, signal.SIGTERM)
+        self.previous_handlers = {}
+        self.previous_wakeup_fd = -1
+        self.read_fd = -1
+        self.write_fd = -1
+        self.worker = None
+        self.stopping = threading.Event()
+
+    def start(self) -> None:
+        self.read_fd, self.write_fd = os.pipe()
+        os.set_blocking(self.read_fd, False)
+        os.set_blocking(self.write_fd, False)
+        self.previous_handlers = {
+            signum: signal.getsignal(signum) for signum in self.signals
+        }
+        for signum in self.signals:
+            signal.signal(signum, lambda signum, frame: None)
+        self.previous_wakeup_fd = signal.set_wakeup_fd(self.write_fd)
+        self.worker = threading.Thread(
+            target=self._watch,
+            name="labassistant-app-signal-bridge",
+            daemon=True,
+        )
+        self.worker.start()
+
+    def close(self) -> None:
+        self.stopping.set()
+        signal.set_wakeup_fd(self.previous_wakeup_fd)
+        for signum, handler in self.previous_handlers.items():
+            signal.signal(signum, handler)
+        if self.write_fd >= 0:
+            try:
+                os.write(self.write_fd, b"\0")
+            except OSError:
+                pass
+        if self.worker is not None:
+            self.worker.join(0.5)
+        for descriptor in (self.read_fd, self.write_fd):
+            if descriptor >= 0:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+
+    def _watch(self) -> None:
+        while not self.stopping.is_set():
+            readable, _, _ = select.select([self.read_fd], [], [], 0.5)
+            if not readable:
+                continue
+            try:
+                received = os.read(self.read_fd, 1024)
+            except BlockingIOError:
+                continue
+            if not received or self.stopping.is_set():
+                return
+            run_loop = CFRunLoopGetMain()
+            self.application.performSelectorOnMainThread_withObject_waitUntilDone_(
+                "terminate:", None, False
+            )
+            CFRunLoopWakeUp(run_loop)
+            return
