@@ -60,8 +60,8 @@ ad-hoc sign, structurally inspect, and exercise a packaged scientific/runtime
 smoke. No packaging code changes the normal desktop launch or enables IPC.
 The build acquires an exact checksum-pinned `python-build-standalone` CPython
 3.12 runtime rather than host Python. Its inspected native closure establishes
-macOS 14.0 as a candidate binary floor; clean-machine execution is still
-required before that becomes a compatibility claim (ADR 007).
+macOS 14.0 as the binary floor; task 072 qualified it on clean macOS 14/current
+arm64 hosts and archived the evidence (ADR 007).
 The compatibility harness runs that same build, audit, scientific smoke,
 persistence reuse, and Finder lifecycle sequence on explicit fresh macOS 14 and
 26 arm64 hosted runners and archives machine-readable environment evidence.

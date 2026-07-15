@@ -76,11 +76,12 @@ stage followed by Developer ID signing, hardened runtime, and notarization for
 direct distribution. Tasks 068–070 completed runtime paths, dependency
 reproducibility, and the first local-only standalone arm64 bundle. Task 071
 replaced host Python with a checksum-pinned controlled runtime and derived a
-candidate macOS 14 binary floor. Sandbox, Mac App Store, universal2, and
-packaged local-read sharing remain separate tracks; the clean macOS 14/current
-compatibility matrix is the next gate.
+candidate macOS 14 binary floor. Task 072 qualified that floor on clean hosted
+minimum/current endpoints. Sandbox, Mac App Store, universal2, and
+packaged local-read sharing remain separate tracks.
 Task 072 has prepared that two-row hosted matrix and locally validated its
-common harness; both clean hosted rows remain pending publication and execution.
+common harness. Both clean hosted rows passed from commit `05ed977`, qualifying
+macOS 14 as the arm64 minimum while leaving distribution gates unchanged.
 
 ## Phase 1: Rename The Product Concepts
 

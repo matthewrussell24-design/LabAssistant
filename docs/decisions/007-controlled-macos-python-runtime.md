@@ -12,11 +12,12 @@ install-only artifact published by Astral's `python-build-standalone` process.
 downloads, verifies, and extracts it outside the repository instead of using a
 Python found on `PATH`.
 
-The bundle declares macOS 14.0 as its **candidate binary floor**. This is the
+The bundle declares macOS 14.0 as its **qualified binary floor**. This is the
 highest deployment target in the complete 76-file Mach-O closure: the runtime
 supports 11.0 and NumPy's extensions require 14.0. The inspection script fails
 if any native file exceeds the declaration. This is not yet a supported-version
-claim: clean arm64 macOS 14 and current-macOS execution remain mandatory.
+claim by itself; task 072 subsequently passed clean arm64 macOS 14.8.7 and
+26.4 execution from the same commit.
 
 ## Context and Alternatives
 
@@ -48,6 +49,9 @@ Remove each patch hunk when an upstream release handles that case.
 - A clean-machine matrix must exercise macOS 14 and current macOS, including
   fresh profile, scientific smoke, Finder launch, and upgrade persistence.
   Versions below 14 are unsupported by this dependency closure.
+
+Task 072 satisfied that matrix in hosted run `29447782134`; the reviewed result
+is preserved in `docs/status/macos-compatibility-evidence.md`.
 
 ## References
 

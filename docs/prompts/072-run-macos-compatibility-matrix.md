@@ -1,6 +1,6 @@
 # Run Clean macOS Compatibility Matrix
 
-Status: In Progress — automation complete; external rows pending
+Status: Complete
 Created: 2026-07-15
 Last Updated: 2026-07-15
 Priority: High
@@ -28,9 +28,9 @@ sequence. `.github/workflows/macos-compatibility.yml` selects explicit fresh
 arm64 `macos-14` and `macos-26` hosted runners and archives each row's log and
 summary. GitHub documents each standard hosted job as a newly provisioned VM.
 
-The workflow has not run because this task is committed locally and repository
-policy prohibits pushing without explicit user authorization. Consequently the
-macOS 14 floor remains a candidate and neither clean row is marked passed.
+The workflow was published with user authorization. Passing run `29447782134`
+completed both clean rows from commit `05ed977`; reviewed durable evidence is in
+`docs/status/macos-compatibility-evidence.md`.
 
 The common runner passed locally on arm64 macOS 26.5.2 (build 25F84): 76 native
 files passed the 11.0/14.0 target audit, scientific smoke passed, persistence
@@ -44,7 +44,7 @@ name lookup first and selected each runner's unrelated system Python framework,
 including Python 3.11 and Tcl. Signing then failed on that contaminated payload.
 The portable-runtime patch now returns the controlled prefix's explicit
 `libpython3.12.dylib` before framework lookup. The corrected bundle and all
-smokes pass locally; a second hosted run is pending. The workflow also uses the
+smokes pass locally; the second hosted run passed. The workflow also uses the
 current Node 24 checkout/artifact actions to avoid deprecated action runtimes.
 
 ## Success Criteria

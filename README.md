@@ -113,9 +113,10 @@ DLS/XLSX, chromatography CSV, synthetic OpenLab `.olax`, JSONL history, SQLite
 memory, paths with spaces, and default-off IPC.
 
 This bundle uses a checksum-pinned controlled CPython runtime and declares a
-candidate macOS 14.0 binary floor from its complete native closure. It is not
-Developer ID signed, hardened/notarized, sandboxed, universal2, or yet validated
-on clean macOS 14/current machines, so the declaration is not a support claim.
+qualified macOS 14.0 minimum from its complete native closure and clean hosted
+macOS 14/current execution. It is not Developer ID signed,
+hardened/notarized, sandboxed, universal2, or distributable; compatibility
+evidence does not bypass those release gates.
 `scripts/qualify-macos-compatibility` runs the complete evidence-producing
 sequence; `.github/workflows/macos-compatibility.yml` applies it to fresh arm64
 macOS 14 and 26 hosted runners.

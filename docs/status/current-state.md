@@ -9,15 +9,15 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Selected a checksum-pinned controlled CPython
-  runtime and derived an enforced candidate macOS 14 binary floor (task 071).
-- Working Tree: Task 072 matrix automation is committed locally. An unrelated
+- Latest Completed Change: Passed and archived the clean arm64 macOS 14/current
+  compatibility matrix, qualifying macOS 14 as the minimum (task 072).
+- Working Tree: Task 072 evidence is committed locally. An unrelated
   duplicate patch file remains untracked.
   before beginning new work.
 - Last Successful Test: `283 passed in 2.97s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 071.
+- Last Updated: 2026-07-15 for task 072.
 
 ## North Star
 
@@ -103,8 +103,8 @@ are future platform capabilities and are not automatically the next task.
   bundle, structural audit, packaged scientific smoke, and Launch Services
   open/quit. Task 071 replaced its host Homebrew payload with checksum-pinned
   controlled CPython 3.12.13, reduced the closure to 76 arm64 Mach-O files with
-  11.0/14.0 targets, and enforced a candidate macOS 14 floor. Clean-machine
-  compatibility remains unqualified.
+  11.0/14.0 targets, and enforced a candidate macOS 14 floor. Task 072 then
+  passed both clean hosted endpoints from the same commit and archived evidence.
 
 ## Five-Minute Rule
 
@@ -469,6 +469,8 @@ architecture rationale.
   including packaged scientific/runtime and Launch Services smoke (task 070).
 - Replaced host Python with an exact verified controlled runtime and enforced
   the inspected candidate macOS 14 binary floor (task 071).
+- Passed clean arm64 macOS 14.8.7/current 26.4 build, audit, scientific,
+  persistence, and Finder checks and archived their provenance (task 072).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -484,13 +486,10 @@ architecture rationale.
 
 ## Active Work
 
-- Task 072 adds one evidence-producing compatibility runner and an explicit
-  fresh arm64 `macos-14`/`macos-26` GitHub Actions matrix.
-- The common harness passes locally on macOS 26.5.2, but neither clean hosted row
-  has passed. The first hosted run exposed and diagnosed py2app host-framework
-  contamination; the bounded portable-runtime fix is locally verified.
+- Task 072 is complete. Its first hosted run exposed py2app host-framework
+  contamination; the bounded portable-runtime fix and second two-row run passed.
 - `/tmp/LabAssistantQualification.app` remains an ad-hoc qualification artifact,
-  not a release; macOS 14 remains only a candidate floor.
+  not a release. macOS 14 is qualified for the tested arm64 boundaries.
 
 ## Known Risks
 
@@ -502,9 +501,8 @@ architecture rationale.
   care until stronger persistence requirements justify a change.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
-- AppKit/WebKit is locally packaged but not Developer ID signed, notarized, or
-  validated across target macOS versions. The controlled bundle's native
-  closure supports the declared macOS 14 floor, but only macOS 26.5.2 has run it.
+- AppKit/WebKit is locally packaged and clean-host qualified at the macOS 14
+  minimum and current macOS, but is not Developer ID signed or notarized.
 - Persisted technique detection currently relies on measurement shape because
   the JSONL record envelope predates an explicit technique discriminator.
 - PySide6 6.11.1, 6.10.1, and 6.8.3 all failed to initialize their installed
@@ -535,7 +533,8 @@ architecture rationale.
   Packaged scientific/runtime smoke and Finder open/quit passed on macOS 26.5.2.
 - Task 072's shared compatibility runner passed locally on arm64 macOS 26.5.2,
   including the same build/audit/smoke, persistence reuse from one to two
-  history records, and Finder lifecycle. Clean hosted rows remain pending.
+  history records, and Finder lifecycle. Hosted run `29447782134` then passed
+  the same checks on clean macOS 14.8.7 and 26.4; durable evidence is linked.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -554,19 +553,22 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Publish task 072 with explicit user authorization, execute the
-  `macos-14` and `macos-26` hosted workflow rows, and review their artifacts.
-- Why this is next: The common harness is locally proven and GitHub provisions
-  each standard hosted job as a new VM. Execution requires the workflow commit
-  to reach GitHub, but repository policy forbids an implicit push.
-- Expected scope: Small if both rows pass; push the committed workflow, observe
-  both jobs, download/review `summary.env` and logs, and record exact image/OS
-  evidence. Diagnose rather than waive any failed boundary.
-- Risks: macOS 14 hosted-image deprecation, GUI lifecycle differences in hosted
-  sessions, or mistaking the successful local harness run for a clean row.
-- Success criteria: both clean rows pass from the same commit and their archived
-  provenance agrees with the pinned runtime and expected OS major. Only then may
-  macOS 14 move from candidate binary floor to qualified compatibility.
+- Objective: Assemble and verify the macOS bundle's third-party license notices
+  and release provenance manifest.
+- Why this is next: Runtime and compatibility gates now pass, while Developer ID
+  signing is externally blocked on an identity. ADR 007 already requires notice
+  review before release, and that work can proceed without credentials.
+- Expected scope: Medium; inventory the exact controlled runtime and locked
+  distributions, collect authoritative license texts/metadata, generate a
+  deterministic notice/provenance artifact, package it as an immutable resource,
+  and test that every shipped component is covered without claiming legal advice.
+- Risks: Treating incomplete wheel metadata as a license grant, duplicating
+  notices inconsistently, omitting runtime/toolchain obligations, or packaging
+  development-only dependencies.
+- Success criteria: a reproducible reviewed manifest maps every shipped runtime
+  component to version, source, digest where applicable, license identifier/text,
+  and bundle location; inspection fails on uncovered components. No signing,
+  notarization, upload, sandbox, or universal2 yet.
 
 ## AI Context Window
 
