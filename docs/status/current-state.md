@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Routed DLS review evidence and immutable per-sample
-  summaries through the Measurement-first projection (task 052).
-- Working Tree: Task 052 is committed locally; inspect `git status --short`
+- Latest Completed Change: Routed DLS decision ranking and narrative
+  interpretation through Measurement-first evidence (task 053).
+- Working Tree: Task 053 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `229 passed in 2.42s` from `scripts/test -q` on
+- Last Successful Test: `230 passed in 2.35s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 052.
+- Last Updated: 2026-07-15 for task 053.
 
 ## North Star
 
@@ -28,11 +28,11 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 229 passing.
+- Tests: 🟢 Healthy — 230 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
-- Application Layer: 🟡 In Progress — metrics/status, review evidence, and sample
-  summaries are Measurement-first, while narrative, observation, and
+- Application Layer: 🟡 In Progress — metrics, status, sample summaries,
+  decisions, and narratives are Measurement-first; observation and raw
   distribution paths still use compatibility workspace fields.
 - API Layer: ⚪ Not Started — intentionally deferred until the application
   boundary is mature.
@@ -70,9 +70,9 @@ are future platform capabilities and are not automatically the next task.
   evidence contracts incrementally while preserving existing shells.
 - Current evidence: Task 050 removed reusable-core view-model imports through
   `DLSSampleEvidence`; tasks 051 and 052 made shared metrics/status, review
-  evidence, and sample summaries Measurement-first. Narrative, observation, and
-  distribution compatibility projections remain before the layer is
-  transport-neutral.
+  evidence, and sample summaries Measurement-first; task 053 migrated decision
+  and narrative interpretation. Observation and distribution compatibility
+  projections remain before the layer is transport-neutral.
 
 ## Five-Minute Rule
 
@@ -371,6 +371,8 @@ architecture rationale.
   through a frozen Measurement-first metrics/status projection (task 051).
 - Routed ordered review evidence and immutable per-sample display summaries
   through the Measurement-first projection (task 052).
+- Routed attention scoring, warning rows, and narrative distribution-confidence
+  checks through Measurement evidence (task 053).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -386,8 +388,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS Measurement-first review-evidence task 052 is complete.
-- The working tree was clean when task 052 began.
+- DLS Measurement-first decision/narrative task 053 is complete.
+- The working tree was clean when task 053 began.
 
 ## Known Risks
 
@@ -422,9 +424,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `229 passed in 2.42s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `230 passed in 2.35s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  052.
+  053.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -441,20 +443,20 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Route DLS decision ranking and narrative interpretation helpers
-  through `DLSMeasurementMetrics` instead of workspace metrics and warnings.
-- Why this is next: Task 052 removed mutable compatibility fields from review
-  evidence and sample summaries. Attention scoring, warning columns, and one
-  data-story completeness check are now the remaining narrative consumers.
-- Expected scope: Medium; migrate attention score inputs and warning rows to the
-  projection, represent distribution-evidence availability authoritatively, and
-  preserve existing ranking, wording, and dataframe schemas.
-- Risks: Changing tie-breaking, score weights, warning ordering, or the
-  distinction between missing distribution evidence and scientific warnings.
-- Success criteria: `labassistant.interpretation` decision/narrative paths no
-  longer read `sample.metrics` or `sample.warnings`, existing immutable
-  application outputs remain unchanged, and observation/distribution migration
-  remains separately bounded.
+- Objective: Route DLS observation normalization through Measurement flags and
+  `DLSMeasurementMetrics` instead of workspace warnings and metrics.
+- Why this is next: Task 053 removed the final compatibility reads from
+  `labassistant.interpretation`. `labassistant.observations` is now the remaining
+  scientific-core consumer of mutable DLS metric/warning fields.
+- Expected scope: Medium; migrate warning iteration and evidence lookup, preserve
+  observation ordering and exact evidence text, and retain sample-based
+  compatibility signatures.
+- Risks: Changing severity/category mapping, recommendation wording, duplicate
+  warning handling, or evidence formatting for missing values.
+- Success criteria: DLS observation generation no longer reads `sample.metrics`
+  or `sample.warnings`, all observation and experiment-brief regressions pass,
+  and raw distribution projection remains the only explicitly bounded
+  workspace-table dependency.
 
 ## AI Context Window
 

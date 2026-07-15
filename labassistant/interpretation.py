@@ -102,42 +102,55 @@ def metric_median(metrics: pd.DataFrame, metric: str) -> float | None:
 
 
 def sample_attention_score(sample: ParsedSample, medians: dict[str, float | None]) -> float:
+    """Compatibility wrapper for Measurement-first attention scoring."""
+
+    return measurement_attention_score(
+        measurement_metrics(sample.measurement), medians
+    )
+
+
+def measurement_attention_score(
+    projected: DLSMeasurementMetrics,
+    medians: dict[str, float | None],
+) -> float:
     score = 0.0
 
-    if sample_status(sample) == STATUS_REVIEW:
+    if projected.status == STATUS_REVIEW:
         score += 60
-    elif sample_status(sample) == STATUS_WATCH:
+    elif projected.status == STATUS_WATCH:
         score += 25
 
-    pdi = sample.metrics["PDI"]
+    pdi = projected.pdi
     if pdi is not None and not pd.isna(pdi):
         score += min(float(pdi) * 55, 35)
         median_pdi = medians.get("PDI")
         if median_pdi is not None and float(pdi) >= median_pdi + 0.10:
             score += 12
 
-    tail_index = sample.metrics["Tail Index"]
+    tail_index = projected.tail_index_percent
     if tail_index is not None and not pd.isna(tail_index):
         score += min(float(tail_index) * 2.5, 30)
         median_tail = medians.get("Tail Index")
         if median_tail is not None and float(tail_index) >= median_tail + 3:
             score += 10
 
-    width_ratio = sample.metrics["Width Ratio"]
+    width_ratio = projected.width_ratio
     if width_ratio is not None and not pd.isna(width_ratio):
         score += min(float(width_ratio) * 1.4, 18)
 
-    if sample.metrics["Secondary Peak"] is not None and not pd.isna(sample.metrics["Secondary Peak"]):
+    if projected.secondary_peak_nm is not None and not pd.isna(
+        projected.secondary_peak_nm
+    ):
         score += 18
 
-    z_average = sample.metrics["Z-Average"]
+    z_average = projected.z_average_nm
     median_z = medians.get("Z-Average")
     if z_average is not None and median_z is not None and median_z > 0 and not pd.isna(z_average):
         fold_change = max(float(z_average) / median_z, median_z / float(z_average)) if float(z_average) > 0 else 1
         if fold_change >= 1.25:
             score += min((fold_change - 1) * 18, 22)
 
-    if "Distribution columns need review" in sample.warnings:
+    if "Distribution columns need review" in projected.warnings:
         score += 18
 
     return score
@@ -152,14 +165,19 @@ def build_attention_table(samples: list[ParsedSample], metrics: pd.DataFrame) ->
     rows = []
 
     for sample in samples:
-        score = sample_attention_score(sample, medians)
+        projected = measurement_metrics(sample.measurement)
+        score = measurement_attention_score(projected, medians)
         rows.append(
             {
                 "Sample": sample.name,
-                "Status": sample_status(sample),
+                "Status": projected.status,
                 "Attention Score": score,
-                "Reason": review_evidence(sample) if sample.warnings else "No warning thresholds crossed",
-                "Warnings": ", ".join(sample.warnings) if sample.warnings else "None",
+                "Reason": review_evidence_from_metrics(projected)
+                if projected.warnings
+                else "No warning thresholds crossed",
+                "Warnings": ", ".join(projected.warnings)
+                if projected.warnings
+                else "None",
             }
         )
 
@@ -325,7 +343,11 @@ def build_data_analysis(samples: list[ParsedSample], metrics: pd.DataFrame) -> d
     if median_tail is not None:
         confidence.append(f"Median large-particle tail is {format_metric(median_tail, '%')}; values above that make the far-right side of the curve more important.")
 
-    missing_distribution = [sample for sample in samples if not sample.metrics["Diameter Column"] or not sample.metrics["Preferred Distribution"]]
+    missing_distribution = [
+        sample
+        for sample in samples
+        if not measurement_metrics(sample.measurement).has_distribution_evidence
+    ]
     if missing_distribution:
         confidence.append(f"Interpret the chart-based analysis cautiously for {sample_label_list(missing_distribution)} because the app could not confidently identify the distribution columns.")
     else:

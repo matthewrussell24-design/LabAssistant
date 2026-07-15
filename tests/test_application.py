@@ -1132,6 +1132,12 @@ def _decision_sample(name: str, pdi: float, warnings: list[str]) -> ParsedSample
             d50_nm=100.0,
             d90_nm=150.0,
         ),
+        distributions={
+            "particle_size": DistributionData(
+                diameter_nm=[50.0, 100.0, 150.0],
+                intensity=[5.0, 100.0, 10.0],
+            )
+        },
         flags=[MeasurementFlag(label=warning) for warning in warnings],
         provenance={"data_type": "Distribution Curve"},
     )
@@ -1241,6 +1247,22 @@ def test_compose_dls_narrative_preserves_findings_and_story_as_immutable_section
     assert result.to_dict()["api_version"] == AGENT_API_VERSION
     with raises(FrozenInstanceError):
         result.data_story[0].heading = "Changed"
+
+
+def test_decision_and_narrative_ignore_workspace_metric_warning_overrides():
+    clean = _decision_sample("clean", 0.12, [])
+    flagged = _decision_sample("flagged", 0.35, ["Moderate PDI"])
+    expected_decision = rank_dls_decisions([clean, flagged]).to_dict()
+    expected_narrative = compose_dls_narrative([clean, flagged]).to_dict()
+
+    flagged.metrics["PDI"] = 9.99
+    flagged.metrics["Tail Index"] = 99.0
+    flagged.warnings.clear()
+    clean.metrics["Diameter Column"] = None
+    clean.metrics["Preferred Distribution"] = None
+
+    assert rank_dls_decisions([clean, flagged]).to_dict() == expected_decision
+    assert compose_dls_narrative([clean, flagged]).to_dict() == expected_narrative
 
 
 def test_compose_dls_narrative_validates_parsed_samples():

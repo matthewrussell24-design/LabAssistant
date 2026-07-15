@@ -75,6 +75,7 @@ class DLSMeasurementMetrics:
     d90_nm: float | None
     measurement_date: str | None
     correlogram_noise_score: float | None
+    has_distribution_evidence: bool
     warnings: tuple[str, ...]
     status: str
 
@@ -154,6 +155,10 @@ def measurement_metrics(measurement: Measurement) -> DLSMeasurementMetrics:
     if not isinstance(measurement, Measurement):
         raise TypeError("DLS metrics require a Measurement")
     warnings = tuple(str(flag.label) for flag in measurement.flags)
+    has_distribution_evidence = any(
+        bool(distribution.diameter_nm) and distribution.has_any_signal()
+        for distribution in measurement.distributions.values()
+    )
     return DLSMeasurementMetrics(
         data_type=str(
             measurement.provenance.get("workspace_data_type")
@@ -183,6 +188,7 @@ def measurement_metrics(measurement: Measurement) -> DLSMeasurementMetrics:
         d90_nm=measurement.derived_metrics.d90_nm,
         measurement_date=measurement.metadata.measurement_datetime,
         correlogram_noise_score=measurement.derived_metrics.correlogram_noise_score,
+        has_distribution_evidence=has_distribution_evidence,
         warnings=warnings,
         status=status_from_warnings(list(warnings)),
     )

@@ -88,9 +88,11 @@ immutable `retrieve_dls_metrics` application read and the legacy pandas metrics
 table now use that projection, so mutable workspace metric overrides cannot
 change their results. Task 052 migrated ordered warning evidence and immutable
 per-sample summaries to the same Measurement-first projection. The workspace
-adapter still carries its compatibility metrics dictionary for decision/story
-scoring, observation normalization, and distribution table selection, so the
-boundary is not yet a transport contract.
+Task 053 then migrated decision scoring, attention rows, narrative warning
+selection, and distribution-confidence wording to the Measurement-first
+projection. The workspace adapter still carries its compatibility metrics
+dictionary for observation normalization and distribution table selection, so
+the boundary is not yet a transport contract.
 
 ## Implemented Capability Catalog
 
@@ -1148,8 +1150,7 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Migrate DLS decision ranking and narrative interpretation helpers to
-`DLSMeasurementMetrics` so attention scores, warning lists, and data-story
-composition no longer read mutable workspace metrics or warnings. Preserve
-ranking, wording, and dataframe compatibility; keep observation and
-distribution migration separate.
+Migrate DLS observation normalization to authoritative Measurement flags and
+projected metrics while preserving labels, categories, evidence wording,
+severity, confidence, and recommendations. Keep the raw distribution/table
+adapter migration separate.
