@@ -7,7 +7,9 @@ import pandas as pd
 
 from labassistant.models import Observation
 from labassistant.quality import STATUS_REVIEW, STATUS_WATCH
-from labassistant.view_models import ParsedSample, sample_status
+from labassistant.dls_evidence import DLSSampleEvidence, sample_status
+
+ParsedSample = DLSSampleEvidence
 
 
 def observations_from_samples(samples: list[ParsedSample]) -> list[Observation]:

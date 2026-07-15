@@ -14,6 +14,12 @@ from labassistant.context_engine import (
     KnowledgeStore,
     ResearchJournal,
 )
+from labassistant.dls_evidence import (
+    DLSSampleEvidence,
+    build_metrics_table,
+    sample_from_measurement,
+    sample_status,
+)
 from labassistant.chromatography import (
     mass_balance_hypotheses,
     observations_from_mass_balance_assessment,
@@ -73,7 +79,6 @@ from labassistant.trend_analysis import (
     filtration_measurement_from_provenance,
     replicate_statistics_table,
 )
-from labassistant.view_models import build_metrics_table, sample_from_measurement, sample_status
 
 
 APP_NAME = "LabAssistant"
@@ -2302,7 +2307,7 @@ def generate_observations(
 
 
 def dls_experiment_from_samples(
-    samples: list[Any],
+    samples: list[DLSSampleEvidence],
     *,
     label: str = "",
     source_files: list[str] | None = None,
@@ -2391,7 +2396,7 @@ def analyze_dls_uploads(sources: list[object]) -> DLSUploadImportResult:
     )
 
 
-def rank_dls_decisions(samples: list[Any]) -> DLSDecisionRanking:
+def rank_dls_decisions(samples: list[DLSSampleEvidence]) -> DLSDecisionRanking:
     """Apply the established DLS screening rank and return immutable rows."""
 
     if not samples:
@@ -2427,7 +2432,7 @@ def rank_dls_decisions(samples: list[Any]) -> DLSDecisionRanking:
     )
 
 
-def compose_dls_narrative(samples: list[Any]) -> DLSNarrative:
+def compose_dls_narrative(samples: list[DLSSampleEvidence]) -> DLSNarrative:
     """Compose established rule-based DLS findings and trend text once."""
 
     if not samples:
@@ -2458,7 +2463,7 @@ def compose_dls_narrative(samples: list[Any]) -> DLSNarrative:
     )
 
 
-def summarize_dls_health(samples: list[Any]) -> DLSHealthOverview:
+def summarize_dls_health(samples: list[DLSSampleEvidence]) -> DLSHealthOverview:
     """Return the established DLS screening score, counts, and medians."""
 
     if not samples:
@@ -2493,7 +2498,9 @@ def summarize_dls_health(samples: list[Any]) -> DLSHealthOverview:
     )
 
 
-def analyze_dls_trend_diagnostics(samples: list[Any]) -> DLSTrendDiagnostics:
+def analyze_dls_trend_diagnostics(
+    samples: list[DLSSampleEvidence],
+) -> DLSTrendDiagnostics:
     """Return established DLS control-chart and replicate statistics as rows."""
 
     if not samples:
@@ -2543,7 +2550,9 @@ def analyze_dls_trend_diagnostics(samples: list[Any]) -> DLSTrendDiagnostics:
     )
 
 
-def _parsed_dls_sample_measurement(sample: Any) -> tuple[str, Measurement]:
+def _parsed_dls_sample_measurement(
+    sample: DLSSampleEvidence,
+) -> tuple[str, Measurement]:
     if not hasattr(sample, "name") or not hasattr(sample, "measurement"):
         raise TypeError("DLS circulation time requires a parsed sample")
     measurement = sample.measurement
@@ -2552,7 +2561,9 @@ def _parsed_dls_sample_measurement(sample: Any) -> tuple[str, Measurement]:
     return str(sample.name), measurement
 
 
-def retrieve_dls_circulation_time(sample: Any) -> DLSCirculationTimeRead | None:
+def retrieve_dls_circulation_time(
+    sample: DLSSampleEvidence,
+) -> DLSCirculationTimeRead | None:
     """Return reviewed circulation-time evidence for one parsed DLS sample."""
 
     sample_name, measurement = _parsed_dls_sample_measurement(sample)
@@ -2571,7 +2582,7 @@ def retrieve_dls_circulation_time(sample: Any) -> DLSCirculationTimeRead | None:
 
 
 def set_dls_circulation_time(
-    sample: Any,
+    sample: DLSSampleEvidence,
     value: float | int | None,
     unit: str | None,
     *,
@@ -2585,7 +2596,7 @@ def set_dls_circulation_time(
 
 
 def analyze_dls_forward_scatter_trends(
-    samples: list[Any],
+    samples: list[DLSSampleEvidence],
 ) -> DLSForwardScatterTrendRead:
     """Analyze reviewed circulation evidence against forward-angle DLS values."""
 
@@ -2639,7 +2650,7 @@ def analyze_dls_forward_scatter_trends(
 
 
 def analyze_filtration_follow_up_trends(
-    samples: list[Any],
+    samples: list[DLSSampleEvidence],
 ) -> FiltrationTrendRead:
     """Analyze reviewed filtration evidence against DLS and circulation values."""
 
@@ -2754,7 +2765,9 @@ def generate_filtration_relationship_hypothesis(
     )
 
 
-def assess_dls_aggregation(samples: list[Any]) -> DLSAggregationRead:
+def assess_dls_aggregation(
+    samples: list[DLSSampleEvidence],
+) -> DLSAggregationRead:
     """Assess dual-angle aggregation evidence for every parsed DLS sample."""
 
     if not samples:
@@ -2819,7 +2832,9 @@ def assess_dls_aggregation(samples: list[Any]) -> DLSAggregationRead:
     return DLSAggregationRead(assessments=tuple(assessments))
 
 
-def summarize_dls_samples(samples: list[Any]) -> DLSSampleSummaries:
+def summarize_dls_samples(
+    samples: list[DLSSampleEvidence],
+) -> DLSSampleSummaries:
     """Return ordered immutable status, evidence, and metric rows by sample."""
 
     if not samples:
@@ -2883,7 +2898,9 @@ def summarize_dls_samples(samples: list[Any]) -> DLSSampleSummaries:
     return DLSSampleSummaries(samples=tuple(summaries))
 
 
-def retrieve_dls_angle_details(samples: list[Any]) -> DLSAngleDetails:
+def retrieve_dls_angle_details(
+    samples: list[DLSSampleEvidence],
+) -> DLSAngleDetails:
     """Return typed per-angle detail rows in established sample/angle order."""
 
     if not samples:
@@ -2913,7 +2930,9 @@ def retrieve_dls_angle_details(samples: list[Any]) -> DLSAngleDetails:
     return DLSAngleDetails(rows=rows)
 
 
-def retrieve_dls_metrics(samples: list[Any]) -> DLSMetricsProjection:
+def retrieve_dls_metrics(
+    samples: list[DLSSampleEvidence],
+) -> DLSMetricsProjection:
     """Return the established shared DLS metrics as typed immutable rows."""
 
     if not samples:
@@ -2961,7 +2980,9 @@ def retrieve_dls_metrics(samples: list[Any]) -> DLSMetricsProjection:
     return DLSMetricsProjection(rows=rows)
 
 
-def retrieve_dls_distributions(samples: list[Any]) -> DLSDistributionProjection:
+def retrieve_dls_distributions(
+    samples: list[DLSSampleEvidence],
+) -> DLSDistributionProjection:
     """Return filtered DLS distribution evidence for visualization shells."""
 
     if not samples:
@@ -3045,7 +3066,7 @@ def retrieve_dls_distributions(samples: list[Any]) -> DLSDistributionProjection:
 
 
 def retrieve_dls_raw_evidence(
-    samples: list[Any],
+    samples: list[DLSSampleEvidence],
     *,
     groups: Any = (),
 ) -> DLSRawEvidence:
@@ -3116,7 +3137,9 @@ def retrieve_dls_raw_evidence(
     )
 
 
-def retrieve_dls_correlograms(samples: list[Any]) -> DLSCorrelograms:
+def retrieve_dls_correlograms(
+    samples: list[DLSSampleEvidence],
+) -> DLSCorrelograms:
     """Return ordered correlogram traces and noise scores for DLS samples."""
 
     if not samples:
@@ -3152,7 +3175,7 @@ def retrieve_dls_correlograms(samples: list[Any]) -> DLSCorrelograms:
 
 
 def retrieve_dls_paired_angle_overlays(
-    samples: list[Any],
+    samples: list[DLSSampleEvidence],
 ) -> DLSPairedAngleOverlays:
     """Return ordered forward/back DLS distribution evidence by sample."""
 
@@ -3291,7 +3314,7 @@ def restore_dls_workspace(
 
 def _dls_restore_from_retrieved(
     retrieved: RetrievedExperiment,
-) -> tuple[DLSAnalysisResult, list[Any]]:
+) -> tuple[DLSAnalysisResult, list[DLSSampleEvidence]]:
     """Build shared DLS read and workspace evidence from one persisted read."""
 
     measurements = retrieved.restore_measurements()
@@ -3315,7 +3338,9 @@ def _dls_restore_from_retrieved(
     return analysis, samples
 
 
-def _dls_measurement_summaries(samples: list[Any]) -> tuple[DLSMeasurementSummary, ...]:
+def _dls_measurement_summaries(
+    samples: list[DLSSampleEvidence],
+) -> tuple[DLSMeasurementSummary, ...]:
     """Build immutable per-lot read summaries shared by import and restore."""
 
     return tuple(
@@ -3604,7 +3629,9 @@ def _filtration_measurement_summary(
     )
 
 
-def retrieve_dls_filtration_measurement(sample: Any) -> DLSFiltrationRead | None:
+def retrieve_dls_filtration_measurement(
+    sample: DLSSampleEvidence,
+) -> DLSFiltrationRead | None:
     """Return reviewed filtration evidence for one parsed DLS sample."""
 
     sample_name, measurement = _parsed_dls_sample_measurement(sample)
@@ -3618,7 +3645,7 @@ def retrieve_dls_filtration_measurement(sample: Any) -> DLSFiltrationRead | None
 
 
 def set_dls_filtration_measurement(
-    sample: Any,
+    sample: DLSSampleEvidence,
     filtration: FiltrationMeasurement | None,
 ) -> DLSFiltrationRead | None:
     """Attach, overwrite, or clear reviewed filtration evidence on one sample."""
@@ -3631,7 +3658,7 @@ def set_dls_filtration_measurement(
 
 
 def attach_dls_filtration_measurements(
-    samples: list[Any],
+    samples: list[DLSSampleEvidence],
     measurements: list[Any],
 ) -> DLSFiltrationAttachmentResult:
     """Attach reviewed filtration evidence by exact sample-name matching."""

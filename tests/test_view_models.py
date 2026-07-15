@@ -1,4 +1,13 @@
-from labassistant.view_models import build_metrics_table, parse_uploaded_file, sample_status
+from labassistant.dls_evidence import (
+    DLSSampleEvidence,
+    DLSWorkspaceEvidence,
+)
+from labassistant.view_models import (
+    ParsedSample,
+    build_metrics_table,
+    parse_uploaded_file,
+    sample_status,
+)
 
 
 class FakeUpload:
@@ -37,3 +46,19 @@ Diameter (nm),Intensity (%)
     assert sample_status(sample) == "Watch"
     assert metrics.loc[0, "Sample"] == "Sample A"
     assert metrics.loc[0, "Warnings"] == "Moderate PDI"
+
+
+def test_parsed_sample_remains_a_compatible_dls_evidence_alias():
+    sample = ParsedSample(
+        name="Sample A",
+        file_name="sample_a.csv",
+        data=None,
+        metadata={},
+        metrics={},
+        warnings=[],
+        source_text="",
+        measurement=None,
+    )
+
+    assert ParsedSample is DLSWorkspaceEvidence
+    assert isinstance(sample, DLSSampleEvidence)

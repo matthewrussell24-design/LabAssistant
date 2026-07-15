@@ -8,7 +8,9 @@ import pandas as pd
 from labassistant.interpretation import format_metric
 from labassistant.filtration import FiltrationMeasurement, filtration_measurement_from_dict
 from labassistant.models import AngleSummary, Measurement
-from labassistant.view_models import ParsedSample
+from labassistant.dls_evidence import DLSSampleEvidence
+
+ParsedSample = DLSSampleEvidence
 
 
 TREND_METRICS = {

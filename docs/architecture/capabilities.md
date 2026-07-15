@@ -74,12 +74,19 @@ relationship summaries, so task 049 removed it. No remaining import performs
 workflow orchestration, persistence, or scientific claim construction in
 Streamlit.
 
-This completes extraction for the current human workflows, but it does not make
-the application boundary transport-neutral. `labassistant.application` still
-imports DLS-oriented view-model helpers and accepts `ParsedSample`-shaped
-inputs. The next contract-maturity step is to define a neutral DLS evidence
-input and migrate application entry points without changing Streamlit's local
-workspace state.
+This completes extraction for the current human workflows. Task 050 then
+introduced the presentation-neutral `DLSSampleEvidence` structural protocol and
+`DLSWorkspaceEvidence` local adapter. Application, interpretation, observation,
+and trend modules now import that neutral contract; `labassistant.view_models`
+is a compatibility facade whose `ParsedSample` name aliases the workspace
+adapter for existing Streamlit and test callers.
+
+The protocol deliberately treats tabular `data` as opaque, but the local
+adapter and several established scientific helpers remain pandas-backed and
+depend on the compatibility metrics dictionary. The boundary is therefore no
+longer coupled to a presentation module, but it is not yet a transport contract.
+The next stabilization step should make one coherent DLS read path derive from
+`Measurement` evidence directly while retaining the workspace adapter.
 
 ## Implemented Capability Catalog
 
@@ -87,7 +94,7 @@ workspace state.
 | --- | --- | --- |
 | `describe_platform` | `app_manifest` | Available |
 | `describe_agent_access` | `agent_access_policy` | Available |
-| `import_dls_experiment` | `dls_experiment_from_samples` | Available, transitional input |
+| `import_dls_experiment` | `dls_experiment_from_samples` | Available; structural local DLS evidence input |
 | `analyze_dls_dataset` | `analyze_dls_dataset` | Available; used by desktop prototype |
 | `analyze_dls_uploads` | `analyze_dls_uploads` | Available; used by Streamlit DLS upload workflow |
 | `rank_dls_decisions` | `rank_dls_decisions` | Available; used by Streamlit DLS Decision Brief |
@@ -172,9 +179,10 @@ clients without creating an agent runtime.
 **Purpose:** Assemble already parsed DLS sample evidence into an experiment and
 generate its normalized observations.
 
-**Inputs:** Parsed samples, optional experiment label, and optional source-file
-names. `ParsedSample` is a transitional compatibility input until a neutral
-import request contract is justified.
+**Inputs:** Objects conforming to `DLSSampleEvidence`, plus an optional
+experiment label and source-file names. Existing `ParsedSample` callers remain
+compatible through the `DLSWorkspaceEvidence` alias. This is an in-process
+structural contract, not a serialized transport request.
 
 **Outputs:** An `Experiment` containing DLS measurements, observations,
 provenance metadata, and a generated identifier.
@@ -1136,8 +1144,8 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Replace the transitional `ParsedSample` application input with a
-presentation-neutral DLS evidence contract while preserving Streamlit's local
-workspace state and existing compatibility entry points. Keep desktop
-packaging, HTTP transport, and richer presentation separate from that contract
-stabilization work.
+Migrate the shared DLS metrics/status projection to derive from authoritative
+`Measurement` evidence rather than the workspace metrics dictionary, while
+retaining `DLSWorkspaceEvidence` as a compatibility adapter. This is the
+smallest next step toward Measurement-first application inputs without mixing
+in desktop packaging, HTTP transport, or presentation redesign.

@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Audited the Streamlit application boundary, removed
-  its dead domain-type dependency, and completed workflow extraction (task 049).
-- Working Tree: Task 049 is committed locally; inspect `git status --short`
+- Latest Completed Change: Introduced a neutral structural DLS evidence
+  contract and removed reusable-core imports of the view-model module (task 050).
+- Working Tree: Task 050 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `224 passed in 2.73s` from `scripts/test -q` on
+- Last Successful Test: `225 passed in 2.60s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 049.
+- Last Updated: 2026-07-15 for task 050.
 
 ## North Star
 
@@ -28,11 +28,12 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 224 passing.
+- Tests: 🟢 Healthy — 225 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — current human workflows cross application
-  contracts, but transitional DLS view-model inputs are not transport-neutral.
+  contracts and use neutral DLS structural typing, but compatibility metrics and
+  pandas-backed workspace evidence are not transport-neutral.
 - API Layer: ⚪ Not Started — intentionally deferred until the application
   boundary is mature.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
@@ -63,15 +64,14 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: Application Layer Extraction
-- Status: Complete
-- Goal: Separate reusable scientific workflows from the Streamlit UI while
-  preserving existing functionality and backwards compatibility.
-- Completion evidence: Existing human workflows call stable application-layer
-  contracts, reusable logic does not depend on Streamlit, compatibility tests
-  protect current behavior, and task 049 classified every remaining direct
-  core import as presentation, input handling, reviewed command data, or
-  transitional UI state.
+- Milestone: Application Contract Stabilization
+- Status: In Progress
+- Goal: Replace UI-shaped compatibility inputs with authoritative scientific
+  evidence contracts incrementally while preserving existing shells.
+- Current evidence: Task 050 removed reusable-core imports of
+  `labassistant.view_models` through `DLSSampleEvidence` and a backwards-
+  compatible workspace adapter. Measurement-first projections remain before
+  the layer is transport-neutral.
 
 ## Five-Minute Rule
 
@@ -122,6 +122,10 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   thresholds, widget/input normalization, a reviewed filtration command DTO,
   and transitional `ParsedSample` workspace typing. The dependency inventory
   is recorded in `docs/architecture/capabilities.md`.
+- `labassistant.dls_evidence` owns the structural DLS sample protocol, mutable
+  local workspace adapter, and compatibility projections. `ParsedSample`
+  remains an alias exposed by `labassistant.view_models`; reusable core modules
+  no longer import that presentation facade.
 - `labassistant.desktop` owns native startup and application invocation;
   `labassistant.ui` owns the pure presenter, local workspace document, and
   AppKit/WebKit controller.
@@ -233,8 +237,9 @@ architecture rationale.
   reasoning over observations.
 - `labassistant/history.py` and `context_engine.py` — local history and
   scientific memory.
-- `labassistant/measurements.py`, `view_models.py`, and `interpretation.py` —
-  adapters and presentation-ready summaries used by the current UI.
+- `labassistant/measurements.py` and `dls_evidence.py` — DLS measurement and
+  structural workspace-evidence adapters; `view_models.py` preserves legacy UI
+  imports and `interpretation.py` owns presentation-ready summaries.
 - `tests/` — unit, integration, importer, and representative-fixture coverage.
 - `docs/` — status, prompts, architecture, roadmap, standards, decisions,
   vision, and technical proposals.
@@ -355,6 +360,11 @@ architecture rationale.
 - Promoted the filtration relationship hypothesis into an immutable read that
   preserves insufficient, partial, and fully qualified evidence states with
   explicit non-causal language (task 048).
+- Audited the remaining Streamlit-to-core imports, removed a dead domain type,
+  and closed current-workflow application extraction (task 049).
+- Introduced the structural `DLSSampleEvidence` contract and retained
+  `ParsedSample` as a compatibility alias without reusable-core view-model
+  imports (task 050).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -370,8 +380,8 @@ architecture rationale.
 
 ## Active Work
 
-- Filtration relationship hypothesis task 048 is complete.
-- The working tree was clean when task 048 began.
+- DLS evidence contract stabilization task 050 is complete.
+- The working tree was clean when task 050 began.
 
 ## Known Risks
 
@@ -406,9 +416,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `224 passed in 2.73s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `225 passed in 2.60s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  049.
+  050.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -425,22 +435,21 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Define a presentation-neutral DLS evidence input contract and
-  migrate application entry points away from direct `ParsedSample`/view-model
-  coupling while preserving existing Streamlit and desktop behavior.
-- Why this is next: Task 049 completed workflow extraction but confirmed that
-  `labassistant.application` still imports view-model helpers and several public
-  operations accept the UI-shaped `ParsedSample` compatibility type. This is
-  the clearest remaining obstacle to a mature, transport-neutral boundary.
-- Expected scope: Medium; introduce the smallest immutable evidence contract or
-  protocol justified by existing callers, add compatibility adapters, migrate
-  application internals incrementally, and retain current Python entry points.
-- Risks: Duplicating the full DLS measurement model, forcing pandas into a
-  public contract, or breaking history restoration and Streamlit session state.
-- Success criteria: Application contracts and internals no longer require
-  `labassistant.view_models` for migrated paths, compatibility tests prove
-  unchanged scientific output, and the remaining migration is explicitly
-  bounded if it cannot safely land in one task.
+- Objective: Make the shared DLS metrics/status projection derive from
+  authoritative `Measurement` evidence instead of the workspace metrics
+  dictionary while retaining existing output and compatibility callers.
+- Why this is next: Task 050 removed the presentation-module dependency, but the
+  neutral protocol still exposes compatibility `metrics` and pandas-backed
+  `data`. Metrics/status is a bounded, widely reused path that can prove the
+  Measurement-first direction before larger narrative and trend migrations.
+- Expected scope: Medium; add pure Measurement-to-metric/status projection,
+  route application metrics and shared table compatibility through it, and
+  preserve column order, warning behavior, and immutable read outputs.
+- Risks: Changing legacy fallback semantics, warning-derived status, column
+  ordering, or metrics reconstructed from restored measurements.
+- Success criteria: `retrieve_dls_metrics` and shared metrics-table generation
+  no longer read `sample.metrics`, existing Streamlit/tests remain unchanged,
+  and pandas stays outside the public application result.
 
 ## AI Context Window
 
