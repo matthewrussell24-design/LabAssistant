@@ -5,10 +5,10 @@ freeze for an external read-only transport, and what must happen first?
 
 ## Decision
 
-Transport implementation is **not ready yet**. The application layer is mature
-and task 058 added a common draft response/error boundary, but every registry
-entry still carries `0.1-draft`; trusted access policy and bounded pagination
-remain unresolved.
+Transport implementation is **not ready yet**. The application layer is mature;
+tasks 058 and 059 completed the draft response/error boundary, local read
+policy, and bounded collections. The final schema-shape/version review remains
+before any transport selection.
 
 The first transport should expose only seven read candidates after the bounded
 hardening gate below. Registry presence does not imply external stability.
@@ -109,25 +109,28 @@ Before selecting or implementing a transport:
 - ✅ Shared typed error envelope and six stable draft codes.
 - ✅ Versioned `ExperimentListings` wrapper; `list_experiments()` itself remains
   backward-compatible and returns its established tuple.
-- 🟡 Bounded reads: related-context `limit` is constrained to 1–50; history and
-  journal pagination/limits remain.
-- 🟡 Access: protected reads require a trusted `access_granted` decision and
-  reject request-controlled path/store injection; the policy producing that
-  decision is not yet defined.
+- ✅ Bounded reads: lists, history, and journal use limit/offset metadata;
+  related context reports honest category bounds and unknown totals.
+- ✅ Access: protected reads require a policy-evaluated local context with a
+  subject, known client, local origin, and capability-specific scope. This is a
+  local host policy, not remote authentication.
 - ✅ JSON conformance and failure-mapping tests cover all seven candidates.
-- ⬜ Stable version: `0.1-draft` remains correct until the two yellow items are
-  complete and the candidate shapes receive a final freeze review.
+- ⬜ Stable version: `0.1-draft` remains correct until the candidate shapes
+  receive their final freeze review.
 
 The conformance implementation lives in `labassistant.api_readiness`. It is an
-in-process boundary, not a server, authentication mechanism, or endpoint grant.
+in-process boundary, not a server, remote authentication mechanism, or endpoint
+grant. Access context is host-asserted and is never accepted inside request
+parameters; loopback alone is not treated as identity.
 
 ## Go/No-Go
 
 **No-go for an HTTP server or agent SDK today.**
 
-**Go for the next task:** define the trusted local read-access policy and add
-bounded pagination/limits for history, context, and journal candidates. That
-work still does not choose a framework, open a port, or grant write access.
+**Go for the next task:** run the final schema-shape review, add golden contract
+fixtures where necessary, and decide whether to promote the seven-read surface
+from `0.1-draft` to a stable version. That work still does not choose a
+framework, open a port, or grant write access.
 
 ## Deliberate Deferrals
 

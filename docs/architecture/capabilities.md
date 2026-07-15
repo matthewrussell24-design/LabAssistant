@@ -161,6 +161,9 @@ in [`api-readiness.md`](api-readiness.md). Registry availability and the
 `labassistant.api_readiness` now provides the draft seven-read invocation,
 success/error envelopes, JSON conformance boundary, and request-parameter
 whitelist while preserving every registered Python handler.
+Task 059 replaced its trusted boolean with a scoped local access policy and
+added explicit collection bounds. Loopback is not identity, and this policy is
+not a remote authentication mechanism.
 
 ## Describe Platform
 

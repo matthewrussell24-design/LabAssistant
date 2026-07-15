@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Added draft response/error envelopes and JSON-safe
-  invocation for the seven candidate reads (task 058).
-- Working Tree: Task 058 is committed locally; inspect `git status --short`
+- Latest Completed Change: Added scoped local read policy and bounded candidate
+  collection responses (task 059).
+- Working Tree: Task 059 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `237 passed in 2.45s` from `scripts/test -q` on
+- Last Successful Test: `237 passed in 2.58s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 058.
+- Last Updated: 2026-07-15 for task 059.
 
 ## North Star
 
@@ -34,9 +34,9 @@ full traceability.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
   Measurement-first, raw vendor inspection is explicitly adapter-bounded, and
   reusable human workflows cross typed application contracts.
-- API Layer: 🟡 Foundation — seven candidates share draft JSON envelopes, stable
-  draft errors, and safe parameter whitelists; access policy, bounded listing,
-  and transport remain absent.
+- API Layer: 🟡 Foundation — seven candidates share draft JSON envelopes,
+  scoped local access policy, and bounded collections; final version freeze and
+  transport remain absent.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
 
 Health labels summarize the evidence in the detailed sections below. Update a
@@ -74,7 +74,8 @@ are future platform capabilities and are not automatically the next task.
   HTTP or agent transports until shared envelopes, stable errors, access
   boundaries, limits, and JSON conformance tests exist. Task 058 completed the
   envelopes, errors, safe invocation, and conformance tests without changing
-  existing handlers.
+  existing handlers. Task 059 added policy-derived local access and honest
+  bounds/pagination metadata for every candidate collection.
 
 ## Five-Minute Rule
 
@@ -393,6 +394,8 @@ architecture rationale.
   and established API contract-freeze/versioning policy (task 057).
 - Added draft success/error envelopes, safe candidate-read invocation, and JSON
   conformance coverage while preserving existing handlers (task 058).
+- Added scoped local read policy and deterministic collection bounds without
+  treating loopback as identity or adding remote authentication (task 059).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -408,8 +411,8 @@ architecture rationale.
 
 ## Active Work
 
-- API conformance-envelope task 058 is complete.
-- The working tree was clean when task 058 began.
+- Local read-policy and bounded-collection task 059 is complete.
+- The working tree was clean when task 059 began.
 
 ## Known Risks
 
@@ -444,7 +447,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `237 passed in 2.45s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `237 passed in 2.58s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -463,21 +466,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Define the trusted local read-access policy and bounded
-  pagination/limits for history, context, and journal candidate reads.
-- Why this is next: Task 058 completed the shared serialization/error boundary.
-  Access decisions are still supplied as a trusted boolean, and history/journal
-  results can remain unbounded.
-- Expected scope: Medium; introduce an immutable access context evaluated by a
-  local policy, replace the raw boolean, add limit/cursor or offset contracts,
-  and keep filesystem/store collaborators internal.
-- Risks: Treating loopback as identity, inventing remote authentication too
-  early, unstable cursors over append-only stores, or silently truncating
-  scientific evidence.
-- Success criteria: protected reads require a policy-derived decision, every
-  collection read reports deterministic bounds/pagination metadata, existing
-  handlers remain compatible, and the final freeze review can decide whether
-  to replace `0.1-draft`.
+- Objective: Run the final seven-read schema review and decide whether to
+  replace `0.1-draft` with a stable contract version.
+- Why this is next: Tasks 058 and 059 completed every functional item in the
+  hardening gate. A deliberate freeze review is safer than changing the version
+  as a side effect of implementation.
+- Expected scope: Medium; capture golden success/error shapes, verify field
+  semantics and pagination consistency, document compatibility promises, and
+  either promote the contract or record specific blockers.
+- Risks: Freezing accidental field names, conflating application DTO versions
+  with transport versions, or promising remote security from a local policy.
+- Success criteria: reviewed golden fixtures for all seven candidates and core
+  errors, an explicit stable-version or remain-draft decision, and a clear
+  go/no-go for selecting the first read-only transport.
 
 ## AI Context Window
 
