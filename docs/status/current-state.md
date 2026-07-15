@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Extended the immutable Experiment Brief with parsed
-  DLS inputs and removed Streamlit's final DLS experiment assembly (task 047).
-- Working Tree: Task 047 is committed locally; inspect `git status --short`
+- Latest Completed Change: Promoted the filtration relationship hypothesis into
+  an immutable, evidence-qualified application read (task 048).
+- Working Tree: Task 048 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `220 passed in 2.59s` from `scripts/test -q` on
+- Last Successful Test: `224 passed in 2.53s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 047.
+- Last Updated: 2026-07-15 for task 048.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 220 passing.
+- Tests: 🟢 Healthy — 224 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟡 In Progress — local DLS dataset analysis now serves
@@ -125,7 +125,7 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   technique-aware DLS and chromatography restoration, local DLS and
   chromatography/OpenLab analysis, immutable investigation results,
   scientific-context and Research Journal reads, and a transport-independent
-  registry of forty-one stable capability names, including explicit
+  registry of forty-two stable capability names, including explicit
   human/CLI-only note, experiment-history, and reviewed-evidence commands.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
@@ -346,6 +346,9 @@ architecture rationale.
 - Extended the immutable generic Experiment Brief with parsed-DLS inputs and
   removed Streamlit's final direct DLS experiment assembly while preserving
   authoritative `Experiment` callers (task 047).
+- Promoted the filtration relationship hypothesis into an immutable read that
+  preserves insufficient, partial, and fully qualified evidence states with
+  explicit non-causal language (task 048).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -361,8 +364,8 @@ architecture rationale.
 
 ## Active Work
 
-- DLS Experiment Brief input task 047 is complete.
-- The working tree was clean when task 047 began.
+- Filtration relationship hypothesis task 048 is complete.
+- The working tree was clean when task 048 began.
 
 ## Known Risks
 
@@ -397,9 +400,9 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `220 passed in 2.59s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `224 passed in 2.53s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
-  047.
+  048.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
   real NSOpenPanel, and renders the representative Lot 1 DLS result end to end.
 - Three consecutive fresh login-shell launches succeeded after Qt removal.
@@ -416,20 +419,22 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Promote the qualified filtration relationship hypothesis into an
-  immutable application read instead of authoring the scientific claim in a
-  static Streamlit callout.
-- Why this is next: Experiment assembly is now application-owned for active
-  Streamlit workflows, while `render_filtration_hypothesis_callout` still owns
-  a cross-technique scientific hypothesis in presentation code; hypothesis
-  generation is the remaining named capability candidate.
-- Expected scope: Small to medium; preserve cautious non-causal wording,
-  circulation-time, forward-size/PDI, and orthogonal-filtration relationships,
-  empty/insufficient-evidence behavior, and the existing trend read.
-- Risks: Overstating correlation as causation or hiding the working hypothesis
-  before the minimum evidence exists.
-- Success criteria: Streamlit renders application-provided, evidence-qualified
-  hypothesis text and contains no presentation-authored scientific claim.
+- Objective: Audit the remaining direct Streamlit-to-core dependencies and
+  determine whether the Application Layer Extraction milestone can close or
+  which concrete boundary remains.
+- Why this is next: Active experiment assembly, persistence workflows,
+  scientific reads, and the filtration hypothesis now cross application
+  contracts. Remaining direct imports appear to be presentation formatting,
+  thresholds, input normalization, and transitional `ParsedSample` typing, but
+  that assumption needs an explicit evidence-backed review.
+- Expected scope: Small to medium; classify every non-application import,
+  remove dead dependencies such as any unused domain-only type, document
+  intentional UI ownership, and identify the next genuine capability gap.
+- Risks: Declaring the application layer mature prematurely or converting
+  legitimate presentation/input concerns into unnecessary service contracts.
+- Success criteria: Architecture and handoff records contain a concise
+  dependency inventory, dead boundary leaks are removed, and the milestone has
+  an evidence-based completion decision or one clearly scoped next task.
 
 ## AI Context Window
 

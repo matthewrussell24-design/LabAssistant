@@ -29,6 +29,7 @@ from labassistant.application import (
     DLSFiltrationAttachmentResult,
     DLSForwardScatterTrendRead,
     FiltrationTrendRead,
+    FiltrationRelationshipHypothesis,
     DLSAggregationRead,
     DLSSampleSummaries,
     DLSAngleDetails,
@@ -56,6 +57,7 @@ from labassistant.application import (
     attach_dls_filtration_measurements,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
+    generate_filtration_relationship_hypothesis,
     assess_dls_aggregation,
     summarize_dls_samples,
     retrieve_dls_angle_details,
@@ -1575,6 +1577,105 @@ def test_analyze_filtration_follow_up_trends_validates_and_preserves_empty_resul
         analyze_filtration_follow_up_trends([object()])
 
 
+def test_generate_filtration_relationship_hypothesis_preserves_proposed_state():
+    samples = [_decision_sample("missing filtration", 0.20, [])]
+
+    result = generate_filtration_relationship_hypothesis(
+        analyze_dls_forward_scatter_trends(samples),
+        analyze_filtration_follow_up_trends(samples),
+    )
+
+    assert isinstance(result, FiltrationRelationshipHypothesis)
+    assert result.status == "insufficient"
+    assert result.estimable_relationship_count == 0
+    assert result.relationship_count == 5
+    assert "Working hypothesis" in result.text
+    assert "remains proposed rather than supported" in result.text
+    assert all("At least 3 valid samples" in item for item in result.supporting_messages)
+    assert result.to_dict()["api_version"] == AGENT_API_VERSION
+    with raises(FrozenInstanceError):
+        result.status = "qualified"
+
+
+def test_generate_filtration_relationship_hypothesis_qualifies_estimable_evidence():
+    samples = [
+        _decision_sample("A", 0.20, []),
+        _decision_sample("B", 0.21, []),
+        _decision_sample("C", 0.22, []),
+    ]
+    for index, sample in enumerate(samples, start=1):
+        sample.measurement.angle_summaries = [
+            AngleSummary(
+                label="Forward 12.8°",
+                position="forward",
+                z_average=float(index * 100),
+                pdi=float(index) / 10,
+            )
+        ]
+        apply_circulation_time(sample.measurement, index * 10, "minutes")
+        apply_filtration_measurement(
+            sample.measurement,
+            FiltrationMeasurement(
+                sample_name=sample.name,
+                difficulty_score=float(index),
+            ),
+        )
+
+    result = generate_filtration_relationship_hypothesis(
+        analyze_dls_forward_scatter_trends(samples),
+        analyze_filtration_follow_up_trends(samples),
+    )
+
+    assert result.status == "qualified"
+    assert result.estimable_relationship_count == 5
+    assert "5 of 5 relationships are currently estimable" in result.text
+    assert "correlation only, not evidence of causation" in result.text
+    assert all("correlation only" in item for item in result.supporting_messages)
+
+
+def test_generate_filtration_relationship_hypothesis_marks_partial_evidence():
+    samples = [
+        _decision_sample("A", 0.20, []),
+        _decision_sample("B", 0.21, []),
+        _decision_sample("C", 0.22, []),
+    ]
+    for index, sample in enumerate(samples, start=1):
+        sample.measurement.angle_summaries = [
+            AngleSummary(
+                label="Forward 12.8°",
+                position="forward",
+                z_average=float(index * 100),
+                pdi=float(index) / 10,
+            )
+        ]
+        apply_filtration_measurement(
+            sample.measurement,
+            FiltrationMeasurement(
+                sample_name=sample.name,
+                difficulty_score=float(index),
+            ),
+        )
+
+    result = generate_filtration_relationship_hypothesis(
+        analyze_dls_forward_scatter_trends(samples),
+        analyze_filtration_follow_up_trends(samples),
+    )
+
+    assert result.status == "partial"
+    assert result.estimable_relationship_count == 2
+    assert "only partially qualified" in result.text
+
+
+def test_generate_filtration_relationship_hypothesis_validates_trend_read():
+    samples = [_decision_sample("missing filtration", 0.20, [])]
+    forward = analyze_dls_forward_scatter_trends(samples)
+    filtration = analyze_filtration_follow_up_trends(samples)
+    with raises(TypeError, match="requires DLSForwardScatterTrendRead"):
+        generate_filtration_relationship_hypothesis(object(), filtration)
+    with raises(TypeError, match="requires FiltrationTrendRead"):
+        generate_filtration_relationship_hypothesis(forward, object())
+
+
 def test_assess_dls_aggregation_preserves_available_and_unavailable_evidence():
     available = _decision_sample("available", 0.20, [])
     available.measurement.angle_summaries = [
@@ -2249,6 +2350,7 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
         "set_dls_filtration_measurement",
         "attach_dls_filtration_measurements",
         "analyze_filtration_follow_up_trends",
+        "generate_filtration_relationship_hypothesis",
         "assess_dls_aggregation",
         "summarize_dls_samples",
         "retrieve_dls_angle_details",
@@ -2337,6 +2439,18 @@ def test_capability_registry_exposes_stable_scientific_workflow_names():
     assert filtration_attach.caller_types == ("Human UI", "CLI")
     filtration_trends = get_capability("analyze_filtration_follow_up_trends")
     assert filtration_trends.handler is analyze_filtration_follow_up_trends
+    filtration_hypothesis = get_capability(
+        "generate_filtration_relationship_hypothesis"
+    )
+    assert (
+        filtration_hypothesis.handler
+        is generate_filtration_relationship_hypothesis
+    )
+    assert filtration_hypothesis.caller_types == (
+        "Human UI",
+        "CLI",
+        "Future API",
+    )
     assert filtration_trends.caller_types == ("Human UI", "CLI", "Future API")
     aggregation = get_capability("assess_dls_aggregation")
     assert aggregation.handler is assess_dls_aggregation

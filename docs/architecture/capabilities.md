@@ -74,6 +74,7 @@ cross the same boundary with ordered matching results.
 | `set_dls_filtration_measurement` | `set_dls_filtration_measurement` | Available; explicit reviewed Streamlit evidence mutation |
 | `attach_dls_filtration_measurements` | `attach_dls_filtration_measurements` | Available; explicit reviewed Streamlit CSV attachment |
 | `analyze_filtration_follow_up_trends` | `analyze_filtration_follow_up_trends` | Available; used by Streamlit filtration follow-up |
+| `generate_filtration_relationship_hypothesis` | `generate_filtration_relationship_hypothesis` | Available; used by Streamlit filtration hypothesis callout |
 | `assess_dls_aggregation` | `assess_dls_aggregation` | Available; used by Streamlit dual-angle comparison |
 | `summarize_dls_samples` | `summarize_dls_samples` | Available; used by Streamlit sample cards and inspection list |
 | `retrieve_dls_angle_details` | `retrieve_dls_angle_details` | Available; used by Streamlit per-angle detail table |
@@ -523,6 +524,34 @@ evidence produces empty points and qualified messages rather than errors.
 **Caller Types:** Human UI, CLI, Future API. Streamlit's filtration follow-up is
 the first caller. Agent use remains excluded pending broader review of ordinal,
 operator-assessed evidence.
+
+## Generate Filtration Relationship Hypothesis
+
+**Name:** `generate_filtration_relationship_hypothesis`
+
+**Purpose:** Qualify the working relationship hypothesis connecting circulation
+time, forward-angle DLS size/PDI, and orthogonal filtration difficulty without
+placing scientific claims or causal interpretation in presentation code.
+
+**Inputs:** One immutable `DLSForwardScatterTrendRead` and one immutable
+`FiltrationTrendRead` produced by the established trend capabilities.
+Correlations are not recomputed, and evidence from only one stage cannot fully
+qualify the two-stage hypothesis.
+
+**Outputs:** A frozen, versioned `FiltrationRelationshipHypothesis` containing
+an insufficient, partial, or qualified status, the count of five component
+relationships that are currently estimable, complete application-authored
+display text, and the five underlying qualified relationship messages. The
+working hypothesis remains visible with proposed-not-supported language before
+evidence thresholds are met; estimable results retain explicit
+correlation-only, non-causal wording.
+
+**Expected Errors:** `TypeError` when either input does not match its expected
+immutable trend read.
+
+**Caller Types:** Human UI, CLI, Future API. Streamlit's filtration callout is
+the first caller. Agent use remains excluded pending broader review of ordinal,
+operator-assessed evidence and hypothesis policy.
 
 ## Assess DLS Aggregation
 
@@ -1051,7 +1080,7 @@ These are capability boundaries, not implemented public contracts:
 
 | Candidate name | Scientific intent | Current owner |
 | --- | --- | --- |
-| `generate_hypotheses` | Produce deterministic, evidence-linked hypotheses | Technique modules/UI |
+| `generate_hypotheses` | Generalize deterministic, evidence-linked hypotheses beyond the available filtration-specific read | Technique modules/application |
 
 Promote candidates one at a time when an existing human workflow can become the
 first real caller. Define typed inputs, stable read outputs, validation, and

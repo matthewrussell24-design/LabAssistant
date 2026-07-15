@@ -525,6 +525,28 @@ class FiltrationTrendRead:
 
 
 @dataclass(frozen=True)
+class FiltrationRelationshipHypothesis:
+    """Evidence-qualified working hypothesis over filtration trend reads."""
+
+    status: str
+    estimable_relationship_count: int
+    relationship_count: int
+    text: str
+    supporting_messages: tuple[str, ...]
+    api_version: str = AGENT_API_VERSION
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "estimable_relationship_count": self.estimable_relationship_count,
+            "relationship_count": self.relationship_count,
+            "text": self.text,
+            "supporting_messages": list(self.supporting_messages),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class DLSAngleEvidence:
     """Immutable evidence from one scattering-angle summary."""
 
@@ -2670,6 +2692,68 @@ def analyze_filtration_follow_up_trends(
     )
 
 
+def generate_filtration_relationship_hypothesis(
+    forward_trends: DLSForwardScatterTrendRead,
+    filtration_trends: FiltrationTrendRead,
+) -> FiltrationRelationshipHypothesis:
+    """Qualify the filtration working hypothesis from immutable trend evidence."""
+
+    if not isinstance(forward_trends, DLSForwardScatterTrendRead):
+        raise TypeError(
+            "Filtration relationship hypothesis requires DLSForwardScatterTrendRead"
+        )
+    if not isinstance(filtration_trends, FiltrationTrendRead):
+        raise TypeError(
+            "Filtration relationship hypothesis requires FiltrationTrendRead"
+        )
+
+    relationships = (
+        forward_trends.z_average,
+        forward_trends.pdi,
+        filtration_trends.z_average,
+        filtration_trends.pdi,
+        filtration_trends.circulation_time,
+    )
+    estimable_count = sum(
+        relationship.correlation is not None for relationship in relationships
+    )
+    hypothesis = (
+        "Working hypothesis: total circulation time may relate to forward-scatter "
+        "size/PDI, and those forward-scatter attributes may relate to filtration "
+        "difficulty. The filtration device run is an orthogonal follow-up "
+        "measurement; it may strengthen or weaken this relationship hypothesis."
+    )
+    if estimable_count == len(relationships):
+        qualification = (
+            f" {estimable_count} of {len(relationships)} relationships are currently "
+            "estimable in this dataset. These estimates are correlation only, not "
+            "evidence of causation."
+        )
+        status = "qualified"
+    elif estimable_count:
+        qualification = (
+            f" {estimable_count} of {len(relationships)} component relationships are "
+            "currently estimable in this dataset, so the hypothesis is only partially "
+            "qualified. These estimates are correlation only, not evidence of causation."
+        )
+        status = "partial"
+    else:
+        qualification = (
+            " None of the five component relationships is currently estimable; the "
+            "hypothesis remains proposed rather than supported by this dataset."
+        )
+        status = "insufficient"
+    return FiltrationRelationshipHypothesis(
+        status=status,
+        estimable_relationship_count=estimable_count,
+        relationship_count=len(relationships),
+        text=hypothesis + qualification,
+        supporting_messages=tuple(
+            relationship.message for relationship in relationships
+        ),
+    )
+
+
 def assess_dls_aggregation(samples: list[Any]) -> DLSAggregationRead:
     """Assess dual-angle aggregation evidence for every parsed DLS sample."""
 
@@ -3812,6 +3896,12 @@ _CAPABILITY_REGISTRY: tuple[CapabilityContract, ...] = (
         name="analyze_filtration_follow_up_trends",
         purpose="Analyze reviewed filtration follow-up evidence against DLS metrics.",
         handler=analyze_filtration_follow_up_trends,
+        caller_types=("Human UI", "CLI", "Future API"),
+    ),
+    CapabilityContract(
+        name="generate_filtration_relationship_hypothesis",
+        purpose="Qualify the filtration relationship hypothesis from trend evidence.",
+        handler=generate_filtration_relationship_hypothesis,
         caller_types=("Human UI", "CLI", "Future API"),
     ),
     CapabilityContract(

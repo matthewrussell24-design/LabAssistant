@@ -28,6 +28,7 @@ from labassistant.application import (
     attach_dls_filtration_measurements,
     analyze_dls_forward_scatter_trends,
     analyze_filtration_follow_up_trends,
+    generate_filtration_relationship_hypothesis,
     assess_dls_aggregation,
     summarize_dls_samples,
     retrieve_dls_angle_details,
@@ -44,6 +45,7 @@ from labassistant.application import (
     DLSForwardScatterPoint,
     DLSRelationshipSummary,
     FiltrationRelationshipSummary,
+    FiltrationRelationshipHypothesis,
     FiltrationTrendPointRead,
     DLSAggregationAssessment,
     DLSSampleSummary,
@@ -1901,16 +1903,13 @@ def render_relationship_summary(
         st.caption(analysis.message)
 
 
-def render_filtration_hypothesis_callout() -> None:
-    st.info(
-        "Working hypothesis: total circulation time may relate to forward-scatter size/PDI, "
-        "and those forward-scatter attributes may relate to filtration difficulty. "
-        "The planned filtration device run is an orthogonal follow-up measurement; it may strengthen or weaken this relationship hypothesis."
-    )
+def render_filtration_hypothesis_callout(
+    hypothesis: FiltrationRelationshipHypothesis,
+) -> None:
+    st.info(hypothesis.text)
 
 
 def render_filtration_follow_up(samples: list[ParsedSample]) -> None:
-    render_filtration_hypothesis_callout()
     st.subheader("Filtration Follow-Up")
     st.caption(
         "Orthogonal filtration measurements can be entered manually or imported from a simple CSV. "
@@ -1928,6 +1927,12 @@ def render_filtration_follow_up(samples: list[ParsedSample]) -> None:
     render_attached_filtration_measurements(samples)
 
     filtration_analysis = analyze_filtration_follow_up_trends(samples)
+    render_filtration_hypothesis_callout(
+        generate_filtration_relationship_hypothesis(
+            analyze_dls_forward_scatter_trends(samples),
+            filtration_analysis,
+        )
+    )
     if not filtration_analysis.points:
         st.info("Attach filtration difficulty scores for at least three samples to compare filtration behavior with DLS forward-scatter attributes.")
         return
