@@ -3,7 +3,12 @@ from __future__ import annotations
 import pandas as pd
 
 from labassistant.quality import STATUS_NORMAL, STATUS_REVIEW, STATUS_WATCH
-from labassistant.dls_evidence import DLSSampleEvidence, sample_status
+from labassistant.dls_evidence import (
+    DLSMeasurementMetrics,
+    DLSSampleEvidence,
+    measurement_metrics,
+    sample_status,
+)
 
 ParsedSample = DLSSampleEvidence
 
@@ -21,25 +26,37 @@ def format_metric(value, unit: str = "", digits: int = 2) -> str:
 
 
 def review_evidence(sample: ParsedSample) -> str:
+    """Compatibility wrapper for Measurement-first review evidence."""
+
+    return review_evidence_from_metrics(measurement_metrics(sample.measurement))
+
+
+def review_evidence_from_metrics(metrics: DLSMeasurementMetrics) -> str:
+    """Format ordered warning evidence from an authoritative DLS projection."""
+
     evidence = []
 
-    if "High PDI" in sample.warnings:
-        evidence.append(f"PDI {format_metric(sample.metrics['PDI'], digits=3)}")
-    if "Moderate PDI" in sample.warnings:
-        evidence.append(f"PDI {format_metric(sample.metrics['PDI'], digits=3)}")
-    if "Secondary peak" in sample.warnings:
-        evidence.append(f"secondary peak {format_metric(sample.metrics['Secondary Peak'], 'nm')}")
-    if "Large-particle tail" in sample.warnings:
-        evidence.append(f"tail index {format_metric(sample.metrics['Tail Index'], '%')}")
-    if "Broad distribution" in sample.warnings:
-        evidence.append(f"D90/D10 {format_metric(sample.metrics['Width Ratio'], digits=2)}")
-    if "Dual-angle aggregation" in sample.warnings:
-        index = sample.metrics.get("Aggregation Index")
+    if "High PDI" in metrics.warnings:
+        evidence.append(f"PDI {format_metric(metrics.pdi, digits=3)}")
+    if "Moderate PDI" in metrics.warnings:
+        evidence.append(f"PDI {format_metric(metrics.pdi, digits=3)}")
+    if "Secondary peak" in metrics.warnings:
+        evidence.append(
+            f"secondary peak {format_metric(metrics.secondary_peak_nm, 'nm')}"
+        )
+    if "Large-particle tail" in metrics.warnings:
+        evidence.append(
+            f"tail index {format_metric(metrics.tail_index_percent, '%')}"
+        )
+    if "Broad distribution" in metrics.warnings:
+        evidence.append(f"D90/D10 {format_metric(metrics.width_ratio, digits=2)}")
+    if "Dual-angle aggregation" in metrics.warnings:
+        index = metrics.aggregation_index
         if index is not None and not pd.isna(index):
             evidence.append(f"dual-angle aggregation index {format_metric(index, digits=2)}")
         else:
             evidence.append("elevated dual-angle aggregation signal")
-    if "Distribution columns need review" in sample.warnings:
+    if "Distribution columns need review" in metrics.warnings:
         evidence.append("distribution columns were not identified")
 
     return ", ".join(evidence) if evidence else "No metric evidence found"

@@ -77,3 +77,29 @@ def test_decision_brief_and_summary_prioritize_flagged_sample():
     assert decision["worst"] == "flagged (Watch)"
     assert decision["flagged"] == "1 of 2"
     assert "flagged: PDI 0.35" in summary["Samples Needing Review"]
+
+
+def test_review_evidence_uses_measurement_metrics_and_ordered_flags():
+    sample = make_sample(
+        "flagged",
+        0.62,
+        [
+            "High PDI",
+            "Secondary peak",
+            "Large-particle tail",
+            "Broad distribution",
+            "Dual-angle aggregation",
+            "Distribution columns need review",
+        ],
+    )
+    sample.measurement.summary_metrics.pdi = 0.62
+    sample.measurement.derived_metrics.secondary_peak_nm = 450.0
+    sample.measurement.derived_metrics.tail_index_percent = 7.2
+    sample.measurement.derived_metrics.width_ratio = 8.5
+    sample.measurement.derived_metrics.aggregation_index = 0.12
+    sample.metrics.clear()
+
+    assert review_evidence(sample) == (
+        "PDI 0.62, secondary peak 450 nm, tail index 7.2 %, D90/D10 8.5, "
+        "dual-angle aggregation index 0.12, distribution columns were not identified"
+    )

@@ -86,9 +86,11 @@ frozen, pandas-free `DLSMeasurementMetrics` projection over authoritative
 summary metrics, derived metrics, metadata, flags, and provenance. Both the
 immutable `retrieve_dls_metrics` application read and the legacy pandas metrics
 table now use that projection, so mutable workspace metric overrides cannot
-change their results. The workspace adapter still carries its compatibility
-metrics dictionary for narrative, sample-summary, and distribution callers, so
-the boundary is not yet a transport contract.
+change their results. Task 052 migrated ordered warning evidence and immutable
+per-sample summaries to the same Measurement-first projection. The workspace
+adapter still carries its compatibility metrics dictionary for decision/story
+scoring, observation normalization, and distribution table selection, so the
+boundary is not yet a transport contract.
 
 ## Implemented Capability Catalog
 
@@ -1146,7 +1148,8 @@ workflow with validation and provenance.
 
 ## Recommended Next Step
 
-Migrate DLS review-evidence formatting and the immutable per-sample summary to
-the shared `DLSMeasurementMetrics` projection. Preserve wording and optional-row
-behavior while removing the next application read path's dependency on the
-workspace metrics dictionary; keep distribution-table migration separate.
+Migrate DLS decision ranking and narrative interpretation helpers to
+`DLSMeasurementMetrics` so attention scores, warning lists, and data-story
+composition no longer read mutable workspace metrics or warnings. Preserve
+ranking, wording, and dataframe compatibility; keep observation and
+distribution migration separate.

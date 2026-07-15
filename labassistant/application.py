@@ -56,7 +56,7 @@ from labassistant.interpretation import (
     build_data_analysis,
     build_decision_brief,
     format_metric,
-    review_evidence,
+    review_evidence_from_metrics,
 )
 from labassistant.models import (
     ChromatographyMeasurement,
@@ -2473,8 +2473,7 @@ def summarize_dls_health(samples: list[DLSSampleEvidence]) -> DLSHealthOverview:
         raise ValueError("At least one parsed DLS sample is required for health summary")
     if any(
         not hasattr(sample, "name")
-        or not hasattr(sample, "metrics")
-        or not hasattr(sample, "warnings")
+        or not isinstance(getattr(sample, "measurement", None), Measurement)
         for sample in samples
     ):
         raise TypeError("DLS health summary requires parsed samples")
@@ -2844,8 +2843,7 @@ def summarize_dls_samples(
         raise ValueError("At least one parsed DLS sample is required for sample summaries")
     if any(
         not hasattr(sample, "name")
-        or not hasattr(sample, "metrics")
-        or not hasattr(sample, "warnings")
+        or not isinstance(getattr(sample, "measurement", None), Measurement)
         for sample in samples
     ):
         raise TypeError("DLS sample summaries require parsed samples")
@@ -2855,46 +2853,48 @@ def summarize_dls_samples(
 
     summaries = []
     for sample in samples:
+        projected = measurement_metrics(sample.measurement)
         rows = [
-            DLSMetricDisplayRow("Type", str(sample.metrics["Data Type"])),
+            DLSMetricDisplayRow("Type", projected.data_type),
             DLSMetricDisplayRow(
-                "Z-Average", format_metric(sample.metrics["Z-Average"], "nm")
+                "Z-Average", format_metric(projected.z_average_nm, "nm")
             ),
-            DLSMetricDisplayRow("PDI", format_metric(sample.metrics["PDI"], digits=3)),
+            DLSMetricDisplayRow("PDI", format_metric(projected.pdi, digits=3)),
             DLSMetricDisplayRow(
                 "Measurements",
-                format_metric(sample.metrics["Measurement Count"], digits=0),
+                format_metric(projected.measurement_count, digits=0),
             ),
             DLSMetricDisplayRow(
-                "Angles", str(sample.metrics["Scattering Angles"] or "Not found")
+                "Angles", str(projected.scattering_angles or "Not found")
             ),
         ]
-        if present(sample.metrics.get("Primary Peak")):
+        if present(projected.primary_peak_nm):
             rows.append(
                 DLSMetricDisplayRow(
-                    "Primary Peak", format_metric(sample.metrics["Primary Peak"], "nm")
+                    "Primary Peak", format_metric(projected.primary_peak_nm, "nm")
                 )
             )
-        if present(sample.metrics.get("Tail Index")):
+        if present(projected.tail_index_percent):
             rows.append(
                 DLSMetricDisplayRow(
-                    "Tail >1,000 nm", format_metric(sample.metrics["Tail Index"], "%")
+                    "Tail >1,000 nm",
+                    format_metric(projected.tail_index_percent, "%"),
                 )
             )
         rows.append(
             DLSMetricDisplayRow(
                 "Review signals",
-                ", ".join(str(warning) for warning in sample.warnings)
-                if sample.warnings
+                ", ".join(projected.warnings)
+                if projected.warnings
                 else "No flags",
             )
         )
         summaries.append(
             DLSSampleSummary(
                 sample_name=sample.name,
-                status=sample_status(sample),
-                warnings=tuple(str(warning) for warning in sample.warnings),
-                review_evidence=review_evidence(sample),
+                status=projected.status,
+                warnings=projected.warnings,
+                review_evidence=review_evidence_from_metrics(projected),
                 metric_rows=tuple(rows),
             )
         )

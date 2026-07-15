@@ -1795,6 +1795,8 @@ def test_summarize_dls_samples_preserves_missing_optional_rows_and_validates():
     sample = _decision_sample("missing", 0.12, [])
     sample.metrics["Primary Peak"] = None
     sample.metrics["Tail Index"] = None
+    sample.measurement.derived_metrics.primary_peak_nm = None
+    sample.measurement.derived_metrics.tail_index_percent = None
     result = summarize_dls_samples([sample])
 
     assert [row.label for row in result.samples[0].metric_rows] == [
@@ -1810,6 +1812,24 @@ def test_summarize_dls_samples_preserves_missing_optional_rows_and_validates():
         summarize_dls_samples([])
     with raises(TypeError, match="require parsed samples"):
         summarize_dls_samples([object()])
+
+
+def test_summarize_dls_samples_ignores_workspace_metric_and_warning_overrides():
+    sample = _decision_sample("authoritative", 0.21, [])
+    sample.metrics["PDI"] = 9.99
+    sample.metrics["Primary Peak"] = None
+    sample.warnings.append("High PDI")
+
+    result = summarize_dls_samples([sample]).samples[0]
+
+    assert result.status == "Normal"
+    assert result.warnings == ()
+    assert result.review_evidence == "No metric evidence found"
+    assert {row.label: row.value for row in result.metric_rows}["PDI"] == "0.21"
+    assert (
+        {row.label: row.value for row in result.metric_rows}["Primary Peak"]
+        == "100 nm"
+    )
 
 
 def test_retrieve_dls_angle_details_preserves_rows_values_and_order():
