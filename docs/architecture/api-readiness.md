@@ -7,8 +7,9 @@ freeze for an external read-only transport, and what must happen first?
 
 Transport implementation is **not ready yet**. The application layer is mature;
 tasks 058 and 059 completed the draft response/error boundary, local read
-policy, and bounded collections. The final schema-shape/version review remains
-before any transport selection.
+policy, and bounded collections. Task 060 captured the golden shapes and made an
+explicit **remain-draft** decision because discovery and version layers are not
+yet cleanly separated.
 
 The first transport should expose only seven read candidates after the bounded
 hardening gate below. Registry presence does not imply external stability.
@@ -115,8 +116,34 @@ Before selecting or implementing a transport:
   subject, known client, local origin, and capability-specific scope. This is a
   local host policy, not remote authentication.
 - ✅ JSON conformance and failure-mapping tests cover all seven candidates.
-- ⬜ Stable version: `0.1-draft` remains correct until the candidate shapes
-  receive their final freeze review.
+- 🟡 Stable version: the final review retained `0.1-draft` until public discovery
+  and external-versus-internal version separation are complete.
+
+## Task 060 Freeze Review
+
+Golden field fixtures now cover all seven success responses, the common error
+envelope, and all six error codes in
+`tests/fixtures/api_contract_shape.json`.
+
+Decision: **remain at `0.1-draft`**.
+
+Blocking findings:
+
+1. `describe_platform` embeds the complete 42-capability in-process registry,
+   including writes and Python-only workflows. Freezing it would contradict the
+   reviewed seven-read surface.
+2. The envelope and nested application DTOs all use the same `api_version`
+   field. A future external contract version cannot evolve independently from
+   internal DTO versions without an explicit separation.
+3. `describe_agent_access` still describes broad in-process stable inputs
+   (`Experiment`, `Observation`) and lists a network service as a non-goal; it
+   is not yet a precise discovery record for the candidate read contract.
+4. Error codes are ready to freeze, but human-readable messages remain
+   descriptive draft text and are not compatibility keys.
+
+Pagination and local policy passed review. Offset paging is acceptable for the
+initial single-user, append-only local stores as long as clients treat each page
+as a point-in-time read rather than a snapshot transaction.
 
 The conformance implementation lives in `labassistant.api_readiness`. It is an
 in-process boundary, not a server, remote authentication mechanism, or endpoint
@@ -127,10 +154,10 @@ parameters; loopback alone is not treated as identity.
 
 **No-go for an HTTP server or agent SDK today.**
 
-**Go for the next task:** run the final schema-shape review, add golden contract
-fixtures where necessary, and decide whether to promote the seven-read surface
-from `0.1-draft` to a stable version. That work still does not choose a
-framework, open a port, or grant write access.
+**Go for the next task:** add a seven-read public discovery projection and an
+independent external contract-version constant, then update the golden fixtures
+and repeat the freeze decision. That work still does not choose a framework,
+open a port, or grant write access.
 
 ## Deliberate Deferrals
 

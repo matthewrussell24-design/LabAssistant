@@ -34,3 +34,10 @@ also require human review.
 - Existing in-process callers remain compatible.
 - `0.1-draft` remains honest until envelope and conformance work is complete.
 - New registry entries must be classified before being proposed externally.
+
+## Task 060 Review
+
+The first freeze review remains at `0.1-draft`. Golden fixtures are in place,
+but `describe_platform` still exposes the full in-process registry and external
+envelope versions are not separated from nested application DTO versions.
+Those are release blockers, not reasons to weaken the seven-read boundary.

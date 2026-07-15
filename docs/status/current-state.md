@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Added scoped local read policy and bounded candidate
-  collection responses (task 059).
-- Working Tree: Task 059 is committed locally; inspect `git status --short`
+- Latest Completed Change: Captured golden seven-read shapes and recorded the
+  explicit remain-draft freeze decision (task 060).
+- Working Tree: Task 060 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `237 passed in 2.58s` from `scripts/test -q` on
+- Last Successful Test: `237 passed in 2.90s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 059.
+- Last Updated: 2026-07-15 for task 060.
 
 ## North Star
 
@@ -34,9 +34,9 @@ full traceability.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
   Measurement-first, raw vendor inspection is explicitly adapter-bounded, and
   reusable human workflows cross typed application contracts.
-- API Layer: 🟡 Foundation — seven candidates share draft JSON envelopes,
-  scoped local access policy, and bounded collections; final version freeze and
-  transport remain absent.
+- API Layer: 🟡 Foundation — seven candidates have golden draft shapes, scoped
+  local access, and bounds; public discovery/version separation blocks a stable
+  version and transport selection.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
 
 Health labels summarize the evidence in the detailed sections below. Update a
@@ -75,7 +75,9 @@ are future platform capabilities and are not automatically the next task.
   boundaries, limits, and JSON conformance tests exist. Task 058 completed the
   envelopes, errors, safe invocation, and conformance tests without changing
   existing handlers. Task 059 added policy-derived local access and honest
-  bounds/pagination metadata for every candidate collection.
+  bounds/pagination metadata for every candidate collection. Task 060 captured
+  golden shapes and retained `0.1-draft` because discovery exposes all 42
+  registry entries and external/internal versions are conflated.
 
 ## Five-Minute Rule
 
@@ -396,6 +398,8 @@ architecture rationale.
   conformance coverage while preserving existing handlers (task 058).
 - Added scoped local read policy and deterministic collection bounds without
   treating loopback as identity or adding remote authentication (task 059).
+- Captured golden success/error shapes and explicitly retained `0.1-draft` with
+  two bounded release blockers (task 060).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -411,8 +415,8 @@ architecture rationale.
 
 ## Active Work
 
-- Local read-policy and bounded-collection task 059 is complete.
-- The working tree was clean when task 059 began.
+- Final schema-review task 060 is complete with a remain-draft decision.
+- The working tree was clean when task 060 began.
 
 ## Known Risks
 
@@ -447,7 +451,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `237 passed in 2.58s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `237 passed in 2.90s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -466,19 +470,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Run the final seven-read schema review and decide whether to
-  replace `0.1-draft` with a stable contract version.
-- Why this is next: Tasks 058 and 059 completed every functional item in the
-  hardening gate. A deliberate freeze review is safer than changing the version
-  as a side effect of implementation.
-- Expected scope: Medium; capture golden success/error shapes, verify field
-  semantics and pagination consistency, document compatibility promises, and
-  either promote the contract or record specific blockers.
-- Risks: Freezing accidental field names, conflating application DTO versions
-  with transport versions, or promising remote security from a local policy.
-- Success criteria: reviewed golden fixtures for all seven candidates and core
-  errors, an explicit stable-version or remain-draft decision, and a clear
-  go/no-go for selecting the first read-only transport.
+- Objective: Add public discovery for only the seven candidate reads and split
+  the external contract version from internal application DTO versions.
+- Why this is next: Task 060 found these are the two concrete blockers to a
+  stable freeze; pagination, access policy, envelopes, errors, and golden tests
+  have passed review.
+- Expected scope: Medium; define public capability metadata, transform
+  `describe_platform` and `describe_agent_access` at the conformance boundary,
+  introduce an independent draft contract version, and update golden fixtures.
+- Risks: Duplicating registry metadata, hiding useful platform context, or
+  accidentally relabeling nested draft DTOs as stable.
+- Success criteria: discovery exposes exactly seven read-only candidates,
+  envelope versioning is independent and unambiguous, internal registry callers
+  remain unchanged, and a repeated freeze review can make a stable/no-go choice.
 
 ## AI Context Window
 

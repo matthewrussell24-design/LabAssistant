@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import labassistant.api_readiness as api
 from labassistant.application import AGENT_API_VERSION, ExperimentListing
@@ -25,6 +26,19 @@ MEMORY_ACCESS = api.LocalReadAccessContext(
     origin="local",
     scopes=(api.MEMORY_READ,),
 )
+
+GOLDEN_SHAPE = json.loads(
+    (Path(__file__).parent / "fixtures" / "api_contract_shape.json").read_text()
+)
+
+
+def assert_golden_fields(payload, expected):
+    for path, fields in expected.items():
+        value = payload
+        if path:
+            for part in path.split("."):
+                value = value[part]
+        assert sorted(value) == sorted(fields)
 
 
 def test_all_candidate_reads_produce_deterministic_json_envelopes(monkeypatch):
@@ -55,7 +69,13 @@ def test_all_candidate_reads_produce_deterministic_json_envelopes(monkeypatch):
         api,
         "retrieve_experiment",
         lambda record_id: StubRead(
-            {"record_id": record_id, "api_version": AGENT_API_VERSION}
+            {
+                "record_id": record_id,
+                "saved_at": "2026-07-15T12:00:00+00:00",
+                "label": "Run 1",
+                "measurement_count": 2,
+                "api_version": AGENT_API_VERSION,
+            }
         ),
     )
     monkeypatch.setattr(
@@ -130,6 +150,7 @@ def test_all_candidate_reads_produce_deterministic_json_envelopes(monkeypatch):
     }
 
     assert tuple(parameters) == api.CANDIDATE_READS
+    payloads = {}
     for capability, request in parameters.items():
         access_context = None
         if capability in api.REQUIRED_SCOPES:
@@ -142,10 +163,15 @@ def test_all_candidate_reads_produce_deterministic_json_envelopes(monkeypatch):
             capability, request, access_context=access_context
         )
         payload = result.to_dict()
+        payloads[capability] = payload
         assert payload["ok"] is True
         assert payload["api_version"] == AGENT_API_VERSION
         assert payload["capability"] == capability
         assert json.loads(json.dumps(payload, allow_nan=False)) == payload
+
+    assert set(payloads) == set(GOLDEN_SHAPE["success"])
+    for capability, payload in payloads.items():
+        assert_golden_fields(payload, GOLDEN_SHAPE["success"][capability])
 
     listings = api.invoke_candidate_read(
         "list_experiments", {"limit": 1}, access_context=HISTORY_ACCESS
@@ -303,3 +329,17 @@ def test_error_code_catalog_is_stable_and_complete():
         "access_denied",
         "internal_failure",
     )
+    assert list(api.ERROR_CODES) == GOLDEN_SHAPE["error"]["codes"]
+    for code in api.ERROR_CODES:
+        payload = api.APIErrorEnvelope(
+            api_version=AGENT_API_VERSION,
+            capability="candidate",
+            error=api.APIError(code=code, message="message"),
+        ).to_dict()
+        assert_golden_fields(
+            payload,
+            {
+                "": GOLDEN_SHAPE["error"][""],
+                "error": GOLDEN_SHAPE["error"]["error"],
+            },
+        )
