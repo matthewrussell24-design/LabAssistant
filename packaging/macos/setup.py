@@ -1,5 +1,6 @@
 """py2app configuration for a local, non-release qualification bundle."""
 
+import os
 from setuptools import find_packages, setup
 
 
@@ -34,6 +35,7 @@ setup(
                 "CFBundleShortVersionString": "0.1.0-dev",
                 "CFBundleVersion": "1",
                 "LSApplicationCategoryType": "public.app-category.productivity",
+                "LSMinimumSystemVersion": os.environ["LABASSISTANT_MIN_MACOS"],
                 "NSHighResolutionCapable": True,
                 "NSPrincipalClass": "NSApplication",
             },

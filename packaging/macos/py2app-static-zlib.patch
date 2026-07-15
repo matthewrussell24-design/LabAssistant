@@ -1,0 +1,7 @@
+--- a/py2app/build_app.py
++++ b/py2app/build_app.py
+@@ -2442 +2442,3 @@
+-            self.copy_file(zlib.__file__, os.path.dirname(arcdir))
++            # Portable CPython builds may link zlib into the interpreter.
++            if getattr(zlib, "__file__", None) is not None:
++                self.copy_file(zlib.__file__, os.path.dirname(arcdir))

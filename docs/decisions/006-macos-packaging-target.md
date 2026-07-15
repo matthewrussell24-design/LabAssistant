@@ -21,7 +21,7 @@ options.
 
 | Area | Current evidence | Decision |
 | --- | --- | --- |
-| Host/runtime | Python 3.12.13 and installed binaries are arm64 | First target is arm64 only |
+| Host/runtime | Task 071 pins controlled CPython 3.12.13 arm64; closure targets 11.0/14.0 | Candidate floor is macOS 14 |
 | Native UI | PyObjC Cocoa/WebKit 12.2.1; AppKit/WKWebView smoke passes | Bundle the native entry point |
 | Packaging tool | task 070 builds a standalone py2app 0.28.10 qualification app | Local bundle gate passed |
 | Dependencies | task 069 split four inputs and generated hashed Python 3.12 arm64 locks | Reproducibility gate passed |
@@ -149,11 +149,11 @@ targets for Python and every bundled Mach-O dependency, choose the highest
 required minimum, then verify clean machines. Until that matrix exists, only
 the build/test host is qualified and development artifacts must say so.
 
-The task 070 audit found embedded minimum targets of macOS 11.0, 14.0, and 26.0.
-The Homebrew Python 3.12.13 runtime and many standard-library/native support
-files require macOS 26.0, so this host-built artifact cannot establish a useful
-lower deployment target. A controlled Python runtime and clean-machine matrix
-are required before freezing compatibility.
+Task 071 replaced the task 070 Homebrew payload with checksum-pinned controlled
+CPython 3.12.13. The rebuilt 76-file native closure contains only macOS 11.0 and
+14.0 targets, and inspection enforces the declared candidate 14.0 floor. ADR
+007 records the provenance and selection. Clean macOS 14 and current-macOS
+execution are still required before freezing supported compatibility.
 
 ## Verification Matrix
 

@@ -112,8 +112,10 @@ development paths, and an invalid signature. The smoke exercises packaged
 DLS/XLSX, chromatography CSV, synthetic OpenLab `.olax`, JSONL history, SQLite
 memory, paths with spaces, and default-off IPC.
 
-This bundle is not Developer ID signed, hardened/notarized, sandboxed,
-universal2, or qualified below the build host's deployment target.
+This bundle uses a checksum-pinned controlled CPython runtime and declares a
+candidate macOS 14.0 binary floor from its complete native closure. It is not
+Developer ID signed, hardened/notarized, sandboxed, universal2, or yet validated
+on clean macOS 14/current machines, so the declaration is not a support claim.
 
 The desktop app opens into a research workspace with reusable experiment,
 metric, analysis, and session-history cards. Streamlit remains available for

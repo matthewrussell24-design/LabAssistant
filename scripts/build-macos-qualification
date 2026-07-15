@@ -6,16 +6,36 @@ VENV="$ROOT_DIR/.packaging-venv"
 BUILD_ROOT="/tmp/labassistant-py2app-build"
 DIST_ROOT="/tmp"
 APP="$DIST_ROOT/LabAssistantQualification.app"
+RUNTIME_ROOT="/tmp/labassistant-python-runtime"
+RUNTIME_ARCHIVE="/tmp/labassistant-python-runtime.tar.gz"
+
+source "$ROOT_DIR/packaging/macos/runtime.env"
+export LABASSISTANT_MIN_MACOS="$BUNDLE_MIN_MACOS"
 
 if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
   echo "The qualification bundle requires an arm64 macOS host." >&2
   exit 1
 fi
 
-rm -rf "$VENV" "$BUILD_ROOT" "$APP"
-python3.12 -m venv "$VENV"
+rm -rf "$VENV" "$BUILD_ROOT" "$APP" "$RUNTIME_ROOT"
+if [[ ! -f "$RUNTIME_ARCHIVE" ]] || \
+  [[ "$(shasum -a 256 "$RUNTIME_ARCHIVE" | awk '{print $1}')" != "$PYTHON_RUNTIME_SHA256" ]]; then
+  curl --fail --location --silent --show-error \
+    "$PYTHON_RUNTIME_URL" -o "$RUNTIME_ARCHIVE"
+fi
+echo "$PYTHON_RUNTIME_SHA256  $RUNTIME_ARCHIVE" | shasum -a 256 --check --status
+mkdir -p "$RUNTIME_ROOT"
+tar -xzf "$RUNTIME_ARCHIVE" -C "$RUNTIME_ROOT"
+PYTHON="$RUNTIME_ROOT/python/bin/python3.12"
+[[ "$($PYTHON -c 'import platform; print(platform.machine())')" == "$PYTHON_RUNTIME_ARCH" ]]
+[[ "$(vtool -show-build "$PYTHON" | awk '/minos/{print $2; exit}')" == \
+  "$PYTHON_RUNTIME_MIN_MACOS" ]]
+"$PYTHON" -m venv "$VENV"
 "$VENV/bin/python" -m pip install -q --require-hashes \
   -r "$ROOT_DIR/requirements/locks/build-py312-macos-arm64.txt"
+PY2APP_SITE="$VENV/lib/python3.12/site-packages"
+patch --batch --forward --strip=1 --directory="$PY2APP_SITE" \
+  < "$ROOT_DIR/packaging/macos/py2app-static-zlib.patch"
 
 cd "$ROOT_DIR"
 "$VENV/bin/python" packaging/macos/setup.py py2app \
@@ -41,7 +61,7 @@ done < <(find "$APP" -type f -print0)
 xattr -cr "$APP"
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
-rm -rf "$VENV"
+rm -rf "$VENV" "$RUNTIME_ROOT"
 
 echo "Built local qualification artifact: $APP"
 echo "This ad-hoc bundle is NOT signed for distribution and is NOT a release."

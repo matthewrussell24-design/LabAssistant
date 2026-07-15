@@ -74,9 +74,11 @@ Experiment" to browse and restore persisted records through the application
 boundary. Task 067 selected arm64 py2app with an ad-hoc local qualification
 stage followed by Developer ID signing, hardened runtime, and notarization for
 direct distribution. Tasks 068–070 completed runtime paths, dependency
-reproducibility, and the first local-only standalone arm64 bundle. Sandbox, Mac
-App Store, universal2, and packaged local-read sharing remain separate
-qualification tracks; deployment-runtime compatibility is the next gate.
+reproducibility, and the first local-only standalone arm64 bundle. Task 071
+replaced host Python with a checksum-pinned controlled runtime and derived a
+candidate macOS 14 binary floor. Sandbox, Mac App Store, universal2, and
+packaged local-read sharing remain separate tracks; the clean macOS 14/current
+compatibility matrix is the next gate.
 
 ## Phase 1: Rename The Product Concepts
 

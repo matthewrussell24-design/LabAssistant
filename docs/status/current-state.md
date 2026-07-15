@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Built and qualified the first standalone arm64
-  py2app artifact as an explicitly local-only non-release bundle (task 070).
-- Working Tree: Task 070 is committed locally; inspect `git status --short`
+- Latest Completed Change: Selected a checksum-pinned controlled CPython
+  runtime and derived an enforced candidate macOS 14 binary floor (task 071).
+- Working Tree: Task 071 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `278 passed in 3.58s` from `scripts/test -q` on
+- Last Successful Test: `280 passed in 4.29s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 070.
+- Last Updated: 2026-07-15 for task 071.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 278 passing.
+- Tests: 🟢 Healthy — 280 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -100,8 +100,10 @@ are future platform capabilities and are not automatically the next task.
   build, and development inputs plus deterministic hashed arm64 locks.
   Task 070 passed the local standalone gate with a 135-Mach-O arm64 py2app
   bundle, structural audit, packaged scientific smoke, and Launch Services
-  open/quit. Its Homebrew Python payload requires macOS 26.0, so compatibility
-  below the build host remains unqualified.
+  open/quit. Task 071 replaced its host Homebrew payload with checksum-pinned
+  controlled CPython 3.12.13, reduced the closure to 76 arm64 Mach-O files with
+  11.0/14.0 targets, and enforced a candidate macOS 14 floor. Clean-machine
+  compatibility remains unqualified.
 
 ## Five-Minute Rule
 
@@ -464,6 +466,8 @@ architecture rationale.
   generated reproducible hash-verified arm64 locks (task 069).
 - Built and audited the first local-only standalone arm64 py2app artifact,
   including packaged scientific/runtime and Launch Services smoke (task 070).
+- Replaced host Python with an exact verified controlled runtime and enforced
+  the inspected candidate macOS 14 binary floor (task 071).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -479,10 +483,10 @@ architecture rationale.
 
 ## Active Work
 
-- Local bundle task 070 is complete; `/tmp/LabAssistantQualification.app` is an
+- Runtime-selection task 071 is complete; `/tmp/LabAssistantQualification.app` is an
   ad-hoc host-qualification artifact, not a release.
-- Deployment-runtime selection and a clean-machine compatibility matrix are the
-  next gate.
+- Its candidate macOS 14 floor is binary-audited; a clean macOS 14/current
+  compatibility matrix is the next gate.
 
 ## Known Risks
 
@@ -495,8 +499,8 @@ architecture rationale.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
 - AppKit/WebKit is locally packaged but not Developer ID signed, notarized, or
-  validated across target macOS versions. The qualification bundle works on the
-  build host but its embedded Homebrew Python requires macOS 26.0.
+  validated across target macOS versions. The controlled bundle's native
+  closure supports the declared macOS 14 floor, but only macOS 26.5.2 has run it.
 - Persisted technique detection currently relies on measurement shape because
   the JSONL record envelope predates an explicit technique discriminator.
 - PySide6 6.11.1, 6.10.1, and 6.8.3 all failed to initialize their installed
@@ -518,10 +522,13 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `278 passed in 3.58s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `280 passed in 4.29s` from `scripts/test -q` on 2026-07-15.
 - Task 070's first full run had one same-second Research Journal ordering
   failure; the isolated rerun and immediate full rerun passed. Treat recurrence
   as a persistence-ordering defect rather than a packaging failure.
+- Task 071 rebuilt from controlled CPython 3.12.13+20260623; 76 arm64 Mach-O
+  files passed linkage, signature, and 11.0/14.0 deployment-target inspection.
+  Packaged scientific/runtime smoke and Finder open/quit passed on macOS 26.5.2.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -540,23 +547,22 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Select and qualify the Python runtime/deployment target for the
-  first arm64 bundle, then define the clean-machine compatibility matrix.
-- Why this is next: Task 070 proved the frozen application boundary but found
-  macOS 11.0, 14.0, and 26.0 minimums; Homebrew Python 3.12.13 makes the current
-  artifact effectively macOS 26-only and cannot support an honest product floor.
-- Expected scope: Medium; compare controlled arm64 Python 3.12 runtime sources,
-  inspect their Mach-O deployment targets and licensing/provenance, choose the
-  highest justified minimum across runtime and wheels, parameterize the build,
-  and run the existing audit/smoke on clean machines at the proposed minimum and
-  current macOS.
-- Risks: Rewriting deployment metadata without compatible binaries, relying on
-  the build host, mixing runtime provenance, or claiming compatibility from a
-  single machine.
-- Success criteria: one documented reproducible Python runtime produces a clean
-  arm64 bundle whose every Mach-O supports the declared minimum; packaged smoke
-  passes on clean arm64 systems at that minimum and current macOS. No Developer
-  ID signing, notarization, release upload, sandbox, or universal2 yet.
+- Objective: Execute and archive the clean arm64 macOS 14/current compatibility
+  matrix for the controlled qualification bundle.
+- Why this is next: Task 071 proves the native binaries do not exceed macOS 14,
+  but a deployment target is not evidence that the application actually works
+  on that OS. Only the macOS 26.5.2 build host has exercised the artifact.
+- Expected scope: Medium; reproduce the checksum-pinned build on clean arm64
+  macOS 14 and current macOS, run structural/scientific/Finder/fresh-profile
+  checks, test state preservation across an OS/app upgrade path, and archive
+  machine/OS/build evidence without committing generated apps.
+- Risks: Treating a CI image as a clean-user test without checking its state,
+  transferring an ad-hoc bundle in a way that changes quarantine/signatures, or
+  converting partial matrix results into a support claim.
+- Success criteria: both clean matrix rows pass the same recorded commands and
+  provenance checks; failures are diagnosed and the candidate floor adjusted if
+  necessary. No Developer ID signing, notarization, release upload, sandbox, or
+  universal2 yet.
 
 ## AI Context Window
 

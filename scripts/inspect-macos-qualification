@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="${1:-/tmp/LabAssistantQualification.app}"
 PLIST="$APP/Contents/Info.plist"
 TARGETS_FILE="$(mktemp /tmp/labassistant-deployment-targets.XXXXXX)"
 trap 'rm -f "$TARGETS_FILE"' EXIT
+
+source "$ROOT_DIR/packaging/macos/runtime.env"
 
 [[ -d "$APP" ]] || { echo "Bundle not found: $APP" >&2; exit 1; }
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST")" == \
   "dev.labassistant.local-qualification" ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$PLIST")" == \
   "LabAssistant Qualification (Local Only)" ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$PLIST")" == \
+  "$BUNDLE_MIN_MACOS" ]]
 
 for excluded in streamlit plotly pytest; do
   if find "$APP" -type d -iname "$excluded" -print -quit | grep -q .; then
@@ -45,5 +50,13 @@ done < <(find "$APP" -type f -print0)
 (( mach_o_count > 0 )) || { echo "No Mach-O files found." >&2; exit 1; }
 codesign --verify --deep --strict "$APP"
 targets="$(sort -Vu "$TARGETS_FILE" | paste -sd, -)"
+highest_target="$(sort -Vu "$TARGETS_FILE" | tail -1)"
+if ! awk -v actual="$highest_target" -v declared="$BUNDLE_MIN_MACOS" 'BEGIN {
+  split(actual, a, "."); split(declared, d, ".");
+  exit !((a[1] < d[1]) || (a[1] == d[1] && a[2] <= d[2]));
+}'; then
+  echo "Bundle requires macOS $highest_target above declared $BUNDLE_MIN_MACOS." >&2
+  exit 1
+fi
 echo "Bundle audit passed: $mach_o_count arm64 Mach-O files; deployment minimums: $targets."
-echo "Local qualification only."
+echo "Declared candidate floor: macOS $BUNDLE_MIN_MACOS; local qualification only."
