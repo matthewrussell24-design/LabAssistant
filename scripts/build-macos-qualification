@@ -35,7 +35,7 @@ PYTHON="$RUNTIME_ROOT/python/bin/python3.12"
   -r "$ROOT_DIR/requirements/locks/build-py312-macos-arm64.txt"
 PY2APP_SITE="$VENV/lib/python3.12/site-packages"
 patch --batch --forward --strip=1 --directory="$PY2APP_SITE" \
-  < "$ROOT_DIR/packaging/macos/py2app-static-zlib.patch"
+  < "$ROOT_DIR/packaging/macos/py2app-portable-runtime.patch"
 
 cd "$ROOT_DIR"
 "$VENV/bin/python" packaging/macos/setup.py py2app \

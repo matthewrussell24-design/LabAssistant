@@ -32,12 +32,12 @@ jobs:
       LABASSISTANT_EXPECTED_MACOS_MAJOR: ${{ matrix.macos }}
       LABASSISTANT_COMPATIBILITY_EVIDENCE_DIR: /tmp/labassistant-compatibility-evidence
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run compatibility qualification
         run: scripts/qualify-macos-compatibility
       - name: Archive compatibility evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-${{ matrix.macos }}-compatibility-evidence
           path: /tmp/labassistant-compatibility-evidence

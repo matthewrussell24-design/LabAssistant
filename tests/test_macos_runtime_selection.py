@@ -39,3 +39,12 @@ def test_qualification_build_uses_verified_runtime_and_declared_floor() -> None:
     assert 'os.environ["LABASSISTANT_MIN_MACOS"]' in setup
     assert "LSMinimumSystemVersion" in setup
     assert "Bundle requires macOS" in inspect
+
+
+def test_py2app_patch_prevents_host_framework_runtime_resolution() -> None:
+    patch = (ROOT / "packaging/macos/py2app-portable-runtime.patch").read_text()
+
+    assert 'dylib = "libpython%s.dylib" % version' in patch
+    assert "if os.path.isfile(runtime):" in patch
+    assert "return dylib, runtime" in patch
+    assert 'getattr(zlib, "__file__", None)' in patch

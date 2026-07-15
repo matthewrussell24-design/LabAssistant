@@ -38,6 +38,15 @@ reuse grew history from one to two records while retaining SQLite state, and
 Finder open/quit passed. This validates the harness but is not a clean hosted
 matrix row.
 
+The first hosted run (`29447233612`) failed during py2app's build on both rows.
+The controlled prefix is named `python`; py2app 0.28.10 performed a framework
+name lookup first and selected each runner's unrelated system Python framework,
+including Python 3.11 and Tcl. Signing then failed on that contaminated payload.
+The portable-runtime patch now returns the controlled prefix's explicit
+`libpython3.12.dylib` before framework lookup. The corrected bundle and all
+smokes pass locally; a second hosted run is pending. The workflow also uses the
+current Node 24 checkout/artifact actions to avoid deprecated action runtimes.
+
 ## Success Criteria
 
 Both hosted rows pass from the same commit and their evidence artifacts are

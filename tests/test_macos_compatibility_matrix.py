@@ -12,7 +12,8 @@ def test_workflow_uses_explicit_clean_arm64_matrix() -> None:
     assert 'macos: "14"' in workflow
     assert 'macos: "26"' in workflow
     assert "scripts/qualify-macos-compatibility" in workflow
-    assert "actions/upload-artifact@v4" in workflow
+    assert "actions/checkout@v6" in workflow
+    assert "actions/upload-artifact@v7" in workflow
     assert "fail-fast: false" in workflow
 
 

@@ -14,7 +14,7 @@
 - Working Tree: Task 072 matrix automation is committed locally. An unrelated
   duplicate patch file remains untracked.
   before beginning new work.
-- Last Successful Test: `282 passed in 4.10s` from `scripts/test -q` on
+- Last Successful Test: `283 passed in 2.97s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
 - Last Updated: 2026-07-15 for task 071.
@@ -29,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 282 passing.
+- Tests: 🟢 Healthy — 283 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -487,7 +487,8 @@ architecture rationale.
 - Task 072 adds one evidence-producing compatibility runner and an explicit
   fresh arm64 `macos-14`/`macos-26` GitHub Actions matrix.
 - The common harness passes locally on macOS 26.5.2, but neither clean hosted row
-  has run because pushing requires explicit user authorization.
+  has passed. The first hosted run exposed and diagnosed py2app host-framework
+  contamination; the bounded portable-runtime fix is locally verified.
 - `/tmp/LabAssistantQualification.app` remains an ad-hoc qualification artifact,
   not a release; macOS 14 remains only a candidate floor.
 
@@ -525,7 +526,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `282 passed in 4.10s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `283 passed in 2.97s` from `scripts/test -q` on 2026-07-15.
 - Task 070's first full run had one same-second Research Journal ordering
   failure; the isolated rerun and immediate full rerun passed. Treat recurrence
   as a persistence-ordering defect rather than a packaging failure.

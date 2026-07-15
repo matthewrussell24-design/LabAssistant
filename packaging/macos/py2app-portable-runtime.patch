@@ -1,6 +1,12 @@
 --- a/py2app/build_app.py
 +++ b/py2app/build_app.py
-@@ -2442 +2442,3 @@
+@@ -832,0 +833,5 @@
++        dylib = "libpython%s.dylib" % version
++        runtime = os.path.join(prefix, "lib", dylib)
++        if os.path.isfile(runtime):
++            return dylib, runtime
++
+@@ -2443 +2448,3 @@
 -            self.copy_file(zlib.__file__, os.path.dirname(arcdir))
 +            # Portable CPython builds may link zlib into the interpreter.
 +            if getattr(zlib, "__file__", None) is not None:

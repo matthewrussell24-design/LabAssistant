@@ -30,8 +30,10 @@ the current Python 3.12 lock boundary.
 
 py2app 0.28.10 assumes `zlib` is a loadable extension, while this runtime links
 it into the interpreter. The build applies the small, version-bound
-`py2app-static-zlib.patch` after installing the hashed build lock. Remove the
-patch when an upstream release handles built-in zlib.
+`py2app-portable-runtime.patch` after installing the hashed build lock. It also
+prefers the controlled runtime's explicit `libpython` before framework-name
+lookup, preventing an unrelated host Python framework from entering the bundle.
+Remove each patch hunk when an upstream release handles that case.
 
 ## Verification and Consequences
 
