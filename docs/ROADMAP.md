@@ -79,6 +79,8 @@ replaced host Python with a checksum-pinned controlled runtime and derived a
 candidate macOS 14 binary floor. Sandbox, Mac App Store, universal2, and
 packaged local-read sharing remain separate tracks; the clean macOS 14/current
 compatibility matrix is the next gate.
+Task 072 has prepared that two-row hosted matrix and locally validated its
+common harness; both clean hosted rows remain pending publication and execution.
 
 ## Phase 1: Rename The Product Concepts
 

@@ -11,9 +11,10 @@
 - Current Branch: `main`
 - Latest Completed Change: Selected a checksum-pinned controlled CPython
   runtime and derived an enforced candidate macOS 14 binary floor (task 071).
-- Working Tree: Task 071 is committed locally; inspect `git status --short`
+- Working Tree: Task 071 is committed; task 072 matrix automation is active and
+  awaiting a local commit. An unrelated duplicate patch file is untracked.
   before beginning new work.
-- Last Successful Test: `280 passed in 4.29s` from `scripts/test -q` on
+- Last Successful Test: `282 passed in 4.10s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
 - Last Updated: 2026-07-15 for task 071.
@@ -28,7 +29,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 280 passing.
+- Tests: 🟢 Healthy — 282 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -483,10 +484,12 @@ architecture rationale.
 
 ## Active Work
 
-- Runtime-selection task 071 is complete; `/tmp/LabAssistantQualification.app` is an
-  ad-hoc host-qualification artifact, not a release.
-- Its candidate macOS 14 floor is binary-audited; a clean macOS 14/current
-  compatibility matrix is the next gate.
+- Task 072 adds one evidence-producing compatibility runner and an explicit
+  fresh arm64 `macos-14`/`macos-26` GitHub Actions matrix.
+- The common harness passes locally on macOS 26.5.2, but neither clean hosted row
+  has run because pushing requires explicit user authorization.
+- `/tmp/LabAssistantQualification.app` remains an ad-hoc qualification artifact,
+  not a release; macOS 14 remains only a candidate floor.
 
 ## Known Risks
 
@@ -522,13 +525,16 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `280 passed in 4.29s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `282 passed in 4.10s` from `scripts/test -q` on 2026-07-15.
 - Task 070's first full run had one same-second Research Journal ordering
   failure; the isolated rerun and immediate full rerun passed. Treat recurrence
   as a persistence-ordering defect rather than a packaging failure.
 - Task 071 rebuilt from controlled CPython 3.12.13+20260623; 76 arm64 Mach-O
   files passed linkage, signature, and 11.0/14.0 deployment-target inspection.
   Packaged scientific/runtime smoke and Finder open/quit passed on macOS 26.5.2.
+- Task 072's shared compatibility runner passed locally on arm64 macOS 26.5.2,
+  including the same build/audit/smoke, persistence reuse from one to two
+  history records, and Finder lifecycle. Clean hosted rows remain pending.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -547,22 +553,19 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Execute and archive the clean arm64 macOS 14/current compatibility
-  matrix for the controlled qualification bundle.
-- Why this is next: Task 071 proves the native binaries do not exceed macOS 14,
-  but a deployment target is not evidence that the application actually works
-  on that OS. Only the macOS 26.5.2 build host has exercised the artifact.
-- Expected scope: Medium; reproduce the checksum-pinned build on clean arm64
-  macOS 14 and current macOS, run structural/scientific/Finder/fresh-profile
-  checks, test state preservation across an OS/app upgrade path, and archive
-  machine/OS/build evidence without committing generated apps.
-- Risks: Treating a CI image as a clean-user test without checking its state,
-  transferring an ad-hoc bundle in a way that changes quarantine/signatures, or
-  converting partial matrix results into a support claim.
-- Success criteria: both clean matrix rows pass the same recorded commands and
-  provenance checks; failures are diagnosed and the candidate floor adjusted if
-  necessary. No Developer ID signing, notarization, release upload, sandbox, or
-  universal2 yet.
+- Objective: Publish task 072 with explicit user authorization, execute the
+  `macos-14` and `macos-26` hosted workflow rows, and review their artifacts.
+- Why this is next: The common harness is locally proven and GitHub provisions
+  each standard hosted job as a new VM. Execution requires the workflow commit
+  to reach GitHub, but repository policy forbids an implicit push.
+- Expected scope: Small if both rows pass; push the committed workflow, observe
+  both jobs, download/review `summary.env` and logs, and record exact image/OS
+  evidence. Diagnose rather than waive any failed boundary.
+- Risks: macOS 14 hosted-image deprecation, GUI lifecycle differences in hosted
+  sessions, or mistaking the successful local harness run for a clean row.
+- Success criteria: both clean rows pass from the same commit and their archived
+  provenance agrees with the pinned runtime and expected OS major. Only then may
+  macOS 14 move from candidate binary floor to qualified compatibility.
 
 ## AI Context Window
 

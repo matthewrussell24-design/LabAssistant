@@ -116,6 +116,9 @@ This bundle uses a checksum-pinned controlled CPython runtime and declares a
 candidate macOS 14.0 binary floor from its complete native closure. It is not
 Developer ID signed, hardened/notarized, sandboxed, universal2, or yet validated
 on clean macOS 14/current machines, so the declaration is not a support claim.
+`scripts/qualify-macos-compatibility` runs the complete evidence-producing
+sequence; `.github/workflows/macos-compatibility.yml` applies it to fresh arm64
+macOS 14 and 26 hosted runners.
 
 The desktop app opens into a research workspace with reusable experiment,
 metric, analysis, and session-history cards. Streamlit remains available for

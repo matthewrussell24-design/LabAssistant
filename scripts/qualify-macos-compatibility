@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP="/tmp/LabAssistantQualification.app"
+EXECUTABLE="$APP/Contents/MacOS/LabAssistantQualification"
+EVIDENCE_DIR="${LABASSISTANT_COMPATIBILITY_EVIDENCE_DIR:-/tmp/labassistant-compatibility-evidence}"
+EXPECTED_MAJOR="${LABASSISTANT_EXPECTED_MACOS_MAJOR:-}"
+PERSISTENCE_ROOT="$(mktemp -d /tmp/labassistant-persistence-smoke.XXXXXX)"
+LOG="$EVIDENCE_DIR/qualification.log"
+
+mkdir -p "$EVIDENCE_DIR"
+rm -f "$LOG"
+exec > >(tee "$LOG") 2>&1
+trap 'rm -rf "$PERSISTENCE_ROOT"' EXIT
+
+product_version="$(sw_vers -productVersion)"
+build_version="$(sw_vers -buildVersion)"
+actual_major="${product_version%%.*}"
+architecture="$(uname -m)"
+
+[[ "$architecture" == "arm64" ]] || {
+  echo "Compatibility qualification requires arm64, found $architecture." >&2
+  exit 1
+}
+if [[ -n "$EXPECTED_MAJOR" && "$actual_major" != "$EXPECTED_MAJOR" ]]; then
+  echo "Expected macOS $EXPECTED_MAJOR, found $product_version." >&2
+  exit 1
+fi
+
+echo "Qualifying macOS $product_version ($build_version), $architecture."
+"$ROOT_DIR/scripts/build-macos-qualification"
+"$ROOT_DIR/scripts/inspect-macos-qualification" "$APP"
+"$ROOT_DIR/scripts/smoke-macos-qualification" "$APP"
+
+run_persistence_smoke() {
+  HOME="$PERSISTENCE_ROOT/home with spaces" \
+  LABASSISTANT_DATA_HOME="$PERSISTENCE_ROOT/Application Support/LabAssistant" \
+  LABASSISTANT_CACHE_HOME="$PERSISTENCE_ROOT/Caches/LabAssistant" \
+  LABASSISTANT_QUALIFICATION_SMOKE=1 \
+  LABASSISTANT_QUALIFICATION_SOURCE="$ROOT_DIR" \
+    "$EXECUTABLE"
+}
+
+run_persistence_smoke
+history_path="$PERSISTENCE_ROOT/Application Support/LabAssistant/history/experiments.jsonl"
+knowledge_path="$PERSISTENCE_ROOT/Application Support/LabAssistant/memory/knowledge.sqlite"
+first_history_count="$(wc -l < "$history_path" | tr -d ' ')"
+first_knowledge_hash="$(shasum -a 256 "$knowledge_path" | awk '{print $1}')"
+run_persistence_smoke
+second_history_count="$(wc -l < "$history_path" | tr -d ' ')"
+[[ "$second_history_count" -gt "$first_history_count" ]]
+[[ -s "$knowledge_path" ]]
+echo "Persistence reuse passed: $first_history_count -> $second_history_count history records."
+
+open -n "$APP"
+app_pid=""
+for _ in {1..20}; do
+  app_pid="$(pgrep -f "$APP/Contents/MacOS/LabAssistantQualification" | head -1 || true)"
+  [[ -n "$app_pid" ]] && break
+  sleep 0.5
+done
+[[ -n "$app_pid" ]] || { echo "Finder launch did not leave the app running." >&2; exit 1; }
+osascript -e 'tell application id "dev.labassistant.local-qualification" to quit'
+for _ in {1..20}; do
+  kill -0 "$app_pid" 2>/dev/null || break
+  sleep 0.5
+done
+if kill -0 "$app_pid" 2>/dev/null; then
+  echo "Application did not quit after the Finder lifecycle check." >&2
+  exit 1
+fi
+echo "Finder open/quit passed."
+
+runtime_archive="/tmp/labassistant-python-runtime.tar.gz"
+runtime_sha="$(shasum -a 256 "$runtime_archive" | awk '{print $1}')"
+app_size_bytes="$(du -sk "$APP" | awk '{print $1 * 1024}')"
+commit="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+
+{
+  echo "status=passed"
+  echo "commit=$commit"
+  echo "macos_product_version=$product_version"
+  echo "macos_build_version=$build_version"
+  echo "architecture=$architecture"
+  echo "runner_image=${ImageOS:-local}"
+  echo "runner_image_version=${ImageVersion:-unknown}"
+  echo "runtime_sha256=$runtime_sha"
+  echo "app_size_bytes=$app_size_bytes"
+  echo "persistence_first_history_count=$first_history_count"
+  echo "persistence_second_history_count=$second_history_count"
+  echo "persistence_initial_knowledge_sha256=$first_knowledge_hash"
+} > "$EVIDENCE_DIR/summary.env"
+
+echo "Compatibility qualification passed; evidence: $EVIDENCE_DIR"

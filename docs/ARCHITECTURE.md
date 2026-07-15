@@ -62,6 +62,10 @@ The build acquires an exact checksum-pinned `python-build-standalone` CPython
 3.12 runtime rather than host Python. Its inspected native closure establishes
 macOS 14.0 as a candidate binary floor; clean-machine execution is still
 required before that becomes a compatibility claim (ADR 007).
+The compatibility harness runs that same build, audit, scientific smoke,
+persistence reuse, and Finder lifecycle sequence on explicit fresh macOS 14 and
+26 arm64 hosted runners and archives machine-readable environment evidence.
+Hosted results, not workflow presence, determine compatibility.
 
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.

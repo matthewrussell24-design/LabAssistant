@@ -1,0 +1,45 @@
+name: macOS compatibility qualification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/macos-compatibility.yml"
+      - "labassistant/**"
+      - "packaging/macos/**"
+      - "requirements/**"
+      - "scripts/*macos*"
+      - "tests/fixtures/**"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: arm64 macOS ${{ matrix.macos }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            macos: "14"
+          - runner: macos-26
+            macos: "26"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      LABASSISTANT_EXPECTED_MACOS_MAJOR: ${{ matrix.macos }}
+      LABASSISTANT_COMPATIBILITY_EVIDENCE_DIR: /tmp/labassistant-compatibility-evidence
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run compatibility qualification
+        run: scripts/qualify-macos-compatibility
+      - name: Archive compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.macos }}-compatibility-evidence
+          path: /tmp/labassistant-compatibility-evidence
+          if-no-files-found: error
+          retention-days: 30
