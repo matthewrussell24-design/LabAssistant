@@ -11,8 +11,8 @@
 - Current Branch: `main`
 - Latest Completed Change: Selected a checksum-pinned controlled CPython
   runtime and derived an enforced candidate macOS 14 binary floor (task 071).
-- Working Tree: Task 071 is committed; task 072 matrix automation is active and
-  awaiting a local commit. An unrelated duplicate patch file is untracked.
+- Working Tree: Task 072 matrix automation is committed locally. An unrelated
+  duplicate patch file remains untracked.
   before beginning new work.
 - Last Successful Test: `282 passed in 4.10s` from `scripts/test -q` on
   2026-07-15.
