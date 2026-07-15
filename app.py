@@ -61,7 +61,7 @@ from labassistant.application import (
     produce_experiment_brief,
     rank_dls_decisions,
     list_experiments,
-    retrieve_experiment,
+    restore_dls_workspace,
     retrieve_history_overview,
     retrieve_related_context,
     retrieve_research_journal,
@@ -91,10 +91,7 @@ from labassistant.quality import (
     STATUS_REVIEW,
     STATUS_WATCH,
 )
-from labassistant.view_models import (
-    ParsedSample,
-    sample_from_measurement,
-)
+from labassistant.view_models import ParsedSample
 
 
 CHROMATOGRAPHY_FIXTURE_PATH = Path("sample_data/chromatography/mass_balance_demo.csv")
@@ -1487,13 +1484,12 @@ def render_saved_experiment_loader() -> None:
     selected_label = st.selectbox("Saved experiment", labels, key="saved_experiment_to_load")
     selected_record = compatible_records[labels.index(selected_label)]
     if st.button("Load saved experiment into workspace", use_container_width=True):
-        retrieved = retrieve_experiment(selected_record.record_id)
-        measurements = retrieved.restore_measurements()
+        restored = restore_dls_workspace(selected_record.record_id)
         st.session_state["imported_upload_signature"] = ("history", selected_record.record_id)
-        st.session_state["imported_samples"] = [sample_from_measurement(measurement) for measurement in measurements]
-        st.session_state["import_errors"] = []
-        st.session_state["loaded_history_record"] = retrieved.to_dict()
-        st.session_state["history_label"] = f"{retrieved.label} (updated)"
+        st.session_state["imported_samples"] = restored.restore_samples()
+        st.session_state["import_errors"] = list(restored.analysis.import_errors)
+        st.session_state["loaded_history_record"] = restored.record.to_dict()
+        st.session_state["history_label"] = f"{restored.record.label} (updated)"
         st.rerun()
 def upload_batch_signature(uploaded_files) -> tuple[tuple[str, int | None], ...]:
     return tuple((uploaded_file.name, getattr(uploaded_file, "size", None)) for uploaded_file in uploaded_files)

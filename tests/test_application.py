@@ -17,6 +17,7 @@ from labassistant.application import (
     ExperimentSaveReceipt,
     ObservationGenerationResult,
     DLSUploadImportResult,
+    DLSWorkspaceRestoreResult,
     DLSUploadFileRead,
     DLSUploadGroupRead,
     DLSDecisionRanking,
@@ -84,6 +85,7 @@ from labassistant.application import (
     retrieve_research_journal,
     restore_chromatography_experiment,
     restore_dls_experiment,
+    restore_dls_workspace,
     retrieve_experiment,
     save_experiment_history,
     save_experiment_to_memory,
@@ -785,6 +787,57 @@ def test_restore_dls_experiment_rehydrates_a_saved_record(tmp_path):
 def test_restore_dls_experiment_reports_missing_record(tmp_path):
     with raises(ExperimentRecordNotFoundError):
         restore_dls_experiment("does-not-exist", history_path=tmp_path / "experiments.jsonl")
+
+
+def test_restore_dls_workspace_returns_fresh_samples_and_record_metadata(tmp_path):
+    fixture_dir = Path(__file__).parent / "fixtures"
+    history_path = tmp_path / "experiments.jsonl"
+    measurements = _import_fixture_measurements(fixture_dir)
+    saved = save_experiment(measurements, label="Saved run", history_path=history_path)
+
+    result = restore_dls_workspace(saved.id, history_path=history_path)
+    first = result.restore_samples()
+    first[0].measurement.metadata.sample_name = "Changed by caller"
+    second = result.restore_samples()
+
+    assert isinstance(result, DLSWorkspaceRestoreResult)
+    assert result.record.to_dict() == {
+        "record_id": saved.id,
+        "saved_at": saved.saved_at,
+        "label": "Saved run",
+        "measurement_count": len(measurements),
+        "api_version": AGENT_API_VERSION,
+    }
+    assert result.analysis.experiment.technique == "DLS"
+    assert result.analysis.source_files
+    assert second[0].name == "Lot 1"
+    assert second[0].measurement.provenance["loaded_from_history"] == {
+        "record_id": saved.id,
+        "label": "Saved run",
+        "saved_at": saved.saved_at,
+    }
+    assert "_samples" not in result.to_dict()
+
+
+def test_restore_dls_workspace_preserves_missing_record_error(tmp_path):
+    with raises(ExperimentRecordNotFoundError):
+        restore_dls_workspace(
+            "does-not-exist", history_path=tmp_path / "experiments.jsonl"
+        )
+
+
+def test_restore_dls_workspace_preserves_malformed_record_error(tmp_path):
+    history_path = tmp_path / "experiments.jsonl"
+    saved = save_experiment(
+        [Measurement(metadata=MeasurementMetadata(sample_name="Lot 1"))],
+        history_path=history_path,
+    )
+    payload = json.loads(history_path.read_text(encoding="utf-8"))
+    payload["measurements"] = "not-a-list"
+    history_path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    with raises(MalformedExperimentRecordError, match="measurements must be"):
+        restore_dls_workspace(saved.id, history_path=history_path)
 
 
 def test_restore_chromatography_experiment_rebuilds_nested_evidence(tmp_path):

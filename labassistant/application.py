@@ -167,6 +167,30 @@ class DLSAnalysisResult:
 
 
 @dataclass(frozen=True)
+class DLSWorkspaceRestoreResult:
+    """Editable DLS workspace evidence restored through the app boundary."""
+
+    analysis: DLSAnalysisResult
+    record: ExperimentListing
+    _samples: tuple[Any, ...] = field(repr=False, compare=False)
+    api_version: str = AGENT_API_VERSION
+
+    def restore_samples(self) -> list[Any]:
+        """Return fresh parsed samples for one human workspace session."""
+
+        return deepcopy(list(self._samples))
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return immutable presentation metadata without editable samples."""
+
+        return {
+            "analysis": self.analysis.to_dict(),
+            "record": self.record.to_dict(),
+            "api_version": self.api_version,
+        }
+
+
+@dataclass(frozen=True)
 class DLSUploadFileRead:
     """Immutable classification and readable-source diagnostics for one upload."""
 
@@ -3118,6 +3142,42 @@ def restore_dls_experiment(
     """
 
     retrieved = retrieve_experiment(record_id, history_path=history_path)
+    analysis, _samples = _dls_restore_from_retrieved(retrieved)
+    return analysis
+
+
+def restore_dls_workspace(
+    record_id: str,
+    *,
+    history_path: Path = DEFAULT_HISTORY_PATH,
+) -> DLSWorkspaceRestoreResult:
+    """Restore one saved DLS record as fresh editable workspace samples.
+
+    The native desktop keeps using the read-only ``restore_dls_experiment``
+    result. Human shells that need editable session evidence use this distinct
+    copy-on-access contract, which also carries stable saved-record metadata.
+    """
+
+    retrieved = retrieve_experiment(record_id, history_path=history_path)
+    analysis, samples = _dls_restore_from_retrieved(retrieved)
+    record = ExperimentListing(
+        record_id=retrieved.record_id,
+        saved_at=retrieved.saved_at,
+        label=retrieved.label,
+        measurement_count=retrieved.measurement_count,
+    )
+    return DLSWorkspaceRestoreResult(
+        analysis=analysis,
+        record=record,
+        _samples=tuple(deepcopy(samples)),
+    )
+
+
+def _dls_restore_from_retrieved(
+    retrieved: RetrievedExperiment,
+) -> tuple[DLSAnalysisResult, list[Any]]:
+    """Build shared DLS read and workspace evidence from one persisted read."""
+
     measurements = retrieved.restore_measurements()
     samples = [sample_from_measurement(measurement) for measurement in measurements]
     source_files = list(
@@ -3130,12 +3190,13 @@ def restore_dls_experiment(
     experiment = dls_experiment_from_samples(
         samples, label=retrieved.label, source_files=source_files
     )
-    return DLSAnalysisResult(
+    analysis = DLSAnalysisResult(
         experiment=build_experiment_snapshot(experiment),
         measurements=_dls_measurement_summaries(samples),
         source_files=tuple(source_files),
         import_errors=(),
     )
+    return analysis, samples
 
 
 def _dls_measurement_summaries(samples: list[Any]) -> tuple[DLSMeasurementSummary, ...]:

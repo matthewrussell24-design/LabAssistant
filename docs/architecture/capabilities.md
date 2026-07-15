@@ -820,6 +820,13 @@ application function (not a separate catalog entry) that composes
 `DLSAnalysisResult`. It lets the desktop reopen a saved record through the same
 read model as a fresh import without reading storage or recomputing metrics.
 
+`restore_dls_workspace(record_id)` reuses that technique-aware reconstruction
+for human shells that need editable session evidence. It returns a frozen
+`DLSWorkspaceRestoreResult` containing the read-only analysis, immutable saved
+record metadata, and copy-on-access parsed samples. This keeps mutable restore
+access out of the native desktop's presentation-oriented `DLSAnalysisResult`
+while preserving history provenance and append-new-version lineage.
+
 `restore_chromatography_experiment(record_id)` is the corresponding
 technique-aware composition for HPLC evidence. It reconstructs nested peaks and
 chromatogram traces, annotates history provenance, reruns deterministic
