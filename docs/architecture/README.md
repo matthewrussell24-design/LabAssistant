@@ -10,7 +10,8 @@ Current architecture references:
 - [`capabilities.md`](capabilities.md) — stable, transport-independent
   scientific workflow contracts and the capability backlog.
 - [`api-readiness.md`](api-readiness.md) — external contract classifications,
-  first-freeze candidates, hardening gate, and transport go/no-go.
+  stable seven-read surface, hardening gate, and selected local-transport
+  go/no-go.
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — target module boundaries and
   migration guidance.
 - [`../STANDALONE_APP.md`](../STANDALONE_APP.md) — standalone application and

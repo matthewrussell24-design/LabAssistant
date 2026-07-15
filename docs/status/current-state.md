@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Stabilized the seven-read external contract at `1.0`
-  with public-only discovery and independent versioning (task 061).
-- Working Tree: Task 061 is committed locally; inspect `git status --short`
+- Latest Completed Change: Selected owner-only Unix-domain IPC for the first
+  local read transport and documented its trust/lifecycle gate (task 062).
+- Working Tree: Task 062 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `237 passed in 2.81s` from `scripts/test -q` on
+- Last Successful Test: `237 passed in 2.48s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 061.
+- Last Updated: 2026-07-15 for task 062.
 
 ## North Star
 
@@ -34,8 +34,8 @@ full traceability.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
   Measurement-first, raw vendor inspection is explicitly adapter-bounded, and
   reusable human workflows cross typed application contracts.
-- API Layer: 🟢 Contract Ready — seven read operations have stable `1.0` golden
-  shapes, scoped local access, bounds, and public discovery; no transport exists.
+- API Layer: 🟢 Transport Designed — seven reads have stable `1.0` shapes and
+  owner-only Unix-domain IPC is selected; the broker is not implemented.
 - Agent SDK: ⚪ Planned — read-only application contracts come first.
 
 Health labels summarize the evidence in the detailed sections below. Update a
@@ -64,10 +64,9 @@ are future platform capabilities and are not automatically the next task.
 
 ## Current Milestone
 
-- Milestone: API Contract Readiness
+- Milestone: Local Read Transport Design
 - Status: Complete
-- Goal: Freeze a small, versioned, read-only external surface without exposing
-  Python-only domain/workspace inputs or prematurely choosing a transport.
+- Goal: Select a local transport and trust boundary without opening a listener.
 - Current evidence: Task 057 audited all 42 registry entries, selected seven
   candidate reads, defined draft-to-stable versioning, and recorded a no-go for
   HTTP or agent transports until shared envelopes, stable errors, access
@@ -78,7 +77,9 @@ are future platform capabilities and are not automatically the next task.
   golden shapes and retained `0.1-draft` because discovery exposes all 42
   registry entries and external/internal versions are conflated. Task 061
   resolved both blockers and promoted only the external seven-read contract to
-  stable `1.0`; the internal registry remains unchanged.
+  stable `1.0`; the internal registry remains unchanged. Task 062 selected a
+  foreground Unix-domain read broker, documented same-user trust limits, and
+  made peer-credential verification the implementation gate.
 
 ## Five-Minute Rule
 
@@ -199,6 +200,8 @@ non-goals.
   models directly.
 - Human interfaces, future APIs, CLIs, and agents should share capability names
   based on scientific intent rather than low-level functions.
+- The first local external transport is owner-only Unix-domain IPC, with access
+  context derived by the broker rather than accepted from requests.
 
 This is a concise captain's log, not a replacement for formal decision records.
 Keep only the most recent strategic choices here and preserve full rationale in
@@ -403,6 +406,8 @@ architecture rationale.
   two bounded release blockers (task 060).
 - Added public-only discovery, independent external versioning, and promoted the
   golden seven-read contract to stable `1.0` (task 061).
+- Selected Unix-domain IPC for the first local read transport and documented
+  threat assumptions, framing, lifecycle, and implementation gates (task 062).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -418,8 +423,8 @@ architecture rationale.
 
 ## Active Work
 
-- Public discovery/version task 061 is complete with a stable `1.0` decision.
-- The working tree was clean when task 061 began.
+- Local transport selection task 062 is complete; no listener was implemented.
+- The working tree was clean when task 062 began.
 
 ## Known Risks
 
@@ -442,6 +447,8 @@ architecture rationale.
   removed; the shell now pins PyObjC 12.2.1 and uses AppKit directly.
 - Cross-technique reasoning and provenance contracts are still early and may
   change as more instruments are integrated.
+- Unix-domain ownership proves a local OS user, not a distinct application; the
+  selected first transport does not resist malicious same-user processes.
 
 ## Outstanding Issues
 
@@ -454,7 +461,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `237 passed in 2.81s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `237 passed in 2.48s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -473,19 +480,21 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Select and document the first local read-only transport for the
-  stable `1.0` contract without implementing a listener.
-- Why this is next: API Contract Readiness is complete. Transport choice is now
-  the first unresolved boundary, especially how a trusted local host establishes
-  subject, client, origin, and scopes.
-- Expected scope: Medium; compare in-process plugin calls, Unix-domain IPC, and
-  loopback HTTP against desktop/CLI/agent needs; define threat assumptions,
-  identity mapping, lifecycle, error mapping, and deployment consequences.
-- Risks: Treating loopback as authentication, choosing a web framework before
-  lifecycle requirements, or coupling the stable contract to one client.
-- Success criteria: an accepted transport ADR, explicit threat/trust model,
-  implementation sequence, and a go/no-go for a minimal read-only adapter. No
-  write route, agent runtime, or instrument control is authorized.
+- Objective: Implement the minimal foreground Unix-domain read broker selected
+  by ADR 004, beginning with a peer-credential compatibility spike.
+- Why this is next: The contract and transport decisions are complete; a small
+  adapter is the shortest path to proving an independent local client without
+  expanding the application surface.
+- Expected scope: Medium; add strict transport frames and limits, broker-derived
+  access context, guarded socket lifecycle, a diagnostic CLI client, and focused
+  integration tests for all seven reads and failure paths.
+- Risks: Platform-specific peer credentials, unsafe stale-socket cleanup,
+  leaking exception/path details, or accidentally exposing the internal
+  42-capability registry.
+- Success criteria: supported macOS/Python peers are verified or fail closed;
+  the owner-only foreground broker exposes exactly seven stable reads; bounds,
+  errors, cleanup, and desktop/CLI smoke tests pass. No writes, background daemon,
+  remote listener, agent runtime, or instrument control is authorized.
 
 ## AI Context Window
 

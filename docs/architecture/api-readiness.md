@@ -172,12 +172,20 @@ parameters; loopback alone is not treated as identity.
 
 ## Go/No-Go
 
-**Go for selecting and designing the first local read-only transport.**
+**Go for a minimal foreground Unix-domain read broker, conditional on proving
+peer-credential retrieval on the supported macOS/Python runtime.**
 
-The stable contract does not itself open a port, authenticate remote clients,
-or approve writes. The next task should choose a local transport and define how
-its trusted host maps identity/scopes into `LocalReadAccessContext` before any
-listener is implemented.
+ADR 004 selects owner-only Unix-domain stream IPC with newline-delimited JSON.
+The broker, not the request, derives the local OS subject and supplies a fixed
+approved client identity, local origin, and server-configured read scopes. The
+stable application envelope remains nested unchanged inside transport framing.
+The trust claim is deliberately limited to the same local OS user; it does not
+distinguish or protect against a malicious process already running as that user.
+
+The stable contract does not itself open a socket, authenticate remote clients,
+or approve writes. See
+[`004-local-read-only-transport.md`](../decisions/004-local-read-only-transport.md)
+for lifecycle, framing, alternatives, and the implementation gate.
 
 ## Deliberate Deferrals
 
