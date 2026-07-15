@@ -321,6 +321,22 @@ The current local history implementation is intentionally small:
 - Track Z-average and PDI trends with `history.trend_table`.
 - Search saved experiments with `history.find_similar_samples`.
 
+Mutable runtime data no longer depends on the launch directory. On macOS,
+history and scientific memory default beneath
+`~/Library/Application Support/LabAssistant/`; the optional local-read socket
+uses `~/Library/Caches/LabAssistant/runtime/`. `LABASSISTANT_DATA_HOME` and
+`LABASSISTANT_CACHE_HOME` provide explicit overrides.
+
+Existing repository-relative data is never discovered or moved automatically.
+Import an explicitly reviewed legacy directory with a copy-only migration:
+
+```bash
+scripts/migrate-runtime-data --from /absolute/path/to/legacy-root
+```
+
+The command accepts only the known history and memory files, rejects links and
+destination conflicts, and leaves the originals unchanged.
+
 The long-term memory layer should compare observations across instruments and
 over time, not only compare one uploaded dataset to another.
 

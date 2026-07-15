@@ -25,8 +25,8 @@ options.
 | Native UI | PyObjC Cocoa/WebKit 12.2.1; AppKit/WKWebView smoke passes | Bundle the native entry point |
 | Packaging tool | py2app is not installed | Pin it after a focused compatibility spike |
 | Dependencies | broad `requirements.txt` is mostly unpinned | Split and lock desktop runtime/build inputs |
-| Persistence | history and memory default to CWD-relative paths | Move packaged defaults to Application Support first |
-| Socket | owner-only path is under user Caches | Keep default-off; qualify separately |
+| Persistence | task 068 routes history and memory through a pure Application Support resolver | Runtime-path gate passed |
+| Socket | task 068 routes the owner-only path through the same Caches contract | Keep default-off; qualify separately |
 | Resources | workspace HTML is an embedded Python constant | Keep mutable data out of `Contents/Resources` |
 | Tooling | Xcode 26.6, `notarytool`, `stapler`, and `codesign` exist | Scripted notarization is possible |
 | Credentials | zero valid signing identities are installed | Distribution signing is currently blocked |
@@ -78,11 +78,12 @@ Mutable user state is outside the bundle:
   ...                        discardable future caches
 ```
 
-The implementation must use a central runtime-path resolver rather than
-hard-coded home strings. For a future sandboxed build, Foundation directory
-APIs resolve inside its container. Existing CWD-relative development data needs
-an explicit one-time migration/import decision; packaging must not silently
-strand or move it.
+The implementation uses the pure `labassistant.runtime_paths` resolver rather
+than hard-coded home strings. Resolution is lazy and side-effect free, and
+explicit caller paths remain authoritative. For a future sandboxed build,
+Foundation directory APIs resolve inside its container. Existing CWD-relative
+development data moves only through `scripts/migrate-runtime-data --from` as a
+copy-only operation that rejects links and conflicts and preserves originals.
 
 Files selected through `NSOpenPanel` remain external user documents. The app
 reads them in place and never copies raw laboratory data into the app bundle.

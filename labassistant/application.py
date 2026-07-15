@@ -9,7 +9,6 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from labassistant.context_engine import (
-    DEFAULT_KNOWLEDGE_STORE_PATH,
     ContextRetriever,
     KnowledgeStore,
     ResearchJournal,
@@ -32,7 +31,6 @@ from labassistant.chromatography import (
 )
 from labassistant.aggregation import assess_dual_angle_aggregation
 from labassistant.history import (
-    DEFAULT_HISTORY_PATH,
     compare_experiments as compare_history_experiments,
     chromatography_measurements_from_record,
     find_similar_samples,
@@ -1896,7 +1894,7 @@ def retrieve_related_context(
     *,
     tags: tuple[str, ...] = (),
     limit: int = 6,
-    knowledge_path: Path = DEFAULT_KNOWLEDGE_STORE_PATH,
+    knowledge_path: Path | None = None,
     store: KnowledgeStore | None = None,
 ) -> RelatedScientificContext:
     """Retrieve compact local scientific context through the application boundary."""
@@ -1952,7 +1950,7 @@ def retrieve_research_journal(
     tag: str = "",
     instrument: str = "",
     sample: str = "",
-    knowledge_path: Path = DEFAULT_KNOWLEDGE_STORE_PATH,
+    knowledge_path: Path | None = None,
     store: KnowledgeStore | None = None,
 ) -> ResearchJournalRead:
     """Return filtered journal entries and their established Markdown export."""
@@ -1995,7 +1993,7 @@ def add_scientific_note(
     title: str = "",
     instrument_id: str | None = None,
     tags: tuple[str, ...] = (),
-    knowledge_path: Path = DEFAULT_KNOWLEDGE_STORE_PATH,
+    knowledge_path: Path | None = None,
     store: KnowledgeStore | None = None,
 ) -> ScientificNoteReceipt:
     """Persist one explicitly requested human note and return its receipt."""
@@ -2034,7 +2032,7 @@ def save_experiment_history(
     *,
     loaded_from_record_id: str | None = None,
     loaded_from_label: str | None = None,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> ExperimentSaveReceipt:
     """Append reviewed experiment evidence to local history and return a receipt."""
 
@@ -2075,7 +2073,7 @@ def save_experiment_history(
 def retrieve_experiment(
     record_id: str,
     *,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> RetrievedExperiment:
     """Retrieve one persisted experiment through the application boundary."""
 
@@ -2092,7 +2090,7 @@ def retrieve_experiment(
 
 def list_experiments(
     *,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> tuple[ExperimentListing, ...]:
     """List persisted experiments newest-first through the application boundary.
 
@@ -2135,7 +2133,7 @@ def compare_experiments(
     *,
     baseline_record_id: str | None = None,
     exclude_record_id: str | None = None,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> ExperimentComparison:
     """Compare current DLS evidence with a selected or latest saved run.
 
@@ -2174,7 +2172,7 @@ def compare_experiments(
 
 
 def retrieve_history_overview(
-    *, history_path: Path = DEFAULT_HISTORY_PATH
+    *, history_path: Path | None = None
 ) -> HistoryOverview:
     """Return persisted summary and trend evidence without exposing storage."""
 
@@ -2211,7 +2209,7 @@ def find_related_experiments(
     *,
     top_n: int = 5,
     exclude_record_id: str | None = None,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> RelatedExperiments:
     """Find the nearest saved DLS samples through the application boundary.
 
@@ -3280,7 +3278,7 @@ def analyze_dls_dataset(
 def restore_dls_experiment(
     record_id: str,
     *,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> DLSAnalysisResult:
     """Restore a persisted DLS experiment as a read-only analysis result.
 
@@ -3299,7 +3297,7 @@ def restore_dls_experiment(
 def restore_dls_workspace(
     record_id: str,
     *,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> DLSWorkspaceRestoreResult:
     """Restore one saved DLS record as fresh editable workspace samples.
 
@@ -3377,7 +3375,7 @@ def _dls_measurement_summaries(
 def restore_chromatography_experiment(
     record_id: str,
     *,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> ChromatographyRestoreResult:
     """Restore persisted chromatography evidence into a stable read model."""
 

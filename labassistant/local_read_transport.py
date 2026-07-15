@@ -23,6 +23,7 @@ from labassistant.api_readiness import (
     LocalReadAccessContext,
     invoke_candidate_read,
 )
+from labassistant.runtime_paths import resolve_runtime_paths
 
 
 TRANSPORT_VERSION = "1"
@@ -63,10 +64,7 @@ class PeerCredentials:
 
 def default_socket_path() -> Path:
     """Return the per-user default without creating filesystem state."""
-    runtime_root = os.environ.get("XDG_RUNTIME_DIR")
-    if runtime_root:
-        return Path(runtime_root) / "labassistant" / "read-api.sock"
-    return Path.home() / "Library" / "Caches" / "LabAssistant" / "runtime" / "read-api.sock"
+    return resolve_runtime_paths().socket_path
 
 
 def get_peer_credentials(connection: socket.socket) -> PeerCredentials:

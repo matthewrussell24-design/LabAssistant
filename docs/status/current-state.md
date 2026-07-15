@@ -9,14 +9,14 @@
 ## Repository State
 
 - Current Branch: `main`
-- Latest Completed Change: Selected the first arm64 Developer ID/notarized
-  macOS packaging target and qualification gates (task 067).
-- Working Tree: Task 067 is committed locally; inspect `git status --short`
+- Latest Completed Change: Centralized platform-native mutable runtime paths
+  and added explicit safe legacy-data import (task 068).
+- Working Tree: Task 068 is committed locally; inspect `git status --short`
   before beginning new work.
-- Last Successful Test: `265 passed in 3.69s` from `scripts/test -q` on
+- Last Successful Test: `274 passed in 3.20s` from `scripts/test -q` on
   2026-07-15.
 - Supported Python Version: Python 3.12; last verified with Python 3.12.13.
-- Last Updated: 2026-07-15 for task 067.
+- Last Updated: 2026-07-15 for task 068.
 
 ## North Star
 
@@ -28,7 +28,7 @@ full traceability.
 
 - Architecture: 🟢 Healthy — target boundaries and migration direction are
   documented.
-- Tests: 🟢 Healthy — 265 passing.
+- Tests: 🟢 Healthy — 274 passing.
 - Documentation: 🟢 Current — canonical status, navigation, prompts, and
   decisions are aligned.
 - Application Layer: 🟢 Mature for current workflows — normalized DLS reads are
@@ -94,6 +94,8 @@ are future platform capabilities and are not automatically the next task.
   Task 067 selected arm64 py2app, direct Developer ID distribution, hardened
   runtime, notarization, and no App Sandbox as the first target. Local ad-hoc
   bundles remain qualification-only; signing is blocked on an identity.
+  Task 068 passed the first packaging gate with side-effect-free Application
+  Support/Caches defaults and explicit safe copy-only legacy import.
 
 ## Five-Minute Rule
 
@@ -167,6 +169,8 @@ Streamlit UI (`app.py`) or native prototype (`labassistant.desktop`)
   seven reads; it does not start the broker or add autonomous behavior.
 - `labassistant.desktop_read_sharing` owns optional process-bounded desktop
   sharing independently of AppKit state; normal desktop launch remains socket-free.
+- `labassistant.runtime_paths` owns platform-native mutable locations and the
+  explicit legacy-data import boundary without UI dependencies.
 - Importers translate DLS, filtration, chromatography CSV, and OpenLab `.olax`
   sources into domain evidence.
 - `Measurement` and `ChromatographyMeasurement` hold instrument evidence.
@@ -281,6 +285,8 @@ architecture rationale.
   reasoning over observations.
 - `labassistant/history.py` and `context_engine.py` — local history and
   scientific memory.
+- `labassistant/runtime_paths.py` — Application Support/Caches layout and safe
+  explicit legacy-data import.
 - `labassistant/measurements.py` and `dls_evidence.py` — DLS measurement and
   structural workspace-evidence adapters; `view_models.py` preserves legacy UI
   imports and `interpretation.py` owns presentation-ready summaries.
@@ -443,6 +449,8 @@ architecture rationale.
   shutdown, and Cocoa termination cleanup (task 066).
 - Audited macOS packaging and selected the first distribution target, runtime
   layout, signing/sandbox boundary, and verification gates (task 067).
+- Centralized platform-native runtime paths and explicit copy-only legacy
+  history/memory migration without CWD scanning (task 068).
 - Added the first explicit application boundary and versioned, read-only
   `ExperimentSnapshot`.
 - Added DLS and chromatography experiment assembly.
@@ -458,8 +466,8 @@ architecture rationale.
 
 ## Active Work
 
-- macOS packaging audit task 067 is complete; no bundle or release was created.
-- The working tree was clean when task 067 began.
+- Runtime-path task 068 is complete; no bundle or release was created.
+- Dependency splitting and reproducible locking are the next packaging gate.
 
 ## Known Risks
 
@@ -471,8 +479,6 @@ architecture rationale.
   care until stronger persistence requirements justify a change.
 - `requirements.txt` is unpinned, so environment resolution is not fully
   reproducible.
-- History and memory defaults are CWD-relative, which is unsafe for Finder-launched
-  packaged apps and must be resolved before bundling.
 - The large Streamlit shell can encourage UI logic to bypass application
   services.
 - AppKit/WebKit proves native shell independence but is not yet packaged,
@@ -498,7 +504,7 @@ architecture rationale.
 
 ## Testing Status
 
-- Latest result: `265 passed in 3.69s` from `scripts/test -q` on 2026-07-15.
+- Latest result: `274 passed in 3.20s` from `scripts/test -q` on 2026-07-15.
 - The Streamlit shell completed a headless startup and health smoke after task
   056.
 - The native AppKit window launches from a fresh `zsh` login shell, opens its
@@ -517,23 +523,21 @@ architecture rationale.
 
 ## Next Recommended Task
 
-- Objective: Centralize runtime paths for Application Support, Caches, history,
-  memory, and local IPC, with an explicit legacy CWD-data migration policy.
-- Why this is next: ADR 006 makes correct mutable-state placement the first
-  packaging gate. Finder launches cannot depend on the repository or current
-  working directory.
-- Expected scope: Medium; add a platform-aware immutable path layout, route
-  default history/memory/socket access through it, preserve explicit test/CLI
-  injection, define one-time legacy discovery/import behavior, and test fresh,
-  existing, read-only, and overridden locations.
-- Risks: Silently moving user data, changing development behavior without a
-  compatibility path, importing from an untrusted CWD, or coupling core modules
-  directly to Foundation/PyObjC.
-- Success criteria: packaged defaults resolve beneath Application Support and
-  Caches without UI dependencies; explicit paths remain authoritative; legacy
-  data is detected and migrated only through a reviewed safe rule; all shells,
-  persistence tests, and opt-in IPC continue to pass. No bundle, dependency
-  lock, signing, notarization, release upload, or sandbox enablement yet.
+- Objective: Split and reproducibly lock desktop runtime, desktop-build,
+  Streamlit, and development dependencies.
+- Why this is next: Runtime placement now passes ADR 006's first gate, but the
+  broad unpinned `requirements.txt` cannot produce a reviewable py2app bundle.
+- Expected scope: Medium; inventory native imports and transitive requirements,
+  define separate human-readable input groups, produce a Python 3.12 arm64
+  reproducible lock with integrity metadata, and verify clean installation plus
+  the existing suite.
+- Risks: Omitting dynamically imported scientific dependencies, accidentally
+  bundling Streamlit/development tools, platform-specific wheels, or creating a
+  lock that only resolves from the current environment.
+- Success criteria: desktop runtime and build inputs are minimal and explicit;
+  Streamlit and development dependencies remain separately installable; a clean
+  Python 3.12 arm64 environment installs reproducibly and passes required
+  imports/tests. No py2app bundle, signing, notarization, or release yet.
 
 ## AI Context Window
 

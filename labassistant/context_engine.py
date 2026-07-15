@@ -10,9 +10,15 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from labassistant.models import Experiment, Observation
+from labassistant.runtime_paths import resolve_runtime_paths
 
 
-DEFAULT_KNOWLEDGE_STORE_PATH = Path(".labassistant_memory/knowledge.sqlite")
+DEFAULT_KNOWLEDGE_STORE_PATH = resolve_runtime_paths().knowledge_store_path
+
+
+def default_knowledge_store_path() -> Path:
+    """Resolve the implicit knowledge-store path lazily."""
+    return resolve_runtime_paths().knowledge_store_path
 
 MEMORY_EXPERIMENT = "experiment"
 MEMORY_PROJECT = "project"
@@ -108,8 +114,8 @@ class ResearchJournalEntry:
 class KnowledgeStore:
     """Small local SQLite knowledge store for experiments and scientific memory."""
 
-    def __init__(self, path: str | Path = DEFAULT_KNOWLEDGE_STORE_PATH) -> None:
-        self.path = Path(path)
+    def __init__(self, path: str | Path | None = None) -> None:
+        self.path = Path(path) if path is not None else default_knowledge_store_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 

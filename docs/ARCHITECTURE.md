@@ -41,8 +41,10 @@ remains disabled for packaged builds until sandbox behavior is proven.
 ADR 006 selects a standalone arm64 py2app bundle for direct distribution with
 Developer ID signing, hardened runtime, and notarization, without App Sandbox.
 Local ad-hoc bundles are qualification artifacts only. Mutable history and
-memory must first move from CWD-relative defaults to Application Support, while
-the socket remains a default-off Caches runtime artifact.
+memory resolve through the pure `labassistant.runtime_paths` contract beneath
+Application Support, while the socket remains a default-off Caches runtime
+artifact. Resolution creates no filesystem state; legacy CWD data is available
+solely through an explicit, copy-only migration that rejects links and conflicts.
 
 The intelligence layer is the product. Instruments are plugins. Experiments are
 first-class objects. Measurements are building blocks.
@@ -68,6 +70,8 @@ The backend package already does several useful jobs:
 - Analyzes reproducibility, drift, change points, and outliers through
   `labassistant/trend_analysis.py`.
 - Stores local experiment history through `labassistant/history.py`.
+- Resolves platform-native mutable state and legacy imports through
+  `labassistant/runtime_paths.py`.
 
 This is a strong foundation, but naming and module boundaries still reflect the
 first DLS use case more than the long-term platform.

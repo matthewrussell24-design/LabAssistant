@@ -22,9 +22,15 @@ from labassistant.models import (
     ChromatographyPeak,
 )
 from labassistant.quality import status_from_warnings
+from labassistant.runtime_paths import resolve_runtime_paths
 
 
-DEFAULT_HISTORY_PATH = Path(".labassistant_history/experiments.jsonl")
+DEFAULT_HISTORY_PATH = resolve_runtime_paths().history_path
+
+
+def default_history_path() -> Path:
+    """Resolve the implicit history path lazily for env-aware callers."""
+    return resolve_runtime_paths().history_path
 
 # Drift thresholds for comparing a batch to a previous saved run.
 Z_DRIFT_PERCENT = 20.0
@@ -186,8 +192,9 @@ def _dataclass_from_dict(dataclass_type, payload: dict):
 def save_experiment(
     measurements: list[object],
     label: str = "",
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> ExperimentRecord:
+    history_path = Path(history_path) if history_path is not None else default_history_path()
     record = ExperimentRecord.from_measurements(measurements, label)
     history_path.parent.mkdir(parents=True, exist_ok=True)
     with history_path.open("a", encoding="utf-8") as history_file:
@@ -195,7 +202,8 @@ def save_experiment(
     return record
 
 
-def load_history(history_path: Path = DEFAULT_HISTORY_PATH) -> list[ExperimentRecord]:
+def load_history(history_path: Path | None = None) -> list[ExperimentRecord]:
+    history_path = Path(history_path) if history_path is not None else default_history_path()
     if not history_path.exists():
         return []
 
@@ -214,7 +222,7 @@ def load_history(history_path: Path = DEFAULT_HISTORY_PATH) -> list[ExperimentRe
 
 def load_experiment_record(
     record_id: str,
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
 ) -> ExperimentRecord:
     """Load one valid history record by id with explicit lookup errors.
 
@@ -223,6 +231,7 @@ def load_experiment_record(
     make a successful lookup ambiguous.
     """
 
+    history_path = Path(history_path) if history_path is not None else default_history_path()
     requested_id = record_id.strip()
     if not requested_id:
         raise ExperimentRecordNotFoundError("Experiment record id is required")
@@ -365,7 +374,7 @@ def compare_experiments(
 
 def compare_to_history(
     current: list[Measurement],
-    history_path: Path = DEFAULT_HISTORY_PATH,
+    history_path: Path | None = None,
     exclude_id: str | None = None,
 ) -> pd.DataFrame:
     """Compare a current batch to the most recent saved experiment on disk."""
